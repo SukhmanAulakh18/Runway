@@ -308,7 +308,7 @@ def test_evidence_multiple_testing(d):
 def test_calibration_is_monotone_and_bounded():
     xs = [E.calibrate_break(x) for x in (0.0, 0.05, 0.2, 0.5, 0.9, 1.0)]
     assert xs == sorted(xs) and all(0 < x < 1 for x in xs)
-    assert E.calibrate_break(0.5) == pytest.approx(0.049, abs=0.002)   # raw 50% is really about 5%
+    assert E.calibrate_break(0.5) == pytest.approx(0.035, abs=0.002)   # raw 50% is really about 3.5% (refit, sim starts at latest balance)
 
 def test_overdraft_risk_93172_time_machine(d):
     m = d["monthly"]; dd = {"monthly": m[m.month <= "2024-12"], "loans": d["loans"]}

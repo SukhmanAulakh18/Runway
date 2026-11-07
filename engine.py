@@ -271,12 +271,9 @@ def explain_difference(p: Profile, r: Realistic, sc: Scenario) -> list[str]:
     return out
 
 
-def simulate(acct: int, d: dict, sc: Scenario, months: int = 24, n_paths: int = 2000,
-             history: int = 24, block: int = 3, seed: int | None = None) -> dict:
-    """Monte Carlo: replay blocks of the customer's own recent months under the shock.
-
-    Seeded by account_id so the same customer and shock always give the same answer.
-    """
+def _sim_paths(acct: int, d: dict, sc: Scenario, months: int, n_paths: int, history: int = 24,
+               block: int = 3, seed: int | None = None):
+    """Simulated month-end balances (n_paths x months) under the shock: blocks of the customer's own recent months."""
     r = realistic_profile(acct, d)
     h = _acct(acct, d).tail(history)
     inc = h.money_in.to_numpy(); out = h.money_out.to_numpy()
@@ -298,8 +295,20 @@ def simulate(acct: int, d: dict, sc: Scenario, months: int = 24, n_paths: int = 
     else:
         income = prot_t + (1 - sc.income_cut) * earned_t
     spend = out_t + sc.bills_increase_pct * hb_t + sc.spending_increase
-    start = r.buffer - sc.one_off_cost - sc.one_off_months_of_spending * r.spending
-    bal = start + np.cumsum(income - spend, axis=1)
+    # Start from today's balance (latest month-end), not the 6-month average B: out of time this lifts AUC 0.863 -> 0.877
+    # and Brier 0.0152 -> 0.0145 after calibration (evidence.json -> sim_calibration). The standard formula keeps B.
+    start = float(h.month_end_balance.iloc[-1]) - sc.one_off_cost - sc.one_off_months_of_spending * r.spending
+    return start + np.cumsum(income - spend, axis=1), start, r, n
+
+
+def simulate(acct: int, d: dict, sc: Scenario, months: int = 24, n_paths: int = 2000,
+             history: int = 24, block: int = 3, seed: int | None = None) -> dict:
+    """Monte Carlo: replay blocks of the customer's own recent months under the shock.
+
+    Seeded by account_id so the same customer and shock always give the same answer.
+    Under a shock, p_survive_* are shares of simulated futures (a scenario), not calibrated chances: see overdraft_risk().
+    """
+    bal, start, r, n = _sim_paths(acct, d, sc, months, n_paths, history, block, seed)
     usable = bal - r.dip
     broke = (usable < 0) | (start - r.dip < 0)
     first = np.where(broke.any(axis=1), broke.argmax(axis=1) + 1, months + 1)
@@ -321,9 +330,9 @@ def simulate(acct: int, d: dict, sc: Scenario, months: int = 24, n_paths: int = 
 
 # Calibration: the raw simulation is ~8x too pessimistic out of time (it predicts 13.5% of customers break in
 # 2025 vs 1.6% who did), because replayed months wander like a random walk while real customers correct course.
-# Its ranking is good (AUC 0.86), so a 2-parameter logistic (Platt) map turns it into a probability.
+# Its ranking is good (AUC 0.88), so a 2-parameter logistic (Platt) map turns it into a probability.
 # Fitted on 2023-12 -> 2024 by evidence.sim_calibration(); validated on 2024-12 -> 2025 (see evidence.json).
-SIM_CAL_A, SIM_CAL_B = -2.9588, 0.6121
+SIM_CAL_A, SIM_CAL_B = -3.3243, 0.4567
 
 
 def calibrate_break(p_raw: float) -> float:
@@ -522,9 +531,11 @@ def optimize_cuts(acct: int, d: dict, sc: Scenario, horizon: int = 12, max_cut_s
     u_max = max_cut_share x (unlabelled outflows + loan payments): bills and insurance are never cut.
     """
     from scipy.optimize import linprog
-    r = realistic_profile(acct, d)
-    sim = simulate(acct, d, sc, months=horizon, n_paths=n_paths)
-    bal = np.array(sim["p10"] if pessimistic else sim["p50"])
+    # Month-by-month 10th (or 50th) percentile of the simulated balances. Balances are running totals, so months move
+    # together: checked on 300 accounts, these cuts keep a median 90% of WHOLE futures safe (never under 75%).
+    # share_of_futures_protected reports the exact share for this customer instead of assuming it.
+    paths, _, r, _ = _sim_paths(acct, d, sc, horizon, n_paths)
+    bal = np.percentile(paths, 10 if pessimistic else 50, axis=0)
     need = r.dip - bal
     ok = need <= 0
     base_months = int(np.argmin(ok)) if not ok.all() else horizon          # protected with no cuts
@@ -537,11 +548,14 @@ def optimize_cuts(acct: int, d: dict, sc: Scenario, horizon: int = 12, max_cut_s
             best = {"months": T, "cuts": res.x.tolist()}
             break
     cuts = np.array(best["cuts"])
+    T = len(cuts)
+    achieved = float(((paths[:, :T] + np.cumsum(cuts)) >= r.dip).all(axis=1).mean()) if T else None
     return {"base_months": base_months, "protected_months": best["months"], "horizon": horizon,
+            "share_of_futures_protected": achieved,   # of all simulated futures, for the protected months
             "cuts": cuts.tolist(), "total": float(cuts.sum()),
             "avg_monthly_cut": float(cuts.mean()) if len(cuts) else 0.0, "max_monthly_cut": umax,
             "path": bal.tolist(), "protected_path": (bal[:len(cuts)] + np.cumsum(cuts)).tolist() if len(cuts) else [],
-            "dip": r.dip, "outcome": "bad (10th percentile)" if pessimistic else "typical (median)"}
+            "dip": r.dip, "outcome": "a bad case (9 in 10 futures do better)" if pessimistic else "a typical case (median future)"}
 
 
 def realistic_vec(d: dict, window: int = WINDOW, ei_rate: float = EI_RATE) -> pd.DataFrame:

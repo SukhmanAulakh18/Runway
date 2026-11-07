@@ -24,9 +24,9 @@
     "semantic_hash": ""
   },
   "ai.py": {
-    "mtime": 1794090818.6569154,
-    "seen": 1794090956.755026,
-    "ast_hash": "53c2d5ed55c7b808a711b639e0a24756",
+    "mtime": 1794094546.3281066,
+    "seen": 1794095058.5023599,
+    "ast_hash": "ad1671b4e03c80a006e44979c5170974",
     "semantic_hash": ""
   },
   "app.py": {
@@ -36,15 +36,15 @@
     "semantic_hash": ""
   },
   "engine.py": {
-    "mtime": 1794091573.6996498,
-    "seen": 1794091862.1178098,
-    "ast_hash": "45cbfa26f3c6b9ce02de967590ec7b89",
+    "mtime": 1794094471.8991413,
+    "seen": 1794095058.502362,
+    "ast_hash": "d33ecb31e5b7de23a32b7c14ef5a25d5",
     "semantic_hash": ""
   },
   "evidence.json": {
-    "mtime": 1794091831.6266382,
-    "seen": 1794091862.117811,
-    "ast_hash": "07b4d09c451c8a5828505cb2c127b588",
+    "mtime": 1794094687.8337705,
+    "seen": 1794095058.502363,
+    "ast_hash": "01dfdafe6af3f7f21f472502d67adb4c",
     "semantic_hash": ""
   },
   "evidence.py": {
@@ -72,9 +72,9 @@
     "semantic_hash": ""
   },
   "tests/test_acceptance.py": {
-    "mtime": 1794091573.7004416,
-    "seen": 1794091862.1178153,
-    "ast_hash": "1de5f30cc7f53784a8962b6864b20cf2",
+    "mtime": 1794094329.8723395,
+    "seen": 1794095058.5023677,
+    "ast_hash": "fbd106f5e15e3b449ee48ffb17a66ff4",
     "semantic_hash": ""
   },
   "tests/test_app_smoke.py": {
@@ -252,9 +252,9 @@
     "semantic_hash": ""
   },
   "tests/test_ai_cards.py": {
-    "mtime": 1794090830.6858602,
-    "seen": 1794090956.755038,
-    "ast_hash": "d536d6119984367b6a1bc461cc539bde",
+    "mtime": 1794094571.4780135,
+    "seen": 1794095058.502369,
+    "ast_hash": "e9f5ebc84dd4d9e787cb8d5aec533631",
     "semantic_hash": ""
   },
   ".claude/skills/ponytail/SKILL.md": {
@@ -264,15 +264,15 @@
     "semantic_hash": ""
   },
   "docs/FRONTEND.md": {
-    "mtime": 1794091646.2098897,
-    "seen": 1794091862.1178424,
-    "ast_hash": "22f5af01b4c3631c0b29bc8e355c4e87",
+    "mtime": 1794094749.637067,
+    "seen": 1794095058.502395,
+    "ast_hash": "a2e8228501a8bbbf489a06c86af85f6e",
     "semantic_hash": ""
   },
   "docs/HANDOFF.md": {
-    "mtime": 1794091634.3366754,
-    "seen": 1794091862.117843,
-    "ast_hash": "0da8e340414e3329fe6f9ae3354d1c70",
+    "mtime": 1794094749.636366,
+    "seen": 1794095058.5023956,
+    "ast_hash": "de1a9144912059751924f63413f00229",
     "semantic_hash": ""
   },
   "docs/REACT_PLAN.md": {
@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "docs/CTO_REVIEW.md": {
-    "mtime": 1794091634.3360124,
-    "seen": 1794091862.1178389,
-    "ast_hash": "be98475c6e71012bcb91f7830b83e2c2",
+    "mtime": 1794094749.6357152,
+    "seen": 1794095058.5023913,
+    "ast_hash": "1188e4728e04bb8545a98f537de758a5",
     "semantic_hash": ""
   }
 }

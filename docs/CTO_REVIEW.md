@@ -22,7 +22,7 @@ a dense UI, and burning the night on a React rewrite.
 
 | # | Severity | Finding | Evidence | Fix |
 |---|---|---|---|---|
-| 1 | **Critical** | **Monte Carlo was not a probability.** As a forecast it said 13.5% of customers would break in 2025; 1.6% did. The top decile said 58%; 8.8% happened. Its Brier score (0.056) was *worse than guessing the base rate* (0.016). The Shock tab shows this number as "Chance they make it 6 months". | out-of-time backtest, now in `evidence.json → sim_calibration` | Ranking was excellent (AUC 0.86), so: Platt calibration fitted 2023→2024, validated 2024→2025. Calibrated mean 1.55% vs 1.61% observed, Brier 0.0152 (beats base 0.0158), AUC 0.863. New `engine.overdraft_risk()` and `calibrate_break()`. |
+| 1 | **Critical** | **Monte Carlo was not a probability.** As a forecast it said 13.5% of customers would break in 2025; 1.6% did. The top decile said 58%; 8.8% happened. Its Brier score (0.056) was *worse than guessing the base rate* (0.016). The Shock tab shows this number as "Chance they make it 6 months". | out-of-time backtest, now in `evidence.json → sim_calibration` | Ranking was excellent (AUC 0.86), so: Platt calibration fitted 2023→2024, validated 2024→2025. Calibrated mean 1.55% vs 1.61% observed, Brier 0.0152 (beats base 0.0158), AUC 0.863. New `engine.overdraft_risk()` and `calibrate_break()`. **Round 3:** simulation now starts at today's balance → AUC 0.877, Brier 0.0145, mean 1.59% vs 1.61%. |
 | 2 | **Critical** | Time Machine lookahead in Streamlit (handoff #1): in Dec 2024 mode the runways, simulation and plan used 2025 data. | 93172 showed 6.6 months | `ui/context.py` cuts the data at `asof`. 93172 Dec 2024 now: standard "no shortfall (120+)", trough riskiest 1.6%, low $238, which is the pitch. |
 | 3 | High | Watchlist "realistic runway (EI)" kept paying EI forever; the Know tab stops it after 6 months. Different on 23.5% of accounts (median 3.6 months apart). A judge clicking a row would see two numbers. | stress check [1] | Watchlist uses `realistic_runway_vec` (same function family as Know). New test. |
 | 4 | High | An LLM returning `"return_to_work_month": "4"` (string) passed `_sanitize` and would crash the simulation mid-demo. Gemini output was not schema-constrained (handoff #6). | probe | Coerced to an int 1-24 or None; `response_schema` added. Contract test between the AI and engine lanes. |
@@ -34,8 +34,8 @@ a dense UI, and burning the night on a React rewrite.
 |---|---|---|---|---|
 | 6 | **Critical (wording)** | Under a shock, `p_survive_6` is a *scenario result*, not a calibrated chance. `ui/pages/shock.py` still says "Chance they make it 6 months", and the plan facts are called `chance_6_months_pct`. | Say "7 of 10 simulated futures last 6 months". Show the calibrated `overdraft_risk` as the only "% chance", and only for no shock. | P3 |
 | 7 | High | **"Money in" is not pay.** 74.9% of money in is cash deposits, 19% transfers, 5.2% pension. A job loss assumes all non-pension money in stops (`employment_share = 1`). It's the biggest assumption in the model. | Say it in the first 20 seconds of Q&A; keep the slider visible. | pitch |
-| 8 | High | The simulation starts from the 6-month **average** balance (B), not today's balance. For 22.7% of accounts today's balance is >25% above B; for 9.7% it's >25% below. Starting from the latest balance raised AUC 0.866 → 0.878 in backtest. | Switch start to latest `month_end_balance`, refit the calibration, re-run `-m slow`. About 1 hour. Not done today: it moves validated numbers. | P1 (E8) |
-| 9 | Medium | The optimiser protects a **pointwise** 10th-percentile path. No customer follows that path, so "safe in a bad outcome" overstates joint survival. | Say "keeps each month above the line in 9 of 10 futures", or solve the LP over sampled paths. | P1 |
+| 8 | ~~High~~ **Done (round 3)** | The simulation started from the 6-month **average** balance (B), not today's balance (>25% off for a third of accounts). | Now starts at the latest month-end balance; calibration refit. Out of time: AUC 0.863 → 0.877, Brier 0.0152 → 0.0145. The standard formula still uses B. | P1 |
+| 9 | ~~Medium~~ **Checked (round 3): not a real problem** | Worry: the optimiser protects a month-by-month 10th-percentile curve, not whole futures. | Measured on 300 accounts: the cuts keep a median **90% of whole futures** safe (never under 75%), because balances are running totals. A whole-path version was tried and rejected (too strict: protected nothing for 25% of accounts). `optimize_cuts` now reports `share_of_futures_protected` per customer. | P1 |
 | 10 | Medium | Realistic runway (12-month window) vs simulation (24-month history): they agree on 95.2% of 400 accounts. Handoff #4 is lower priority than it looked. | Leave it. | |
 | 11 | Low | Loan payment P uses "running at end of 2025" even in the Time Machine. That's the judges' definition and `profile()` must not change. | Mention only if asked. | |
 | 12 | Low | `ai._sanitize` caps EI at 12 months; EI regular benefits max out at 45 weeks (~10.4 months). | Cap at 10. | P3 |
@@ -91,14 +91,14 @@ Corrections to the critique:
   dip (median $8.5K). It works as a *limit*, not cash: 97% of it is never drawn.
 - **Fees are tiny. Agreed.** Pitch retention and credit losses (76/76), not fees.
 - **Trough as a probability:** done via the calibrated simulation (`engine.overdraft_risk`), which ranks at least as
-  well as the trough (AUC 0.863 vs 0.860) and is validated out of time. A second logistic on the trough adds nothing.
+  well as the trough (AUC 0.877 vs 0.860) and is validated out of time. A second logistic on the trough adds nothing.
 - **Dip timing:** from the 1M transactions, 58% of customers dip within ±5 days of the same day in at least 70% of months.
   `engine.cushion(..., dip_table=engine.load_dip_days())` returns the usual day only when it's reliable. 93172's isn't, and the engine says so.
 
 ## Pitch (60 seconds, in this order)
 
 1. "Tangerine's riskiest customers aren't broke. Their balance falls by the same amount every month, and one month it falls through zero."
-2. Demo mode: 93172, Dec 2024. "Averaged $18.5K; the standard formula says no shortfall. But it dipped to $238. We ranked her in the riskiest 2%, a 5.5% chance of a first overdraft in 12 months, 3× normal. In January she was overdrawn for 13 days."
+2. Demo mode: 93172, Dec 2024. "Averaged $18.5K; the standard formula says no shortfall. But it dipped to $238. We ranked her in the riskiest 2%, a 4% chance of a first overdraft in 12 months, 2.5× the average customer. In January she was overdrawn for 13 days."
 3. "Flag 10% of customers and we catch 62% of next year's first overdrafts, three years running. It survives controls for balance size and correction for the 29 ideas we tested."
 4. "The fix is cheap: overdraft protection sized to each customer's own dip covers 79% of those overdrafts. Of $2.9M in limits, only $78K is ever used. And an alert at *their* danger level warns 3 months early; a $100 alert catches 1 in 34."
 5. "Why it matters: every borrower in this data who went overdrawn defaulted. Pick any account and any twist card."
@@ -110,6 +110,16 @@ status D is partly "in debt" by definition; it's an early-warning signal, not ca
 
 1. P3: **Plan tab leads with `plan["cushion"]`** (prompt in `docs/FRONTEND.md` §9); fix the "chance" wording (#6); turn on Gemini (S1).
 2. P2: Know tab: summary sentence first, one chart, add the calibrated risk card from `engine.overdraft_risk`. Drop the Kalman chart.
-3. P1: E8, start the simulation at the latest balance and refit the calibration (#8). Test the "self-correction" finding before it goes in the pitch.
+3. P1: E8 done (round 3). Still open: test the "self-correction" finding before it goes in the pitch.
 4. Everyone: rehearse the live twist on 10 accounts (E7), including 20176 (pensioner) and 56072 (16-year-old owner).
 5. 8 PM hard deadline: Devpost draft + Tangerine track.
+
+## Round 3 (backend + AI hardening)
+
+| Area | Change | Evidence |
+|---|---|---|
+| Monte Carlo | Starts at today's balance; calibration refit | 2025 out of time: AUC 0.877, Brier 0.0145 (base 0.0158), predicted 1.59% vs 1.61% |
+| Optimiser | Kept the month-by-month method after testing a whole-path version; adds `share_of_futures_protected` | Median 90% of whole futures protected on 300 accounts |
+| AI: plan facts | `ai.plan_facts()` builds the writer's facts from engine outputs, leading with the cushion; no "chance" field | Template passes its own number + wording checks on 60 accounts × 3 twists |
+| AI: wording guard | `ai.verify_wording()` rejects Gemini text that calls a simulation count a "chance" | Fake-Gemini test |
+| AI: twist safety net | `ai.parse_twist_checked()`: when Gemini reads the card, lists fields where the offline rules disagree, plus plain-English chips (`describe_scenario`) | Fake-Gemini test: a mis-read "bills +50%" is flagged |

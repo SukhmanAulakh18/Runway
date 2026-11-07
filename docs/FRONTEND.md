@@ -203,6 +203,7 @@ export interface Milestone { name: string; target: number; need: number; done: b
 export interface Lever { action: string; how: string; monthly_saving: number; runway: number; gain: number | null }
 export interface Cushion { buffer: number; alert_level: number; top_up_now: number; last_balance: number; as_of: string;
   dip_day: number | null; dip_day_share: number | null; dip_day_reliable: boolean }
+// optimiser also has share_of_futures_protected: number | null (round 3)
 export interface PlanResult {
   cushion: Cushion;              // headline action (engine.cushion); add dip_table in the API for dip_day
   goal: { have: number; monthly_gap_on_ei: number; monthly_surplus: number;
@@ -313,6 +314,14 @@ Backend tests that guard this contract: `pytest -q tests/test_api.py`.
 | Simulation as the headline, deterministic as "simple estimate" | handoff #4: same window for both in engine |
 | Milestone progress ring % | a `progress` field per milestone |
 | Sparklines in the watchlist | a compact balance series per row (or fetch `/api/customer` per visible row, lazily) |
+
+## 8b. New backend pieces (round 3) the UI should use
+
+| Use | Instead of |
+|---|---|
+| `ai.parse_twist_checked(text)` → `{settings, source, disagree, chips}`: show `chips` to confirm; highlight `disagree` fields in amber ("AI and rules read this differently, check it") | `ai.parse_twist` + hand-made chip text |
+| `ai.plan_facts(plan, key_res, real_res, sim, opt, risk)` then `ai.write_plan(facts)` | the facts dict built inside `ui/pages/plan.py` (it still sends `chance_6_months_pct`) |
+| `optimiser.share_of_futures_protected` ("protects 93% of simulated futures") | assuming "bad case" = 90% |
 
 ## 9. Paste-ready Claude Code prompts (Streamlit now; same rules apply to React)
 
