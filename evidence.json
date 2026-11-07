@@ -552,5 +552,59 @@
         "events": 42
       }
     ]
+  },
+  "impact": {
+    "2023-12": {
+      "population": "12+ months of history, never overdrawn up to asof, full next year",
+      "accounts": 2213,
+      "flagged": 221,
+      "first_overdrafts": 34,
+      "caught": 20,
+      "caught_share": 0.5882352941176471,
+      "days_below_zero_caught": 1031,
+      "days_below_zero_all": 1374,
+      "hindsight_need_median_caught": 2156.4449999999997,
+      "hindsight_need_total_caught": 60137.92999999999,
+      "buffer": {
+        "rule": "engine.cushion: buffer = typical in-month dip (median of avg - min balance, last 12 months)",
+        "limits_total": 1824916.8399999999,
+        "limit_median": 7912.385,
+        "drawn_total": 44220.02,
+        "covered_in_full": 15,
+        "covered_share": 0.75
+      },
+      "alert": {
+        "rule": "month-end balance below the customer's own alert_level, before the first overdraft",
+        "fired_before": 12,
+        "median_lead_months": 2.5,
+        "generic_100_fired_before": 0
+      }
+    },
+    "2024-12": {
+      "population": "12+ months of history, never overdrawn up to asof, full next year",
+      "accounts": 3417,
+      "flagged": 341,
+      "first_overdrafts": 55,
+      "caught": 34,
+      "caught_share": 0.6181818181818182,
+      "days_below_zero_caught": 2039,
+      "days_below_zero_all": 2795,
+      "hindsight_need_median_caught": 1440.37,
+      "hindsight_need_total_caught": 103054.55,
+      "buffer": {
+        "rule": "engine.cushion: buffer = typical in-month dip (median of avg - min balance, last 12 months)",
+        "limits_total": 2875822.9800000004,
+        "limit_median": 8486.66,
+        "drawn_total": 77899.36499999998,
+        "covered_in_full": 27,
+        "covered_share": 0.7941176470588235
+      },
+      "alert": {
+        "rule": "month-end balance below the customer's own alert_level, before the first overdraft",
+        "fired_before": 23,
+        "median_lead_months": 3.0,
+        "generic_100_fired_before": 1
+      }
+    }
   }
 }

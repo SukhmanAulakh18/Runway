@@ -201,7 +201,10 @@ export interface ShockResult {
 export interface Milestone { name: string; target: number; need: number; done: boolean;
   months_steady: number | null; months_stretch: number | null }
 export interface Lever { action: string; how: string; monthly_saving: number; runway: number; gain: number | null }
+export interface Cushion { buffer: number; alert_level: number; top_up_now: number; last_balance: number; as_of: string;
+  dip_day: number | null; dip_day_share: number | null; dip_day_reliable: boolean }
 export interface PlanResult {
+  cushion: Cushion;              // headline action (engine.cushion); add dip_table in the API for dip_day
   goal: { have: number; monthly_gap_on_ei: number; monthly_surplus: number;
           steady_saving: number; stretch_saving: number; milestones: Milestone[];
           benchmark_3mo_spending: number; deficit_to_close: number };
@@ -263,6 +266,7 @@ const PRESETS = {
 ```
 
 ### Make a plan: `POST /api/plan/{acct}` then `POST /api/write-plan`
+- **Headline (first thing on the tab): `plan.cushion`.** "Set overdraft protection or an auto-transfer of $`buffer`. Alert them when the balance drops below $`alert_level`." If `top_up_now > 0`: "Move $`top_up_now` to chequing now." If `dip_day_reliable`: "Their balance usually bottoms out around day `dip_day`." Bank line from `evidence.impact["2024-12"]`: "A buffer like this covered 79% of caught first overdrafts; 97% of it was never used." The job-loss sections below come second.
 - Milestones: `goal.milestones[]` with `done`, `need`, `months_stretch ?? months_steady` ("about N months"). Progress ring = `goal.have` against `target` is a display ratio; prefer showing `need` as text and, if you draw a ring, ask P1 for a `progress` field.
 - Backup levers: `backup.levers[]` (already in engine order); show `action`, `how`, `runway` months, `+gain` (or "120+" when `gain` is null).
 - Optimiser: bars `optimiser.cuts[]` under the lines `optimiser.path` (without changes, slate dashed) and `optimiser.protected_path` (with cuts, orange), line at `optimiser.dip`.
@@ -309,3 +313,30 @@ Backend tests that guard this contract: `pytest -q tests/test_api.py`.
 | Simulation as the headline, deterministic as "simple estimate" | handoff #4: same window for both in engine |
 | Milestone progress ring % | a `progress` field per milestone |
 | Sparklines in the watchlist | a compact balance series per row (or fetch `/api/customer` per visible row, lazily) |
+
+## 9. Paste-ready Claude Code prompts (Streamlit now; same rules apply to React)
+
+**P3, Plan tab leads with the cushion:**
+```
+Read CLAUDE.md. In ui/pages/plan.py only: make the first block of the tab a card from c.cushion (it also has
+dip_day / dip_day_reliable). Text: "Set overdraft protection or an auto-transfer of $buffer. Alert them when
+the balance drops below $alert_level." Add "Move $top_up_now to chequing now." only if top_up_now > 0, and "Their balance usually bottoms out around day
+{dip_day}." only if dip_day_reliable. Under it, one
+caption from EV["impact"]["2024-12"]: "In 2025 a buffer like this fully covered {covered_in_full} of {caught} caught
+first overdrafts; ${drawn_total} of ${limits_total} was ever used." Format $ with commas. No maths. Move the job-loss
+milestones below it. Run pytest -q -m ui.
+```
+
+**P3, "chance" wording:**
+```
+Read CLAUDE.md and docs/CTO_REVIEW.md finding #6. In ui/pages/shock.py replace "Chance they make it 6 months: X%"
+with "{round(p*10)} of 10 simulated futures last 6 months", and the 12-month one the same way. Don't use the word
+"chance" for simulation results anywhere. Run pytest -q -m ui.
+```
+
+**P2, Know tab risk card (`c.risk` and `c.cushion` are already in the context):**
+```
+Read CLAUDE.md. In ui/pages/know.py add a card: "{p_12m:.1%} chance of a first overdraft in the next 12 months if
+nothing changes" from c.risk, shown only if c.risk["validated_population"], else "Already overdrawn before or too new
+to forecast". Caption: "Calibrated on 2024, checked on 2025". Remove the Kalman chart. Run pytest -q -m ui.
+```

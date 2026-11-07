@@ -5,7 +5,7 @@ Scoring weights: Discovery 35%, Data Use 25%, Communication 25%, Impact 15%.
 
 ## Verdict
 
-**Go. It can win the track, but only if we stop adding features and fix how we talk about probabilities.**
+**Go. It can win the track. Round 2 tied the solution to the finding (dip → buffer + personal alert, backtested). What's left is delivery: fewer numbers, no wrong "chance" wording, rehearsal.**
 The engine and the evidence are stronger than most datathon entries will be. The risks are overclaiming,
 a dense UI, and burning the night on a React rewrite.
 
@@ -14,7 +14,7 @@ a dense UI, and burning the night on a React rewrite.
 | Discovery (35%) | **A-** | The trough finding holds out of time over 3 years (AUC 0.84-0.86, 14.6×), survives confounders (OR 16.8) and BH correction (28/29). 76 of 76 defaulters were overdrawn; 27 loans went to already-overdrawn customers, all defaulted. That's a real, bank-relevant insight. |
 | Data Use (25%) | **A-** | Integrity audit (10 checks pass), quirks handled explicitly (cash economy, opening month, pensioners, minors, stale accounts). Answer key reproduced exactly (20111 → 3.4 / 4.0 / 3.4). |
 | Communication (25%) | **C+** | Two runways plus a trough plus a Kalman chart plus a simulation is too much for a 5-minute table. Until today the UI called an uncalibrated number a "chance". |
-| Impact (15%) | **B** | An advisor watchlist with a Time Machine reveal is a product a bank could actually pilot. |
+| Impact (15%) | **B+** (was B: dip buffer + personal alert now backtested) | An advisor watchlist with a Time Machine reveal is a product a bank could actually pilot. |
 
 ## What I found (strict)
 
@@ -69,20 +69,46 @@ communication, not the framework. **Streamlit stays primary.** React ships only 
 checklist in `docs/FRONTEND.md` §7 on 5 accounts by midnight. Otherwise show it as "advisor UI preview".
 The API draft is ready and tested but held out of the repo until then.
 
+## Round 2: answering the "finding ≠ product" critique
+
+The critique was right: the finding is about **the dip**, but the plan tab was about **job loss**. The engine now has the
+dip product, and every number below is backtested (`evidence.json → impact`, `engine.cushion`).
+
+| Claim | 2024-12 → 2025 | 2023-12 → 2024 |
+|---|---|---|
+| Flag the riskiest 10% → first overdrafts caught | **34 of 55 (62%)** | 20 of 34 (59%) |
+| Share of first-timers' days below zero in the flagged group | **73%** (2,039 of 2,795) | 75% |
+| Hindsight: median shortfall of caught customers | $1,440 | $2,156 |
+| Buffer sized at each flagged customer's own typical dip: overdrafts covered in full | **27 of 34 (79%)** | 15 of 20 (75%) |
+| ...money actually drawn vs limits offered | **$78K of $2.9M** | $44K of $1.8M |
+| Personal alert at the customer's own dip level fires *before* the first overdraft | **23 of 34, median 3 months early** | 12 of 20, 2.5 months |
+| Generic $100 low-balance alert fires before | **1 of 34** | 0 of 20 |
+
+Corrections to the critique:
+- **"$1,500 cushion each" is a hindsight number.** You only know who needed $1,440 after they went negative. The spec
+  "smallest buffer that kept the last 6 months' low above $0" is **$0 for every target customer**, because the
+  warning targets people who were never overdrawn. The forward rule that works is the customer's typical in-month
+  dip (median $8.5K). It works as a *limit*, not cash: 97% of it is never drawn.
+- **Fees are tiny. Agreed.** Pitch retention and credit losses (76/76), not fees.
+- **Trough as a probability:** done via the calibrated simulation (`engine.overdraft_risk`), which ranks at least as
+  well as the trough (AUC 0.863 vs 0.860) and is validated out of time. A second logistic on the trough adds nothing.
+- **Dip timing:** from the 1M transactions, 58% of customers dip within ±5 days of the same day in at least 70% of months.
+  `engine.cushion(..., dip_table=engine.load_dip_days())` returns the usual day only when it's reliable. 93172's isn't, and the engine says so.
+
 ## Pitch (60 seconds, in this order)
 
-1. Demo mode: 93172, Dec 2024. "The standard formula says no shortfall. Her balance averaged $18.5K but dipped to $238. We flagged her in the riskiest 2%. In January she was overdrawn."
-2. "That signal predicted first overdrafts out of time, three years running: 14.6× the risk. It survives controls for balance size and correction for the 29 ideas we tested."
-3. "Overdrafts matter: all 76 defaulted borrowers had been overdrawn; 27 loans went to customers already overdrawn, and every one defaulted."
-4. "And our probabilities are real probabilities: we backtested our Monte Carlo, found it 8× too pessimistic, and calibrated it on 2024. On 2025 it predicted 1.5%; 1.6% happened."
-5. "Pick any account and any twist card."
+1. "Tangerine's riskiest customers aren't broke. Their balance falls by the same amount every month, and one month it falls through zero."
+2. Demo mode: 93172, Dec 2024. "Averaged $18.5K; the standard formula says no shortfall. But it dipped to $238. We ranked her in the riskiest 2%, a 5.5% chance of a first overdraft in 12 months, 3× normal. In January she was overdrawn for 13 days."
+3. "Flag 10% of customers and we catch 62% of next year's first overdrafts, three years running. It survives controls for balance size and correction for the 29 ideas we tested."
+4. "The fix is cheap: overdraft protection sized to each customer's own dip covers 79% of those overdrafts. Of $2.9M in limits, only $78K is ever used. And an alert at *their* danger level warns 3 months early; a $100 alert catches 1 in 34."
+5. "Why it matters: every borrower in this data who went overdrawn defaulted. Pick any account and any twist card."
 
 Limits, said first in Q&A: re-dated 1990s Czech data (not Tangerine customers); money in is mostly cash, not pay;
 status D is partly "in debt" by definition; it's an early-warning signal, not causal.
 
 ## Next 6 hours (in order)
 
-1. P3: fix the "chance" wording (#6) and turn on Gemini (S1). 30 minutes.
+1. P3: **Plan tab leads with `plan["cushion"]`** (prompt in `docs/FRONTEND.md` §9); fix the "chance" wording (#6); turn on Gemini (S1).
 2. P2: Know tab: summary sentence first, one chart, add the calibrated risk card from `engine.overdraft_risk`. Drop the Kalman chart.
 3. P1: E8, start the simulation at the latest balance and refit the calibration (#8). Test the "self-correction" finding before it goes in the pitch.
 4. Everyone: rehearse the live twist on 10 accounts (E7), including 20176 (pensioner) and 56072 (16-year-old owner).

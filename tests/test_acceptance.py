@@ -328,3 +328,28 @@ def test_evidence_sim_calibration(d):
     v = c["validate"]
     assert v["brier_calibrated"] < v["brier_base_rate"] < v["brier_raw"]
     assert abs(v["calibrated_mean"] - v["observed_rate"]) < 0.005
+
+
+# ---------------------------------------------------------------- Dip-focused action (added)
+def test_cushion_93172_time_machine(d):
+    m = d["monthly"]; dd = {"monthly": m[m.month <= "2024-12"], "loans": d["loans"]}
+    c = E.cushion(93172, dd)
+    assert c["as_of"] == "2024-12" and c["buffer"] == pytest.approx(E.realistic_profile(93172, dd).dip)
+    assert c["alert_level"] == c["buffer"] and c["top_up_now"] >= 0
+    assert "cushion" in E.make_plan(93172, dd, E.Scenario())
+
+def test_dip_days(d):
+    t = E.load_dip_days()
+    if t is None:
+        pytest.skip("transactions.csv not present")
+    assert t.day.between(1, 31).all() and not t.duplicated(["account_id", "month"]).any()
+    c = E.cushion(93172, {"monthly": d["monthly"][d["monthly"].month <= "2024-12"], "loans": d["loans"]}, dip_table=t)
+    assert c["dip_day"] is not None and not c["dip_day_reliable"]   # 93172 dips on scattered days (3 .. 23)
+
+@pytest.mark.slow
+def test_evidence_impact(d):
+    import evidence
+    i = evidence.impact(d, "2024-12")
+    assert (i["first_overdrafts"], i["caught"]) == (55, 34)
+    assert i["buffer"]["covered_in_full"] == 27 and i["alert"]["fired_before"] == 23 and i["alert"]["generic_100_fired_before"] == 1
+    assert i["buffer"]["drawn_total"] < 0.05 * i["buffer"]["limits_total"]

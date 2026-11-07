@@ -49,3 +49,8 @@ def pcurve(sc_items):
 @st.cache_resource
 def trough_table(asof):
     return E.ltr_table(load_all()[0], asof=asof)
+
+
+@st.cache_resource
+def dip_days():
+    return E.load_dip_days()   # None if transactions.csv is absent; ~5 s once

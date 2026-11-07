@@ -344,6 +344,48 @@ def overdraft_risk(acct: int, d: dict) -> dict:
     return {"p_12m": calibrate_break(raw), "p_raw": float(raw), "validated_population": in_pop}
 
 
+# ---------------------------------------------------------------------------
+# Dip-focused action: the product that follows from the trough finding.
+# Backtest (evidence.json -> impact): flag the riskiest 10% at Dec 2024; a buffer sized at each customer's
+# typical dip fully covers 27 of 34 caught first overdrafts in 2025, with $78K actually drawn on $2.9M of limits;
+# an alert at the customer's own dip level fires before 23 of 34 of them (median 3 months early), a $100 alert 1 of 34.
+# A cushion from the last 6 months' lowest balance is $0 for exactly these customers (they were never negative).
+# ---------------------------------------------------------------------------
+DIP_DAY_RELIABLE = 0.70   # share of months within +-5 days of the usual dip day to call the timing reliable
+
+
+def cushion(acct: int, d: dict, dip_table: pd.DataFrame | None = None) -> dict:
+    """Dip-focused plan for one customer: buffer size, personal alert level, top-up now, usual dip day."""
+    a = _acct(acct, d)
+    r = realistic_profile(acct, d)
+    last = float(a.month_end_balance.iloc[-1])
+    out = {"buffer": r.dip,                        # overdraft protection / auto-transfer limit = typical in-month dip
+           "alert_level": r.dip,                   # below this, a normal month can take the balance under $0
+           "top_up_now": max(r.dip - last, 0.0),   # move this to chequing now to be covered this month
+           "last_balance": last, "as_of": a.month.iloc[-1],
+           "dip_day": None, "dip_day_share": None, "dip_day_reliable": False}
+    if dip_table is not None:
+        t = dip_table[(dip_table.account_id == acct) & (dip_table.month <= a.month.iloc[-1])].tail(WINDOW)
+        if len(t) >= 6:
+            day = int(t.day.median())
+            share = float((t.day.sub(day).abs() <= 5).mean())
+            out.update(dip_day=day, dip_day_share=share, dip_day_reliable=share >= DIP_DAY_RELIABLE)
+    return out
+
+
+def load_dip_days(data_dir: Path = DATA) -> pd.DataFrame | None:
+    """Day of the month each account's balance is lowest, per month, from transactions.csv (None if absent).
+    About 5 s and 1M rows: callers cache it once."""
+    f = data_dir / "transactions.csv"
+    if not f.exists():
+        return None
+    tx = pd.read_csv(f, usecols=["account_id", "date", "balance"])
+    tx["month"] = tx.date.str[:7]
+    low = tx.loc[tx.groupby(["account_id", "month"]).balance.idxmin(), ["account_id", "month", "date"]]
+    return pd.DataFrame({"account_id": low.account_id.to_numpy(), "month": low.month.to_numpy(),
+                         "day": low.date.str[8:10].astype(int).to_numpy()}).sort_values(["account_id", "month"], ignore_index=True)
+
+
 def make_plan(acct: int, d: dict, sc: Scenario) -> dict:
     """Goal plan + backup plan, every number from this customer's own data."""
     p = profile(acct, d)
@@ -390,7 +432,8 @@ def make_plan(acct: int, d: dict, sc: Scenario) -> dict:
     combo = -(0.20 * r.flexible + r.loan_payments)
     if combo < 0:
         lever("Combined: 20% reduction + loan deferral", "Both levers together", combo)
-    return {"goal": goal, "backup": {"base_runway": base, "levers": levers}, "profile": p, "realistic": r}
+    return {"cushion": cushion(acct, d), "goal": goal, "backup": {"base_runway": base, "levers": levers},
+            "profile": p, "realistic": r}
 
 
 # ---------------------------------------------------------------------------
