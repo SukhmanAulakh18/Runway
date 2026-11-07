@@ -506,49 +506,49 @@
   "sim_calibration": {
     "design": "Platt (logistic on logit of raw simulated P(break in 12 months), no shock); fit 2023-12 -> 2024, validate 2024-12 -> 2025",
     "fit": {
-      "a": -2.958750544398925,
-      "b": 0.6121455727608497,
+      "a": -3.324280735006,
+      "b": 0.45670794126395364,
       "accounts": 2213,
       "events": 34
     },
     "engine_constants": {
-      "a": -2.9588,
-      "b": 0.6121
+      "a": -3.3243,
+      "b": 0.4567
     },
     "validate": {
       "accounts": 3417,
       "events": 55,
       "observed_rate": 0.016095990635059995,
-      "raw_mean": 0.13490064383962538,
-      "calibrated_mean": 0.015486980735496852,
-      "brier_raw": 0.05536810674568335,
-      "brier_calibrated": 0.015197789771414484,
+      "raw_mean": 0.1540841381328651,
+      "calibrated_mean": 0.015919043161283186,
+      "brier_raw": 0.07318653124085454,
+      "brier_calibrated": 0.014479585666825634,
       "brier_base_rate": 0.015837445882821318,
-      "auc": 0.8625087880590557
+      "auc": 0.876726515602185
     },
     "bins": [
       {
-        "predicted": 0.0010490380091616083,
-        "observed": 0.0007272727272727272,
-        "accounts": 1375,
-        "events": 1
+        "predicted": 0.0017369920189474646,
+        "observed": 0.0,
+        "accounts": 1368,
+        "events": 0
       },
       {
-        "predicted": 0.006860730875813252,
-        "observed": 0.007407407407407408,
-        "accounts": 675,
-        "events": 5
-      },
-      {
-        "predicted": 0.01883337718805712,
-        "observed": 0.010248901903367497,
+        "predicted": 0.007086951173060083,
+        "observed": 0.004392386530014641,
         "accounts": 683,
-        "events": 7
+        "events": 3
       },
       {
-        "predicted": 0.04968186542394529,
-        "observed": 0.06140350877192982,
-        "accounts": 684,
+        "predicted": 0.017478567829667866,
+        "observed": 0.014641288433382138,
+        "accounts": 683,
+        "events": 10
+      },
+      {
+        "predicted": 0.05159724146606343,
+        "observed": 0.06149341142020498,
+        "accounts": 683,
         "events": 42
       }
     ]

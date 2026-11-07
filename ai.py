@@ -130,6 +130,40 @@ def parse_twist(text: str) -> tuple[dict, str]:
     return _sanitize(parse_twist_offline(text)), "rules"
 
 
+def parse_twist_checked(text: str) -> dict:
+    """parse_twist plus a safety net for the live demo: when Gemini read the card, list the fields where the
+    offline rules read it differently, so the advisor checks those chips before running."""
+    settings, source = parse_twist(text)
+    disagree = []
+    if source == "AI":
+        rules = _sanitize(parse_twist_offline(text))
+        disagree = [k for k in rules if (rules[k] != settings.get(k)) and not (
+            isinstance(rules[k], float) and isinstance(settings.get(k), (int, float)) and abs(rules[k] - settings[k]) < 1e-6)]
+    return {"settings": settings, "source": source, "disagree": disagree, "chips": describe_scenario(settings)}
+
+
+def describe_scenario(s: dict) -> list[str]:
+    """Plain-English chips for parsed settings, so the judge can confirm the card was read right (no maths)."""
+    chips = []
+    if s.get("job_loss"):
+        chips.append(f"Job loss: EI {s.get('ei_rate', 0.55):.0%} for {s.get('ei_months', 6)} months")
+        if s.get("return_to_work_month"):
+            chips.append(f"Back to work in month {s['return_to_work_month']}")
+    if s.get("income_cut"):
+        chips.append(f"Pay cut {s['income_cut']:.0%}")
+    if s.get("bills_increase_pct"):
+        chips.append(f"Household bills +{s['bills_increase_pct']:.0%}")
+    if s.get("spending_increase"):
+        v = s["spending_increase"]
+        chips.append(f"{'Extra' if v > 0 else 'Cut'} ${abs(v):,.0f} a month money out")
+    if s.get("one_off_cost"):
+        chips.append(f"One-off cost ${s['one_off_cost']:,.0f}")
+    if s.get("one_off_months_of_spending"):
+        m = s["one_off_months_of_spending"]
+        chips.append(f"One-off cost: {m:g} month{'s' if m != 1 else ''} of typical money out")
+    return chips or ["No shock"]
+
+
 def _sanitize(s: dict) -> dict:
     s["job_loss"] = bool(s["job_loss"])
     for k in ["ei_rate", "income_cut", "bills_increase_pct", "one_off_months_of_spending"]:
@@ -145,10 +179,36 @@ def _sanitize(s: dict) -> dict:
 # ---------------------------------------------------------------- plan writer
 _PLAN_PROMPT = """Write a short, warm plan (4-6 sentences, plain English, second person "you") for a bank
 customer, using ONLY the numbers in the facts below. Do not invent, round differently or calculate new
-numbers. Mention the shock result, the first milestone they haven't reached, and the single most useful
-backup action. No headings, no bullet points.
+numbers. Start with the cushion: the buffer to keep (overdraft protection or an automatic transfer) and the
+balance at which they get an alert. Then the shock result, the first milestone they haven't reached, and the
+single most useful backup action. "futures_lasting_6_months_of_10" is a count of simulated futures: say
+"N of 10 simulated futures", never "chance" or "%". Only overdraft_risk_pct may be called a chance.
+No headings, no bullet points.
 FACTS (JSON):
 {facts}"""
+
+
+def plan_facts(plan: dict, key_res: dict, real_res: dict, sim: dict, opt: dict, risk: dict | None = None) -> dict:
+    """The only numbers the plan writer may use, picked and rounded from engine outputs (no new maths).
+    plan = engine.make_plan(), key_res = engine.runway(), real_res = engine.realistic_runway(),
+    sim = engine.simulate(), opt = engine.optimize_cuts(), risk = engine.overdraft_risk()."""
+    g, levers, cu = plan["goal"], plan["backup"]["levers"], plan.get("cushion")
+    best = max([l for l in levers if l.get("gain")], key=lambda l: l["gain"], default=None)
+    nxt = next((m for m in g["milestones"] if not m["done"]), None)
+    return {
+        "cushion": ({"buffer": round(cu["buffer"]), "alert_level": round(cu["alert_level"]),
+                     "top_up_now": round(cu["top_up_now"]),
+                     "dip_day": cu["dip_day"] if cu.get("dip_day_reliable") else None} if cu else None),
+        "overdraft_risk_pct": (round(risk["p_12m"] * 100, 1) if risk and risk.get("validated_population") else None),
+        "realistic_runway": real_res["label"], "answer_key_runway": key_res["label"],
+        "futures_lasting_6_months_of_10": round(sim["p_survive_6"] * 10),
+        "next_milestone": ({"name": nxt["name"], "need": round(nxt["need"]),
+                            "months": round(nxt["months_stretch"] or nxt["months_steady"] or 0) or None} if nxt else None),
+        "saving": round(g["stretch_saving"]),
+        "best_lever": ({"action": best["action"], "runway": best["runway"]} if best else None),
+        "optimised_plan": {"months_safe_without_changes": opt["base_months"], "months_safe_with_cuts": opt["protected_months"],
+                           "average_monthly_cut": round(opt["avg_monthly_cut"])},
+    }
 
 
 def _numbers(text: str) -> list[float]:
@@ -170,12 +230,28 @@ def verify_numbers(text: str, facts: dict) -> bool:
             for x in _numbers(v):
                 allowed.add(round(x, 1))
     walk(facts)
-    allowed |= {1.0, 2.0, 3.0, 6.0, 12.0}  # small counting words like "3 months" milestones
+    allowed |= {1.0, 2.0, 3.0, 6.0, 10.0, 12.0}  # counting words: "3 months" milestones, "N of 10 simulated futures"
     return all(round(x, 1) in allowed for x in _numbers(text))
 
 
+def verify_wording(text: str, facts: dict) -> bool:
+    """Simulation counts are not probabilities: 'chance' is only allowed when a calibrated risk is in the facts."""
+    return facts.get("overdraft_risk_pct") is not None or not re.search(r"\bchance|\bprobab|\blikel(y|ihood)", text.lower())
+
+
 def template_plan(f: dict) -> str:
-    s = [f"Under this shock your realistic runway is {f['realistic_runway']}, versus {f['answer_key_runway']} on the standard formula."]
+    s = []
+    cu = f.get("cushion")
+    if cu:
+        s.append(f"To stay out of overdraft, keep a buffer of ${cu['buffer']:,.0f}: overdraft protection or an automatic "
+                 f"transfer for that amount, with an alert when your balance drops below ${cu['alert_level']:,.0f}.")
+        if cu.get("top_up_now"):
+            s.append(f"Move ${cu['top_up_now']:,.0f} into chequing now to be covered this month.")
+        if cu.get("dip_day"):
+            s.append(f"Your balance usually bottoms out around day {cu['dip_day']} of the month.")
+    s.append(f"Under this shock your realistic runway is {f['realistic_runway']}, versus {f['answer_key_runway']} on the standard formula.")
+    if f.get("futures_lasting_6_months_of_10") is not None:
+        s.append(f"{f['futures_lasting_6_months_of_10']} of 10 simulated futures last 6 months.")
     nxt = f.get("next_milestone")
     if nxt:
         s.append(f"Your next goal is the {nxt['name']} milestone: ${nxt['need']:,.0f} more, "
@@ -196,7 +272,7 @@ def write_plan(facts: dict) -> tuple[str, str]:
             resp = _client.models.generate_content(
                 model=MODEL, contents=_PLAN_PROMPT.format(facts=json.dumps(facts, default=str)))
             text = resp.text.strip()
-            if verify_numbers(text, facts):
+            if verify_numbers(text, facts) and verify_wording(text, facts):
                 return text, "AI (numbers verified)"
         except Exception:
             pass
