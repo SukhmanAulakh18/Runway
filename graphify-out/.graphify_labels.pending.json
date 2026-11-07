@@ -1,0 +1,21 @@
+{
+  "0": "engine.py",
+  "1": "test_acceptance.py",
+  "2": "pandas",
+  "3": "README.md",
+  "4": "ai.py",
+  "5": "evidence.py",
+  "6": "Part A. Strategy and setup",
+  "7": "test_app_smoke.py",
+  "8": "audit_data.py",
+  "9": "Data pipeline: from raw files to every number on screen",
+  "10": "Contributing: getting started, Git, and Claude Code",
+  "11": "Architecture: the tech, and how everything works",
+  "12": "Findings log (Tangerine: Resilience Rewired)",
+  "13": "pull_request_template.md",
+  "14": "create_issues.sh",
+  "15": ".claude/CLAUDE.md",
+  "16": "check.md",
+  "17": "review.md",
+  "18": "task.md"
+}
