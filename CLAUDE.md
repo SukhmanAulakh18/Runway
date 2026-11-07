@@ -2,6 +2,25 @@
 
 Runway is a Streamlit app that, for any bank `account_id`, shows the customer's money picture, applies a shock (job loss with EI, higher bills, a one-off repair) and produces a plan. Its headline finding is the Liquidity Trough Ratio, an early warning for first overdrafts, which in this data also separate repaid from defaulted loans. Read `docs/ARCHITECTURE.md` for how it works and `docs/TASKS.md` for who owns which file.
 
+## Start here
+
+Before any task, read `docs/HANDOFF.md` (verified numbers, decisions, open bugs with owners) and `docs/CTO_REVIEW.md` (what's strong, what's wrong, what to do next). Frontend work: `docs/FRONTEND.md` and `docs/REACT_PLAN.md`. There is no API in the repo yet; it gets added later, with no maths in it either.
+
+## Two Claude Code sessions on this repo
+
+Two sessions work here at once. Each stays in its lane, on its own branch, so they never edit the same file.
+
+| Lane | Branch prefix | Owns | Never edits |
+|---|---|---|---|
+| **Engine** (maths, stats, evidence) | `p1/` | `engine.py`, `evidence.py`, `evidence.json`, `ui/context.py`, `tests/test_acceptance.py` | `ai.py` |
+| **AI** (twist reader, plan writer) | `p3/` | `ai.py`, `tests/test_ai_cards.py` | `engine.py`, `evidence.py` |
+
+- **The seam** is `engine.Scenario` (fields the AI may set) and the plan `facts` dict. `tests/test_ai_cards.py::test_ai_engine_contract` fails if either side breaks it. Renaming a Scenario field needs both lanes: write it in `docs/HANDOFF.md` first.
+- **Before you start:** `git pull`, read the newest `docs/HANDOFF.md` log lines, run `graphify query "<question>"` instead of re-reading files.
+- **When you finish:** run `pytest -q` (and `-m slow` if engine/evidence changed), `graphify update .`, add one line to the log at the bottom of `docs/HANDOFF.md` (date, lane, what changed, any new field), then open a PR.
+- **`graphify-out/` merge conflict:** don't hand-merge it. Take either side, then run `graphify update .` and commit the result.
+- **`evidence.json`:** only the engine lane rewrites it.
+
 ## Hard rules
 
 1. **All maths lives in `engine.py`.** `app.py` and everything in `ui/` only display. A page may build `Scenario` objects and call engine functions, but must never contain a formula. If a page needs a new number, stop and say what engine function is needed.

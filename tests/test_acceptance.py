@@ -302,3 +302,29 @@ def test_evidence_multiple_testing(d):
     assert all(r["survives"] for r in mt["rows"] if r["log_row"] in (7, "E4"))   # the trough headline
     assert not by["Trough beats Lowest balance, last 6 months (2025)"]["survives"]   # honest: a tie with plain lowest balance
     assert any("14 first overdrafts vs 1.7%" in h for h in by)   # matches the Time Machine watchlist test
+
+
+# ---------------------------------------------------------------- Monte Carlo calibration (added)
+def test_calibration_is_monotone_and_bounded():
+    xs = [E.calibrate_break(x) for x in (0.0, 0.05, 0.2, 0.5, 0.9, 1.0)]
+    assert xs == sorted(xs) and all(0 < x < 1 for x in xs)
+    assert E.calibrate_break(0.5) == pytest.approx(0.049, abs=0.002)   # raw 50% is really about 5%
+
+def test_overdraft_risk_93172_time_machine(d):
+    m = d["monthly"]; dd = {"monthly": m[m.month <= "2024-12"], "loans": d["loans"]}
+    risky, calm = E.overdraft_risk(93172, dd), E.overdraft_risk(20134, d)
+    assert risky["validated_population"] and 0 < calm["p_12m"] < risky["p_12m"] < 1
+
+def test_watchlist_realistic_matches_know(d):
+    w = E.watchlist(d)
+    for a in w.sample(30, random_state=5).index:
+        assert abs(w.loc[a, "realistic_runway_ei"] - E.realistic_runway(E.realistic_profile(a, d), E.Scenario(job_loss=True))["runway"]) <= 0.05
+
+@pytest.mark.slow
+def test_evidence_sim_calibration(d):
+    import evidence
+    c = evidence.sim_calibration(d)
+    assert c["fit"]["a"] == pytest.approx(E.SIM_CAL_A, abs=1e-3) and c["fit"]["b"] == pytest.approx(E.SIM_CAL_B, abs=1e-3)
+    v = c["validate"]
+    assert v["brier_calibrated"] < v["brier_base_rate"] < v["brier_raw"]
+    assert abs(v["calibrated_mean"] - v["observed_rate"]) < 0.005

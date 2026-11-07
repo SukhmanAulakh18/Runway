@@ -24,11 +24,11 @@
     "auc_realistic": 0.8411882216103617,
     "diff": 0.05824029474449721,
     "diff_ci95": [
-      0.03056894053997497,
-      0.08860789408710781
+      0.033222554651226734,
+      0.09467170189363316
     ],
-    "n_boot": 1000,
-    "diff_p_boot": 0.001998001998001998,
+    "n_boot": 200,
+    "diff_p_boot": 0.009950248756218905,
     "design": "features from months <= 2024-12; outcome = any negative-balance day in 2025; accounts with >= 12 months history"
   },
   "trough": {
@@ -77,7 +77,7 @@
         "risk_ratio": 14.557226399331661,
         "rr_ci95": [
           8.54799837767272,
-          24.790931289237573
+          24.79093128923757
         ]
       }
     ],
@@ -89,15 +89,15 @@
     },
     "rank_average_runway_trough_auc": 0.8271943107457682,
     "ltr_auc_2025_ci95": [
-      0.8090240147644991,
-      0.9109690289306908
+      0.818586361721168,
+      0.9091146535625665
     ],
     "trough_minus_rival_p_boot": {
-      "Standard runway (answer key, EI 55%)": 0.001998001998001998,
-      "Realistic runway (EI capped, dip-aware)": 0.001998001998001998,
-      "Lowest balance, last 6 months": 0.3936063936063936
+      "Standard runway (answer key, EI 55%)": 0.009950248756218905,
+      "Realistic runway (EI capped, dip-aware)": 0.009950248756218905,
+      "Lowest balance, last 6 months": 0.417910447761194
     },
-    "rank_average_minus_trough_p_boot": 0.005994005994005994,
+    "rank_average_minus_trough_p_boot": 0.01990049751243781,
     "sensitivity_window": [
       {
         "window_months": 3,
@@ -199,7 +199,7 @@
     "minors": 57,
     "cash_over_80pct_share": 0.6431111111111111,
     "bad_month_ratio_p90_over_median": 1.9551863863947376,
-    "district_unemployment_corr_2022_2023": 0.9815212338478939,
+    "district_unemployment_corr_2022_2023": 0.981521233847894,
     "stale_accounts": 76
   },
   "confounders": {
@@ -209,25 +209,25 @@
     "events": 55,
     "flagged": 342,
     "unadjusted": {
-      "odds_ratio": 16.05380333951765,
+      "odds_ratio": 16.0538033395175,
       "or_ci95": [
-        9.202654834139842,
-        28.005462152922004
+        9.202654834139965,
+        28.00546215292111
       ],
-      "p_value": 1.4057421408717476e-22
+      "p_value": 1.4057421408667118e-22
     },
     "adjusted": {
-      "odds_ratio": 16.813333999653118,
+      "odds_ratio": 16.813333999653125,
       "or_ci95": [
-        9.51823867537951,
-        29.69963349575494
+        9.518238675379495,
+        29.69963349575502
       ],
-      "p_value": 2.4336839241617474e-22
+      "p_value": 2.433683924162603e-22
     },
     "controls_odds_ratios": {
-      "log_avg_balance": 0.31435405862814514,
+      "log_avg_balance": 0.3143540586281447,
       "months_of_history": 0.9706793077936734,
-      "district_unemployment_2023": 0.9997902432003157
+      "district_unemployment_2023": 0.9997902432003155
     },
     "pseudo_r2": 0.20717892365083546
   },
@@ -262,9 +262,9 @@
         "log_row": 3,
         "hypothesis": "judges' runway (EI 55%) predicts a 2025 overdraft (AUC 0.783)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 7.798156853712888e-28,
+        "p": 7.798156853712891e-28,
         "source": "findings_log",
-        "p_bh": 3.2306649822524822e-27,
+        "p_bh": 3.2306649822524833e-27,
         "survives": true
       },
       {
@@ -280,18 +280,18 @@
         "log_row": 3,
         "hypothesis": "10th pct of monthly min balance predicts a 2025 overdraft (AUC 0.874)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 2.4403467072035974e-47,
+        "p": 2.440346707203597e-47,
         "source": "findings_log",
-        "p_bh": 2.3590018169634774e-46,
+        "p_bh": 2.359001816963477e-46,
         "survives": true
       },
       {
         "log_row": 3,
         "hypothesis": "buffer / spend predicts a 2025 overdraft (AUC 0.786)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 2.1578353937656515e-28,
+        "p": 2.1578353937656524e-28,
         "source": "findings_log",
-        "p_bh": 1.0429537736533983e-27,
+        "p_bh": 1.0429537736533986e-27,
         "survives": true
       },
       {
@@ -307,27 +307,27 @@
         "log_row": 3,
         "hypothesis": "prior negative predicts a 2025 overdraft (AUC 0.758)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 2.0735433904649277e-23,
+        "p": 2.073543390464928e-23,
         "source": "findings_log",
-        "p_bh": 7.516594790435363e-23,
+        "p_bh": 7.516594790435364e-23,
         "survives": true
       },
       {
         "log_row": 3,
         "hypothesis": "low-income-month share predicts a 2025 overdraft (AUC 0.703)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 4.3576714346950345e-15,
+        "p": 4.357671434695034e-15,
         "source": "findings_log",
-        "p_bh": 9.720959354319693e-15,
+        "p_bh": 9.72095935431969e-15,
         "survives": true
       },
       {
         "log_row": 3,
         "hypothesis": "median gap predicts a 2025 overdraft (AUC 0.611)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 1.793291268305342e-05,
+        "p": 1.7932912683053425e-05,
         "source": "findings_log",
-        "p_bh": 2.6002723390427454e-05,
+        "p_bh": 2.6002723390427464e-05,
         "survives": true
       },
       {
@@ -352,9 +352,9 @@
         "log_row": 5,
         "hypothesis": "Realistic variant '+ cap + pension' beats the answer key",
         "test": "normal from logged 95% CI",
-        "p": 0.04597351839405172,
+        "p": 0.04597351839405169,
         "source": "findings_log",
-        "p_bh": 0.04761542976526785,
+        "p_bh": 0.04761542976526782,
         "survives": true
       },
       {
@@ -363,16 +363,16 @@
         "test": "normal from logged 95% CI",
         "p": 0.0018085103996446823,
         "source": "findings_log",
-        "p_bh": 0.0022285406900791516,
+        "p_bh": 0.002280295721291121,
         "survives": true
       },
       {
         "log_row": 5,
         "hypothesis": "Chosen realistic runway (last 12 months, cap, pension, dip) beats the answer key",
         "test": "bootstrap AUC difference",
-        "p": 0.001998001998001998,
+        "p": 0.009950248756218905,
         "source": "data",
-        "p_bh": 0.0022285406900791516,
+        "p_bh": 0.011098354381936472,
         "survives": true
       },
       {
@@ -406,36 +406,36 @@
         "log_row": 8,
         "hypothesis": "Trough beats Standard runway (answer key, EI 55%) (2025)",
         "test": "bootstrap AUC difference",
-        "p": 0.001998001998001998,
+        "p": 0.009950248756218905,
         "source": "data",
-        "p_bh": 0.0022285406900791516,
+        "p_bh": 0.011098354381936472,
         "survives": true
       },
       {
         "log_row": 8,
         "hypothesis": "Trough beats Realistic runway (EI capped, dip-aware) (2025)",
         "test": "bootstrap AUC difference",
-        "p": 0.001998001998001998,
+        "p": 0.009950248756218905,
         "source": "data",
-        "p_bh": 0.0022285406900791516,
+        "p_bh": 0.011098354381936472,
         "survives": true
       },
       {
         "log_row": 8,
         "hypothesis": "Trough beats Lowest balance, last 6 months (2025)",
         "test": "bootstrap AUC difference",
-        "p": 0.3936063936063936,
+        "p": 0.417910447761194,
         "source": "data",
-        "p_bh": 0.3936063936063936,
+        "p_bh": 0.417910447761194,
         "survives": false
       },
       {
         "log_row": 8,
         "hypothesis": "Rank-average of realistic runway + trough differs from trough alone (it is worse: AUC 0.827 vs 0.860)",
         "test": "bootstrap AUC difference",
-        "p": 0.005994005994005994,
+        "p": 0.01990049751243781,
         "source": "data",
-        "p_bh": 0.006438006438006438,
+        "p_bh": 0.021374608439285056,
         "survives": true
       },
       {
@@ -487,19 +487,69 @@
         "log_row": 12,
         "hypothesis": "Payment / money in predicts default",
         "test": "Mann-Whitney (AUC)",
-        "p": 0.00025026765270798925,
+        "p": 0.0002502676527079892,
         "source": "data",
-        "p_bh": 0.0003298982694787131,
+        "p_bh": 0.00032989826947871307,
         "survives": true
       },
       {
         "log_row": "E4",
         "hypothesis": "Trough flag predicts after balance, history and unemployment",
         "test": "Logit Wald",
-        "p": 2.4336839241617474e-22,
+        "p": 2.433683924162603e-22,
         "source": "data",
-        "p_bh": 7.841870422298964e-22,
+        "p_bh": 7.841870422301721e-22,
         "survives": true
+      }
+    ]
+  },
+  "sim_calibration": {
+    "design": "Platt (logistic on logit of raw simulated P(break in 12 months), no shock); fit 2023-12 -> 2024, validate 2024-12 -> 2025",
+    "fit": {
+      "a": -2.958750544398925,
+      "b": 0.6121455727608497,
+      "accounts": 2213,
+      "events": 34
+    },
+    "engine_constants": {
+      "a": -2.9588,
+      "b": 0.6121
+    },
+    "validate": {
+      "accounts": 3417,
+      "events": 55,
+      "observed_rate": 0.016095990635059995,
+      "raw_mean": 0.13490064383962538,
+      "calibrated_mean": 0.015486980735496852,
+      "brier_raw": 0.05536810674568335,
+      "brier_calibrated": 0.015197789771414484,
+      "brier_base_rate": 0.015837445882821318,
+      "auc": 0.8625087880590557
+    },
+    "bins": [
+      {
+        "predicted": 0.0010490380091616083,
+        "observed": 0.0007272727272727272,
+        "accounts": 1375,
+        "events": 1
+      },
+      {
+        "predicted": 0.006860730875813252,
+        "observed": 0.007407407407407408,
+        "accounts": 675,
+        "events": 5
+      },
+      {
+        "predicted": 0.01883337718805712,
+        "observed": 0.010248901903367497,
+        "accounts": 683,
+        "events": 7
+      },
+      {
+        "predicted": 0.04968186542394529,
+        "observed": 0.06140350877192982,
+        "accounts": 684,
+        "events": 42
       }
     ]
   }

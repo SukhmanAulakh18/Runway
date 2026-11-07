@@ -51,6 +51,15 @@ SCENARIO_FIELDS = {
     "return_to_work_month": "month number they find a new job, or null",
 }
 
+# Typed output for Gemini (structured output): every field has a type, so the model can't return prose or strings.
+_TWIST_SCHEMA = {"type": "object", "properties": {
+    "job_loss": {"type": "boolean"}, "ei_rate": {"type": "number"}, "ei_months": {"type": "integer"},
+    "income_cut": {"type": "number"}, "bills_increase_pct": {"type": "number"}, "spending_increase": {"type": "number"},
+    "one_off_cost": {"type": "number"}, "one_off_months_of_spending": {"type": "number"},
+    "return_to_work_month": {"type": "integer", "nullable": True}},
+    "required": ["job_loss", "ei_rate", "ei_months", "income_cut", "bills_increase_pct", "spending_increase",
+                 "one_off_cost", "one_off_months_of_spending"]}
+
 _PROMPT = """You convert a bank stress-test "twist card" into JSON settings. Return ONLY a JSON object
 with these keys (use defaults or 0/false/null when the card doesn't mention something):
 {fields}
@@ -110,7 +119,8 @@ def parse_twist(text: str) -> tuple[dict, str]:
             prompt = _PROMPT.format(fields="\n".join(f"- {k}: {v}" for k, v in SCENARIO_FIELDS.items()), text=text)
             resp = _client.models.generate_content(
                 model=MODEL, contents=prompt,
-                config=types.GenerateContentConfig(response_mime_type="application/json", temperature=0))
+                config=types.GenerateContentConfig(response_mime_type="application/json", response_schema=_TWIST_SCHEMA,
+                                                   temperature=0))
             data = json.loads(resp.text)
             base = parse_twist_offline("")
             base.update({k: data[k] for k in base if k in data and data[k] is not None or k == "return_to_work_month" and k in data})
@@ -127,6 +137,8 @@ def _sanitize(s: dict) -> dict:
     s["ei_months"] = int(min(max(int(s["ei_months"] or 0), 0), 12))   # EI regular benefits last at most 45 weeks
     s["spending_increase"] = float(s["spending_increase"] or 0)
     s["one_off_cost"] = float(max(float(s["one_off_cost"] or 0), 0))
+    rtw = s.get("return_to_work_month")   # LLMs sometimes send "4" or 0; the simulation needs an int month or None
+    s["return_to_work_month"] = int(min(max(int(float(rtw)), 1), 24)) if rtw not in (None, "", 0, "0") else None
     return s
 
 

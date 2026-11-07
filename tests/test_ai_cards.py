@@ -47,3 +47,27 @@ def test_card(text, expect):
 def test_no_shock_card_stays_empty():
     s = ai.parse_twist_offline("Nothing changes this month.")
     assert not s["job_loss"] and s["bills_increase_pct"] == 0 and s["one_off_cost"] == 0
+
+
+def test_sanitize_llm_shaped_output():
+    s = ai.parse_twist_offline("")
+    s.update({"return_to_work_month": "4", "ei_rate": "0.55", "job_loss": 1})
+    out = ai._sanitize(s)
+    assert out["return_to_work_month"] == 4 and out["job_loss"] is True and out["ei_rate"] == 0.55
+    s["return_to_work_month"] = 0
+    assert ai._sanitize(s)["return_to_work_month"] is None
+
+
+def test_twist_schema_builds():
+    from google.genai import types
+    types.GenerateContentConfig(response_mime_type="application/json", response_schema=ai._TWIST_SCHEMA, temperature=0)
+
+
+def test_ai_engine_contract():
+    """The seam between the engine session and the AI session: every field the AI reads must exist on Scenario."""
+    import dataclasses
+    import engine as E
+    fields = {f.name for f in dataclasses.fields(E.Scenario)}
+    assert set(ai.SCENARIO_FIELDS) <= fields
+    assert set(ai.parse_twist_offline("laid off, EI 55% for 6 months")) <= fields
+    E.Scenario(**ai._sanitize(ai.parse_twist_offline("laid off, back to work in month 4, bills up 15%")))

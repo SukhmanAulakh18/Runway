@@ -36,7 +36,12 @@ if acct not in set(ACCOUNTS):
     st.error(f"account_id {acct} isn't in the data. Try {ACCOUNTS[0]} or use Random customer.")
     st.stop()
 
-c = build_context(d, people, EV, ACCOUNTS, acct, ASOF[st.session_state.asof_label], scenario())
+asof = ASOF[st.session_state.asof_label]
+if asof and not (d["monthly"].account_id == acct).loc[d["monthly"].month <= asof].any():
+    st.warning(f"account_id {acct} has no activity up to {asof}. Pick another customer or switch the Time Machine to Today.")
+    st.stop()
+
+c = build_context(d, people, EV, ACCOUNTS, acct, asof, scenario())
 
 st.markdown(f"### Customer {acct}" + (f" <span class='muted'>· owner aged {c.age}</span>" if c.age else ""), unsafe_allow_html=True)
 if c.flags:

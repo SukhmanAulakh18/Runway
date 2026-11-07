@@ -319,6 +319,31 @@ def simulate(acct: int, d: dict, sc: Scenario, months: int = 24, n_paths: int = 
     }
 
 
+# Calibration: the raw simulation is ~8x too pessimistic out of time (it predicts 13.5% of customers break in
+# 2025 vs 1.6% who did), because replayed months wander like a random walk while real customers correct course.
+# Its ranking is good (AUC 0.86), so a 2-parameter logistic (Platt) map turns it into a probability.
+# Fitted on 2023-12 -> 2024 by evidence.sim_calibration(); validated on 2024-12 -> 2025 (see evidence.json).
+SIM_CAL_A, SIM_CAL_B = -2.9588, 0.6121
+
+
+def calibrate_break(p_raw: float) -> float:
+    """Raw simulated P(break within 12 months) -> calibrated P(first overdraft within 12 months)."""
+    p = min(max(float(p_raw), 1e-3), 1 - 1e-3)
+    return float(1 / (1 + np.exp(-(SIM_CAL_A + SIM_CAL_B * np.log(p / (1 - p))))))
+
+
+def overdraft_risk(acct: int, d: dict) -> dict:
+    """Calibrated chance of a first overdraft in the next 12 months if nothing changes (no shock).
+
+    Only a forecast for the population it was validated on: 12+ months of history and never overdrawn.
+    Under a shock, use simulate()'s share of surviving futures instead; that is a scenario, not a forecast.
+    """
+    a = _acct(acct, d)
+    raw = 1 - simulate(acct, d, Scenario())["p_survive_12"]
+    in_pop = bool(len(a) >= LTR_MIN_HISTORY and (a.days_below_zero == 0).all())
+    return {"p_12m": calibrate_break(raw), "p_raw": float(raw), "validated_population": in_pop}
+
+
 def make_plan(acct: int, d: dict, sc: Scenario) -> dict:
     """Goal plan + backup plan, every number from this customer's own data."""
     p = profile(acct, d)
@@ -438,7 +463,9 @@ def net_flow_filter(acct: int, d: dict) -> dict:
     if len(lvl) > 7 and sd[-1] > 0:
         drift = float((lvl[-1] - lvl[-7]) / max(sd[-1], 1.0))   # change over 6 months, in filter s.d.
     return {"month": a.month.tolist(), "net": net.tolist(), "level": lvl.tolist(), "sd": sd.tolist(),
-            "q": k["q"], "obs_sd": k["obs_sd"], "drift_sd": drift}
+            "q": k["q"], "obs_sd": k["obs_sd"], "drift_sd": drift,
+            "has_trend": bool(k["q"] > 1e-5 * 1.0001),   # q on the grid floor = month-to-month swings are noise
+            "band_from": 2}                               # first 2 months' sd is the diffuse start, don't draw it
 
 
 def optimize_cuts(acct: int, d: dict, sc: Scenario, horizon: int = 12, max_cut_share: float = 0.5,
@@ -494,7 +521,8 @@ def watchlist(d: dict) -> pd.DataFrame:
     """Advisor view: every account ranked by liquidity trough, with plain reason codes."""
     P = all_profiles(d)
     t = ltr_table(d)
-    out = P[["I", "S", "B", "H"]].join(t).join(realistic_vec(d))
+    out = P[["I", "S", "B", "H"]].join(t)
+    out["realistic_runway_ei"] = realistic_runway_vec(d, Scenario(job_loss=True))   # same as realistic_runway()
     out["answer_key_runway_ei"] = runway_vec(P, Shock(income_factor=0.55))
     last = d["monthly"].groupby("account_id").month.max()
     def reasons(r):
