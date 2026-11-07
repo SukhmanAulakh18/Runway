@@ -280,3 +280,13 @@ def test_evidence_loans_and_holes(d):
     assert fh["ei_forever"]["flip_from_no_shortfall"] == 257
     assert fh["pensioners"]["accounts"] == 740 and fh["pensioners"]["min_owner_age"] >= 59
     assert fh["minors"] == 57
+
+@pytest.mark.slow
+def test_evidence_confounders(d):
+    import evidence
+    cf = evidence.confounders(d)
+    assert (cf["accounts"], cf["events"], cf["flagged"]) == (3417, 55, 342)   # same population as by_year 2025
+    adj = cf["adjusted"]
+    assert adj["or_ci95"][0] < adj["odds_ratio"] < adj["or_ci95"][1]
+    assert adj["odds_ratio"] == pytest.approx(16.81, abs=0.01)
+    assert adj["or_ci95"][0] > 1   # the trough still predicts after balance size, history and unemployment
