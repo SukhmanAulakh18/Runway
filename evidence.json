@@ -28,6 +28,7 @@
       0.08860789408710781
     ],
     "n_boot": 1000,
+    "diff_p_boot": 0.001998001998001998,
     "design": "features from months <= 2024-12; outcome = any negative-balance day in 2025; accounts with >= 12 months history"
   },
   "trough": {
@@ -86,10 +87,17 @@
       "Lowest balance, last 6 months": 0.840108701530474,
       "Liquidity Trough Ratio": 0.8604510302309232
     },
+    "rank_average_runway_trough_auc": 0.8271943107457682,
     "ltr_auc_2025_ci95": [
       0.8090240147644991,
       0.9109690289306908
     ],
+    "trough_minus_rival_p_boot": {
+      "Standard runway (answer key, EI 55%)": 0.001998001998001998,
+      "Realistic runway (EI capped, dip-aware)": 0.001998001998001998,
+      "Lowest balance, last 6 months": 0.3936063936063936
+    },
+    "rank_average_minus_trough_p_boot": 0.005994005994005994,
     "sensitivity_window": [
       {
         "window_months": 3,
@@ -222,5 +230,277 @@
       "district_unemployment_2023": 0.9997902432003157
     },
     "pseudo_r2": 0.20717892365083546
+  },
+  "multiple_testing": {
+    "method": "Benjamini-Hochberg, q = 0.1",
+    "tests": 29,
+    "survive": 28,
+    "trough_tests_survive": "6 of 7",
+    "did_not_survive": [
+      "Trough beats Lowest balance, last 6 months (2025)"
+    ],
+    "rows": [
+      {
+        "log_row": 1,
+        "hypothesis": "Median 'money out > money in' flag marks real deficits (it doesn't: most are net positive)",
+        "test": "sign test",
+        "p": 0.0,
+        "source": "data",
+        "p_bh": 0.0,
+        "survives": true
+      },
+      {
+        "log_row": 2,
+        "hypothesis": "Flagged accounts have more negative-balance months",
+        "test": "Fisher exact",
+        "p": 1.6474010584739915e-17,
+        "source": "data",
+        "p_bh": 3.98121922464548e-17,
+        "survives": true
+      },
+      {
+        "log_row": 3,
+        "hypothesis": "judges' runway (EI 55%) predicts a 2025 overdraft (AUC 0.783)",
+        "test": "Mann-Whitney (logged AUC)",
+        "p": 7.798156853712888e-28,
+        "source": "findings_log",
+        "p_bh": 3.2306649822524822e-27,
+        "survives": true
+      },
+      {
+        "log_row": 3,
+        "hypothesis": "mean-based runway predicts a 2025 overdraft (AUC 0.837)",
+        "test": "Mann-Whitney (logged AUC)",
+        "p": 9.158815559529568e-39,
+        "source": "findings_log",
+        "p_bh": 6.640141280658936e-38,
+        "survives": true
+      },
+      {
+        "log_row": 3,
+        "hypothesis": "10th pct of monthly min balance predicts a 2025 overdraft (AUC 0.874)",
+        "test": "Mann-Whitney (logged AUC)",
+        "p": 2.4403467072035974e-47,
+        "source": "findings_log",
+        "p_bh": 2.3590018169634774e-46,
+        "survives": true
+      },
+      {
+        "log_row": 3,
+        "hypothesis": "buffer / spend predicts a 2025 overdraft (AUC 0.786)",
+        "test": "Mann-Whitney (logged AUC)",
+        "p": 2.1578353937656515e-28,
+        "source": "findings_log",
+        "p_bh": 1.0429537736533983e-27,
+        "survives": true
+      },
+      {
+        "log_row": 3,
+        "hypothesis": "income CV predicts a 2025 overdraft (AUC 0.741)",
+        "test": "Mann-Whitney (logged AUC)",
+        "p": 1.247911623202324e-20,
+        "source": "findings_log",
+        "p_bh": 3.289948824806127e-20,
+        "survives": true
+      },
+      {
+        "log_row": 3,
+        "hypothesis": "prior negative predicts a 2025 overdraft (AUC 0.758)",
+        "test": "Mann-Whitney (logged AUC)",
+        "p": 2.0735433904649277e-23,
+        "source": "findings_log",
+        "p_bh": 7.516594790435363e-23,
+        "survives": true
+      },
+      {
+        "log_row": 3,
+        "hypothesis": "low-income-month share predicts a 2025 overdraft (AUC 0.703)",
+        "test": "Mann-Whitney (logged AUC)",
+        "p": 4.3576714346950345e-15,
+        "source": "findings_log",
+        "p_bh": 9.720959354319693e-15,
+        "survives": true
+      },
+      {
+        "log_row": 3,
+        "hypothesis": "median gap predicts a 2025 overdraft (AUC 0.611)",
+        "test": "Mann-Whitney (logged AUC)",
+        "p": 1.793291268305342e-05,
+        "source": "findings_log",
+        "p_bh": 2.6002723390427454e-05,
+        "survives": true
+      },
+      {
+        "log_row": 3,
+        "hypothesis": "mean gap predicts a 2025 overdraft (AUC 0.697)",
+        "test": "Mann-Whitney (logged AUC)",
+        "p": 2.6917906374790895e-14,
+        "source": "findings_log",
+        "p_bh": 5.5758520347781133e-14,
+        "survives": true
+      },
+      {
+        "log_row": 5,
+        "hypothesis": "Realistic variant 'mean flows' beats the answer key",
+        "test": "normal from logged 95% CI",
+        "p": 3.316218939829828e-05,
+        "source": "findings_log",
+        "p_bh": 4.5795404407173816e-05,
+        "survives": true
+      },
+      {
+        "log_row": 5,
+        "hypothesis": "Realistic variant '+ cap + pension' beats the answer key",
+        "test": "normal from logged 95% CI",
+        "p": 0.04597351839405172,
+        "source": "findings_log",
+        "p_bh": 0.04761542976526785,
+        "survives": true
+      },
+      {
+        "log_row": 5,
+        "hypothesis": "Realistic variant '+ dip' beats the answer key",
+        "test": "normal from logged 95% CI",
+        "p": 0.0018085103996446823,
+        "source": "findings_log",
+        "p_bh": 0.0022285406900791516,
+        "survives": true
+      },
+      {
+        "log_row": 5,
+        "hypothesis": "Chosen realistic runway (last 12 months, cap, pension, dip) beats the answer key",
+        "test": "bootstrap AUC difference",
+        "p": 0.001998001998001998,
+        "source": "data",
+        "p_bh": 0.0022285406900791516,
+        "survives": true
+      },
+      {
+        "log_row": 7,
+        "hypothesis": "Bottom-10% trough -> more first overdrafts in 2023",
+        "test": "Fisher exact",
+        "p": 7.542131011452285e-09,
+        "source": "data",
+        "p_bh": 1.286598819600684e-08,
+        "survives": true
+      },
+      {
+        "log_row": 7,
+        "hypothesis": "Bottom-10% trough -> more first overdrafts in 2024",
+        "test": "Fisher exact",
+        "p": 1.846519309545369e-12,
+        "source": "data",
+        "p_bh": 3.3468162485509814e-12,
+        "survives": true
+      },
+      {
+        "log_row": 7,
+        "hypothesis": "Bottom-10% trough -> more first overdrafts in 2025",
+        "test": "Fisher exact",
+        "p": 2.6696592652533695e-21,
+        "source": "data",
+        "p_bh": 7.742011869234772e-21,
+        "survives": true
+      },
+      {
+        "log_row": 8,
+        "hypothesis": "Trough beats Standard runway (answer key, EI 55%) (2025)",
+        "test": "bootstrap AUC difference",
+        "p": 0.001998001998001998,
+        "source": "data",
+        "p_bh": 0.0022285406900791516,
+        "survives": true
+      },
+      {
+        "log_row": 8,
+        "hypothesis": "Trough beats Realistic runway (EI capped, dip-aware) (2025)",
+        "test": "bootstrap AUC difference",
+        "p": 0.001998001998001998,
+        "source": "data",
+        "p_bh": 0.0022285406900791516,
+        "survives": true
+      },
+      {
+        "log_row": 8,
+        "hypothesis": "Trough beats Lowest balance, last 6 months (2025)",
+        "test": "bootstrap AUC difference",
+        "p": 0.3936063936063936,
+        "source": "data",
+        "p_bh": 0.3936063936063936,
+        "survives": false
+      },
+      {
+        "log_row": 8,
+        "hypothesis": "Rank-average of realistic runway + trough differs from trough alone (it is worse: AUC 0.827 vs 0.860)",
+        "test": "bootstrap AUC difference",
+        "p": 0.005994005994005994,
+        "source": "data",
+        "p_bh": 0.006438006438006438,
+        "survives": true
+      },
+      {
+        "log_row": 9,
+        "hypothesis": "Watchlist top 50 as of 2023-12: 7 first overdrafts vs 1.5% base rate",
+        "test": "binomial",
+        "p": 1.1114047897632377e-05,
+        "source": "data",
+        "p_bh": 1.69635467911231e-05,
+        "survives": true
+      },
+      {
+        "log_row": 9,
+        "hypothesis": "Watchlist top 50 as of 2024-12: 14 first overdrafts vs 1.7% base rate",
+        "test": "binomial",
+        "p": 7.024803277551049e-14,
+        "source": "data",
+        "p_bh": 1.3581286336598696e-13,
+        "survives": true
+      },
+      {
+        "log_row": 10,
+        "hypothesis": "Ever overdrawn -> loan default (status D partly definitional)",
+        "test": "Fisher exact",
+        "p": 6.217609607324258e-103,
+        "source": "data",
+        "p_bh": 9.015533930620175e-102,
+        "survives": true
+      },
+      {
+        "log_row": 11,
+        "hypothesis": "Loan granted while already overdrawn -> default",
+        "test": "Fisher exact",
+        "p": 1.605499182028294e-28,
+        "source": "data",
+        "p_bh": 9.311895255764104e-28,
+        "survives": true
+      },
+      {
+        "log_row": 12,
+        "hypothesis": "Lowest-20% pre-loan trough -> default",
+        "test": "Fisher exact",
+        "p": 1.5252433543278653e-08,
+        "source": "data",
+        "p_bh": 2.457336515306005e-08,
+        "survives": true
+      },
+      {
+        "log_row": 12,
+        "hypothesis": "Payment / money in predicts default",
+        "test": "Mann-Whitney (AUC)",
+        "p": 0.00025026765270798925,
+        "source": "data",
+        "p_bh": 0.0003298982694787131,
+        "survives": true
+      },
+      {
+        "log_row": "E4",
+        "hypothesis": "Trough flag predicts after balance, history and unemployment",
+        "test": "Logit Wald",
+        "p": 2.4336839241617474e-22,
+        "source": "data",
+        "p_bh": 7.841870422298964e-22,
+        "survives": true
+      }
+    ]
   }
 }

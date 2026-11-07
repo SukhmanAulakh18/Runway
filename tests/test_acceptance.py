@@ -290,3 +290,15 @@ def test_evidence_confounders(d):
     assert adj["or_ci95"][0] < adj["odds_ratio"] < adj["or_ci95"][1]
     assert adj["odds_ratio"] == pytest.approx(16.81, abs=0.01)
     assert adj["or_ci95"][0] > 1   # the trough still predicts after balance size, history and unemployment
+
+@pytest.mark.slow
+def test_evidence_multiple_testing(d):
+    import evidence
+    ev = evidence.main(n_boot=200)
+    mt = ev["multiple_testing"]
+    assert mt["tests"] == len(mt["rows"]) == 29
+    assert all(0 <= r["p"] <= r["p_bh"] <= 1 for r in mt["rows"])
+    by = {r["hypothesis"]: r for r in mt["rows"]}
+    assert all(r["survives"] for r in mt["rows"] if r["log_row"] in (7, "E4"))   # the trough headline
+    assert not by["Trough beats Lowest balance, last 6 months (2025)"]["survives"]   # honest: a tie with plain lowest balance
+    assert any("14 first overdrafts vs 1.7%" in h for h in by)   # matches the Time Machine watchlist test
