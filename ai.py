@@ -67,9 +67,11 @@ def parse_twist_offline(text: str) -> dict:
     out = {"job_loss": False, "ei_rate": 0.55, "ei_months": 6, "income_cut": 0.0,
            "bills_increase_pct": 0.0, "spending_increase": 0.0, "one_off_cost": 0.0,
            "one_off_months_of_spending": 0.0, "return_to_work_month": None}
-    if re.search(r"laid off|lay ?off|lose (their|his|her|the)? ?job|job loss|unemploy|fired", t):
+    t = re.sub(r"\s*\bper ?cent\b", "%", t)   # "15 percent" -> "15%"
+    if re.search(r"laid[\s-]*of+\b|lay[\s-]*off|\blos(?:e|es|t|ing)\s+(?:(?:their|his|her|the|a)\s+)?jobs?\b|"
+                 r"jobs?\s+(?:loss|lost)|unemploy|fired|redundan|let go", t):
         out["job_loss"] = True
-        m = re.search(r"ei[^.%]*?(\d+(?:\.\d+)?)\s*%", t) or re.search(r"(\d+(?:\.\d+)?)\s*%[^.]*\bei\b", t)
+        m = re.search(r"\bei\b[^.%]*?(\d+(?:\.\d+)?)\s*%", t) or re.search(r"(\d+(?:\.\d+)?)\s*%[^.]*\bei\b", t)
         if m:
             out["ei_rate"] = _num(m.group(1)) / 100
         m = re.search(r"for (\d+) months", t)
@@ -91,7 +93,7 @@ def parse_twist_offline(text: str) -> dict:
     if monthly:
         out["spending_increase"] += sum(monthly)
     words = {"a full": 1, "one": 1, "a": 1, "two": 2, "three": 3, "half a": 0.5, "half": 0.5}
-    m = re.search(r"(a full|half a|one|two|three|\d+(?:\.\d+)?)\s+months?\s+of\s+(?:their\s+)?(?:typical\s+|usual\s+)?spending", t)
+    m = re.search(r"(a full|half a|a|one|two|three|\d+(?:\.\d+)?)\s+months?(?:'s|\s+of)\s+(?:their\s+)?(?:typical\s+|usual\s+)?spending", t)
     if m:
         g = m.group(1)
         out["one_off_months_of_spending"] = words.get(g, None) or _num(g)
