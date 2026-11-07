@@ -1,0 +1,197 @@
+{
+  "mislabel": {
+    "accounts": 4500,
+    "flagged_deficit": 1181,
+    "flagged_share": 0.2624444444444444,
+    "flagged_actually_net_positive": 0.9754445385266723,
+    "flagged_balance_grew": 0.9043183742591024
+  },
+  "ei_cap": {
+    "ei_monthly_max": 3159.0,
+    "capped_share": 0.572,
+    "capped_n": 2574,
+    "capped_median_runway_card": 5.4,
+    "capped_median_runway_real": 3.1,
+    "capped_survive6_card": 0.44522144522144524,
+    "capped_survive6_real": 0.16317016317016317,
+    "all_survive6_card": 0.6493333333333333,
+    "all_survive6_real": 0.488
+  },
+  "out_of_time": {
+    "n_accounts": 3668,
+    "events": 129,
+    "auc_answer_key": 0.7829479268658645,
+    "auc_realistic": 0.8411882216103617,
+    "diff": 0.05824029474449721,
+    "diff_ci95": [
+      0.033222554651226734,
+      0.09467170189363316
+    ],
+    "n_boot": 200,
+    "design": "features from months <= 2024-12; outcome = any negative-balance day in 2025; accounts with >= 12 months history"
+  },
+  "trough": {
+    "definition": "lowest end-of-day balance / average daily balance over the last 6 months",
+    "population": "complete records in both years; never below zero before the predicted year",
+    "by_year": [
+      {
+        "predicted_year": 2023,
+        "accounts": 1556,
+        "new_overdrafts": 18,
+        "auc": 0.8412440398786302,
+        "low10_rate": 0.07692307692307693,
+        "low10_n": 156,
+        "low10_events": 12,
+        "rest_rate": 0.004285714285714286,
+        "risk_ratio": 17.94871794871795,
+        "rr_ci95": [
+          6.831769534588795,
+          47.15564164914711
+        ]
+      },
+      {
+        "predicted_year": 2024,
+        "accounts": 2213,
+        "new_overdrafts": 34,
+        "auc": 0.8440191129228194,
+        "low10_rate": 0.09009009009009009,
+        "low10_n": 222,
+        "low10_events": 20,
+        "rest_rate": 0.007031642390758413,
+        "risk_ratio": 12.81209781209781,
+        "rr_ci95": [
+          6.56416509168437,
+          25.006965555255476
+        ]
+      },
+      {
+        "predicted_year": 2025,
+        "accounts": 3417,
+        "new_overdrafts": 55,
+        "auc": 0.8604510302309232,
+        "low10_rate": 0.09941520467836257,
+        "low10_n": 342,
+        "low10_events": 34,
+        "rest_rate": 0.006829268292682927,
+        "risk_ratio": 14.557226399331661,
+        "rr_ci95": [
+          8.54799837767272,
+          24.79093128923757
+        ]
+      }
+    ],
+    "head_to_head_2025": {
+      "Standard runway (answer key, EI 55%)": 0.6849521388783733,
+      "Realistic runway (EI capped, dip-aware)": 0.7588881077280839,
+      "Lowest balance, last 6 months": 0.840108701530474,
+      "Liquidity Trough Ratio": 0.8604510302309232
+    },
+    "ltr_auc_2025_ci95": [
+      0.818586361721168,
+      0.9091146535625665
+    ],
+    "sensitivity_window": [
+      {
+        "window_months": 3,
+        "auc": 0.83850521875507
+      },
+      {
+        "window_months": 6,
+        "auc": 0.8604510302309232
+      },
+      {
+        "window_months": 12,
+        "auc": 0.8592774863447084
+      }
+    ],
+    "no_shock_vs_shock": {
+      "accounts": 4424,
+      "overdrafts_2025": 158,
+      "median_no_shock": 0.6258182152670215,
+      "mean_no_shock": 0.541019809266084,
+      "median_ei_shock": 0.7270358204703662,
+      "mean_ei_shock": 0.7770522886289591,
+      "note": "With no shock almost every account shows 'no shortfall', so the runway can't rank them; under the EI stress test it can."
+    },
+    "example_93172": {
+      "avg_balance_jul_dec_2024": 18502.566666666666,
+      "lowest_balance": 238.49,
+      "ltr": 0.01288956306962818,
+      "jan_2025_days_below_zero": 13,
+      "feb_2025_days_below_zero": 8,
+      "lowest_2025": -717.24
+    }
+  },
+  "loans": {
+    "loans": 682,
+    "defaults": 76,
+    "overdrawn_and_defaulted": 76,
+    "overdrawn_borrowers": 76,
+    "never_overdrawn_defaulted": 0,
+    "never_overdrawn_borrowers": 606,
+    "status_by_overdrawn": {
+      "A": {
+        "overdrawn": 0,
+        "never": 203
+      },
+      "B": {
+        "overdrawn": 31,
+        "never": 0
+      },
+      "C": {
+        "overdrawn": 0,
+        "never": 403
+      },
+      "D": {
+        "overdrawn": 45,
+        "never": 0
+      }
+    },
+    "pre_loan_overdrawn": 27,
+    "pre_loan_overdrawn_defaulted": 27,
+    "pre_loan_overdrawn_status": {
+      "D": 19,
+      "B": 8
+    },
+    "pre_loan_overdrawn_amount": 3475049.76,
+    "pre_loan_overdrawn_median_amount": 111849.12,
+    "others": 655,
+    "others_defaulted": 49,
+    "fisher_p": 1.605499182028294e-28,
+    "no_loan_overdrawn": 212,
+    "no_loan_overdrawn_2025": 122,
+    "pre_loan_signal": {
+      "loans": 588,
+      "defaults": 38,
+      "auc_pre_loan_trough": 0.7752631578947369,
+      "auc_payment_to_money_in": 0.6774641148325359,
+      "low20_trough_default": 0.19491525423728814,
+      "low20_n": 118,
+      "low20_defaults": 23,
+      "rest_default": 0.031914893617021274,
+      "top25_payment_default": 0.11564625850340136,
+      "rest_payment_default": 0.047619047619047616,
+      "both_n": 38,
+      "both_default": 0.2631578947368421
+    }
+  },
+  "formula_holes": {
+    "ei_forever": {
+      "survive12_formula": 0.39311111111111113,
+      "survive12_ei_stops_6": 0.21755555555555556,
+      "flip_from_no_shortfall": 257
+    },
+    "pensioners": {
+      "accounts": 740,
+      "share": 0.16444444444444445,
+      "min_owner_age": 59.17864476386037,
+      "median_pension_share": 0.9813100711658453,
+      "median_formula_runway_job_loss": 35.4
+    },
+    "minors": 57,
+    "cash_over_80pct_share": 0.6431111111111111,
+    "bad_month_ratio_p90_over_median": 1.9551863863947376,
+    "district_unemployment_corr_2022_2023": 0.981521233847894,
+    "stale_accounts": 76
+  }
+}
