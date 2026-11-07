@@ -302,3 +302,54 @@ def test_evidence_multiple_testing(d):
     assert all(r["survives"] for r in mt["rows"] if r["log_row"] in (7, "E4"))   # the trough headline
     assert not by["Trough beats Lowest balance, last 6 months (2025)"]["survives"]   # honest: a tie with plain lowest balance
     assert any("14 first overdrafts vs 1.7%" in h for h in by)   # matches the Time Machine watchlist test
+
+
+# ---------------------------------------------------------------- Monte Carlo calibration (added)
+def test_calibration_is_monotone_and_bounded():
+    xs = [E.calibrate_break(x) for x in (0.0, 0.05, 0.2, 0.5, 0.9, 1.0)]
+    assert xs == sorted(xs) and all(0 < x < 1 for x in xs)
+    assert E.calibrate_break(0.5) == pytest.approx(0.049, abs=0.002)   # raw 50% is really about 5%
+
+def test_overdraft_risk_93172_time_machine(d):
+    m = d["monthly"]; dd = {"monthly": m[m.month <= "2024-12"], "loans": d["loans"]}
+    risky, calm = E.overdraft_risk(93172, dd), E.overdraft_risk(20134, d)
+    assert risky["validated_population"] and 0 < calm["p_12m"] < risky["p_12m"] < 1
+
+def test_watchlist_realistic_matches_know(d):
+    w = E.watchlist(d)
+    for a in w.sample(30, random_state=5).index:
+        assert abs(w.loc[a, "realistic_runway_ei"] - E.realistic_runway(E.realistic_profile(a, d), E.Scenario(job_loss=True))["runway"]) <= 0.05
+
+@pytest.mark.slow
+def test_evidence_sim_calibration(d):
+    import evidence
+    c = evidence.sim_calibration(d)
+    assert c["fit"]["a"] == pytest.approx(E.SIM_CAL_A, abs=1e-3) and c["fit"]["b"] == pytest.approx(E.SIM_CAL_B, abs=1e-3)
+    v = c["validate"]
+    assert v["brier_calibrated"] < v["brier_base_rate"] < v["brier_raw"]
+    assert abs(v["calibrated_mean"] - v["observed_rate"]) < 0.005
+
+
+# ---------------------------------------------------------------- Dip-focused action (added)
+def test_cushion_93172_time_machine(d):
+    m = d["monthly"]; dd = {"monthly": m[m.month <= "2024-12"], "loans": d["loans"]}
+    c = E.cushion(93172, dd)
+    assert c["as_of"] == "2024-12" and c["buffer"] == pytest.approx(E.realistic_profile(93172, dd).dip)
+    assert c["alert_level"] == c["buffer"] and c["top_up_now"] >= 0
+    assert "cushion" in E.make_plan(93172, dd, E.Scenario())
+
+def test_dip_days(d):
+    t = E.load_dip_days()
+    if t is None:
+        pytest.skip("transactions.csv not present")
+    assert t.day.between(1, 31).all() and not t.duplicated(["account_id", "month"]).any()
+    c = E.cushion(93172, {"monthly": d["monthly"][d["monthly"].month <= "2024-12"], "loans": d["loans"]}, dip_table=t)
+    assert c["dip_day"] is not None and not c["dip_day_reliable"]   # 93172 dips on scattered days (3 .. 23)
+
+@pytest.mark.slow
+def test_evidence_impact(d):
+    import evidence
+    i = evidence.impact(d, "2024-12")
+    assert (i["first_overdrafts"], i["caught"]) == (55, 34)
+    assert i["buffer"]["covered_in_full"] == 27 and i["alert"]["fired_before"] == 23 and i["alert"]["generic_100_fired_before"] == 1
+    assert i["buffer"]["drawn_total"] < 0.05 * i["buffer"]["limits_total"]

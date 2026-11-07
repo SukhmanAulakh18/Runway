@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 import engine as E
-from ui.data import trough_table
+from ui.data import dip_days, trough_table
 
 
 @dataclass
@@ -25,9 +25,15 @@ class Context:
     sim: dict
     age: int | None
     flags: list = field(default_factory=list)
+    d_full: dict | None = None   # uncut data, only for the Time Machine reveal (what happened after asof)
+    risk: dict | None = None     # engine.overdraft_risk: calibrated chance of a first overdraft in 12 months
+    cushion: dict | None = None  # engine.cushion: buffer, personal alert level, top-up now, usual dip day
 
 
 def build_context(d, people, EV, accounts, acct, asof, sc) -> Context:
+    d_full = d
+    if asof:   # Time Machine: every number uses only what the bank knew at asof (no lookahead)
+        d = {"monthly": d["monthly"][d["monthly"].month <= asof], "loans": d["loans"]}
     p, r = E.profile(acct, d), E.realistic_profile(acct, d)
     a_rows = d["monthly"][d["monthly"].account_id == acct].sort_values("month")
     tt = trough_table(asof)
@@ -35,7 +41,8 @@ def build_context(d, people, EV, accounts, acct, asof, sc) -> Context:
     LR = E.loan_risk(acct, d)
     who = people[people.account_id == acct]
     owner = who[who.type == "owner"]
-    age = int((pd.Timestamp("2025-12-31") - owner.birth_date.iloc[0]).days // 365.25) if len(owner) else None
+    ref = pd.Timestamp(f"{asof}-28") if asof else E.END_OF_DATA
+    age = int((ref - owner.birth_date.iloc[0]).days // 365.25) if len(owner) else None
 
     flags = []   # plain-English warnings a judge might trip over (no money is computed here)
     if LR and LR["overdrawn_before_loan"]:
@@ -50,7 +57,7 @@ def build_context(d, people, EV, accounts, acct, asof, sc) -> Context:
         flags.append("Savings already at or below zero")
     elif p.buffer < p.spending:
         flags.append("Less than one month of spending saved")
-    if a_rows.month.max() < "2025-12":
+    if a_rows.month.max() < (asof or "2025-12"):
         flags.append(f"No activity recorded after {a_rows.month.max()}")
     if p.spending > p.income and r.income > r.spending:
         flags.append("Medians say money out > money in; averages say the opposite")
@@ -63,4 +70,5 @@ def build_context(d, people, EV, accounts, acct, asof, sc) -> Context:
 
     return Context(d=d, EV=EV, accounts=accounts, acct=acct, asof=asof, p=p, r=r, sc=sc,
                    key_res=E.runway(p, sc.to_answer_key_shock()), real_res=E.realistic_runway(r, sc),
-                   a_rows=a_rows, lt=lt, LR=LR, sim=E.simulate(acct, d, sc), age=age, flags=flags)
+                   a_rows=a_rows, lt=lt, LR=LR, sim=E.simulate(acct, d, sc), age=age, flags=flags, d_full=d_full,
+                   risk=E.overdraft_risk(acct, d), cushion=E.cushion(acct, d, dip_table=dip_days()))

@@ -80,6 +80,8 @@ def main(n_boot=1000, seed=0):
     ev["formula_holes"] = formula_holes(d)
     ev["confounders"] = confounders(d)
     ev["multiple_testing"] = multiple_testing(ev, d)
+    ev["sim_calibration"] = sim_calibration(d)
+    ev["impact"] = {asof: impact(d, asof) for asof in ("2023-12", "2024-12")}
     json.dump(ev, open("evidence.json", "w"), indent=2)
     return ev
 
@@ -286,6 +288,80 @@ def loan_evidence(d):
         "top25_payment_default": float(ok[hi].defaulted.mean()), "rest_payment_default": float(ok[~hi].defaulted.mean()),
         "both_n": int((low & hi).sum()), "both_default": float(ok[low & hi].defaulted.mean())}
     return out
+
+
+def _sim_cohort(d, asof):
+    """Accounts with 12+ months up to asof, never overdrawn, full next year: raw simulated P(break in 12 months), outcome."""
+    m = d["monthly"]; past = m[m.month <= asof]
+    nxt = m[(m.month > asof) & (m.month <= f"{int(asof[:4]) + 1}-12")]
+    full = nxt.groupby("account_id").size() == 12
+    neg = nxt.groupby("account_id").days_below_zero.sum() > 0
+    g = past.groupby("account_id"); nh = g.size(); clean = g.days_below_zero.sum() == 0
+    pop = [a for a in full[full].index if nh.get(a, 0) >= E.LTR_MIN_HISTORY and clean.get(a, False)]
+    dd = {"monthly": past, "loans": d["loans"]}
+    p = np.array([1 - E.simulate(a, dd, E.Scenario())["p_survive_12"] for a in pop])
+    return np.clip(p, 1e-3, 1 - 1e-3), neg.reindex(pop).astype(int).to_numpy()
+
+
+def sim_calibration(d):
+    """Is the Monte Carlo's probability a real probability? Fit Platt on 2023->2024, validate on 2024->2025."""
+    import statsmodels.api as sm
+    from sklearn.metrics import brier_score_loss
+    lg = lambda p: np.log(p / (1 - p))
+    p23, y23 = _sim_cohort(d, "2023-12"); p24, y24 = _sim_cohort(d, "2024-12")
+    a, b = sm.Logit(y23, sm.add_constant(lg(p23))).fit(disp=0).params
+    cal = np.array([E.calibrate_break(x) for x in p24])   # uses the constants in engine.py
+    bins = pd.qcut(cal, 5, duplicates="drop")
+    tab = pd.DataFrame({"pred": cal, "obs": y24}).groupby(bins, observed=True).agg(
+        predicted=("pred", "mean"), observed=("obs", "mean"), accounts=("obs", "size"), events=("obs", "sum"))
+    return {"design": "Platt (logistic on logit of raw simulated P(break in 12 months), no shock); fit 2023-12 -> 2024, validate 2024-12 -> 2025",
+            "fit": {"a": float(a), "b": float(b), "accounts": int(len(y23)), "events": int(y23.sum())},
+            "engine_constants": {"a": E.SIM_CAL_A, "b": E.SIM_CAL_B},
+            "validate": {"accounts": int(len(y24)), "events": int(y24.sum()), "observed_rate": float(y24.mean()),
+                         "raw_mean": float(p24.mean()), "calibrated_mean": float(cal.mean()),
+                         "brier_raw": float(brier_score_loss(y24, p24)), "brier_calibrated": float(brier_score_loss(y24, cal)),
+                         "brier_base_rate": float(brier_score_loss(y24, np.full(len(y24), y23.mean()))),
+                         "auc": float(roc_auc_score(y24, cal))},
+            "bins": [{k: (int(v) if k in ("accounts", "events") else float(v)) for k, v in r.items()} for r in tab.to_dict(orient="records")]}
+
+
+def impact(d, asof, flag_share=0.10):
+    """Bank view of the early warning: flag the riskiest 10% at `asof`, what happens in the next 12 months,
+    and what the dip-sized buffer and personal alert (engine.cushion) would have done."""
+    m = d["monthly"]; past = m[m.month <= asof]
+    nxt = m[(m.month > asof) & (m.month <= f"{int(asof[:4]) + 1}-12")]
+    g = past.groupby("account_id"); nh = g.size(); clean = g.days_below_zero.sum() == 0
+    full = nxt.groupby("account_id").size() == 12
+    pop = sorted(a for a in full[full].index if nh.get(a, 0) >= E.LTR_MIN_HISTORY and clean.get(a, False))
+    flag = E.ltr_table(d, asof=asof).loc[pop].ltr.rank(pct=True) <= flag_share
+    ng = nxt[nxt.account_id.isin(pop)].groupby("account_id")
+    days = ng.days_below_zero.sum().reindex(pop); ev = days > 0
+    need = (-ng.min_balance.min()).clip(lower=0).reindex(pop)          # hindsight: how far below $0 they went
+    dd = {"monthly": past, "loans": d["loans"]}
+    caught = [a for a in pop if flag[a] and ev[a]]
+    cu = {a: E.cushion(a, dd) for a in pop if flag[a]}
+    buf = pd.Series({a: c["buffer"] for a, c in cu.items()})
+    covered = sum(buf[a] >= need[a] for a in caught)
+    drawn = float(sum(min(buf[a], need[a]) for a in cu))
+    leads, generic = [], 0
+    for a in caught:
+        h = pd.concat([past[past.account_id == a].tail(1), nxt[nxt.account_id == a]]).sort_values("month")
+        first = h[h.days_below_zero > 0].month.iloc[0]; before = h[h.month < first]
+        hit = before[before.month_end_balance < cu[a]["alert_level"]]
+        leads.append((pd.Period(first) - pd.Period(hit.month.iloc[0])).n if len(hit) else None)
+        generic += int((before.month_end_balance < 100).any())
+    L = pd.Series(leads, dtype=float)
+    return {"population": "12+ months of history, never overdrawn up to asof, full next year", "accounts": len(pop),
+            "flagged": int(flag.sum()), "first_overdrafts": int(ev.sum()), "caught": len(caught),
+            "caught_share": len(caught) / max(int(ev.sum()), 1),
+            "days_below_zero_caught": int(days[flag].sum()), "days_below_zero_all": int(days.sum()),
+            "hindsight_need_median_caught": float(need[caught].median()), "hindsight_need_total_caught": float(need[caught].sum()),
+            "buffer": {"rule": "engine.cushion: buffer = typical in-month dip (median of avg - min balance, last 12 months)",
+                       "limits_total": float(buf.sum()), "limit_median": float(buf.median()), "drawn_total": drawn,
+                       "covered_in_full": int(covered), "covered_share": covered / max(len(caught), 1)},
+            "alert": {"rule": "month-end balance below the customer's own alert_level, before the first overdraft",
+                      "fired_before": int(L.notna().sum()), "median_lead_months": float(L.median()) if L.notna().any() else None,
+                      "generic_100_fired_before": generic}}
 
 
 def formula_holes(d):

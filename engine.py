@@ -319,6 +319,73 @@ def simulate(acct: int, d: dict, sc: Scenario, months: int = 24, n_paths: int = 
     }
 
 
+# Calibration: the raw simulation is ~8x too pessimistic out of time (it predicts 13.5% of customers break in
+# 2025 vs 1.6% who did), because replayed months wander like a random walk while real customers correct course.
+# Its ranking is good (AUC 0.86), so a 2-parameter logistic (Platt) map turns it into a probability.
+# Fitted on 2023-12 -> 2024 by evidence.sim_calibration(); validated on 2024-12 -> 2025 (see evidence.json).
+SIM_CAL_A, SIM_CAL_B = -2.9588, 0.6121
+
+
+def calibrate_break(p_raw: float) -> float:
+    """Raw simulated P(break within 12 months) -> calibrated P(first overdraft within 12 months)."""
+    p = min(max(float(p_raw), 1e-3), 1 - 1e-3)
+    return float(1 / (1 + np.exp(-(SIM_CAL_A + SIM_CAL_B * np.log(p / (1 - p))))))
+
+
+def overdraft_risk(acct: int, d: dict) -> dict:
+    """Calibrated chance of a first overdraft in the next 12 months if nothing changes (no shock).
+
+    Only a forecast for the population it was validated on: 12+ months of history and never overdrawn.
+    Under a shock, use simulate()'s share of surviving futures instead; that is a scenario, not a forecast.
+    """
+    a = _acct(acct, d)
+    raw = 1 - simulate(acct, d, Scenario())["p_survive_12"]
+    in_pop = bool(len(a) >= LTR_MIN_HISTORY and (a.days_below_zero == 0).all())
+    return {"p_12m": calibrate_break(raw), "p_raw": float(raw), "validated_population": in_pop}
+
+
+# ---------------------------------------------------------------------------
+# Dip-focused action: the product that follows from the trough finding.
+# Backtest (evidence.json -> impact): flag the riskiest 10% at Dec 2024; a buffer sized at each customer's
+# typical dip fully covers 27 of 34 caught first overdrafts in 2025, with $78K actually drawn on $2.9M of limits;
+# an alert at the customer's own dip level fires before 23 of 34 of them (median 3 months early), a $100 alert 1 of 34.
+# A cushion from the last 6 months' lowest balance is $0 for exactly these customers (they were never negative).
+# ---------------------------------------------------------------------------
+DIP_DAY_RELIABLE = 0.70   # share of months within +-5 days of the usual dip day to call the timing reliable
+
+
+def cushion(acct: int, d: dict, dip_table: pd.DataFrame | None = None) -> dict:
+    """Dip-focused plan for one customer: buffer size, personal alert level, top-up now, usual dip day."""
+    a = _acct(acct, d)
+    r = realistic_profile(acct, d)
+    last = float(a.month_end_balance.iloc[-1])
+    out = {"buffer": r.dip,                        # overdraft protection / auto-transfer limit = typical in-month dip
+           "alert_level": r.dip,                   # below this, a normal month can take the balance under $0
+           "top_up_now": max(r.dip - last, 0.0),   # move this to chequing now to be covered this month
+           "last_balance": last, "as_of": a.month.iloc[-1],
+           "dip_day": None, "dip_day_share": None, "dip_day_reliable": False}
+    if dip_table is not None:
+        t = dip_table[(dip_table.account_id == acct) & (dip_table.month <= a.month.iloc[-1])].tail(WINDOW)
+        if len(t) >= 6:
+            day = int(t.day.median())
+            share = float((t.day.sub(day).abs() <= 5).mean())
+            out.update(dip_day=day, dip_day_share=share, dip_day_reliable=share >= DIP_DAY_RELIABLE)
+    return out
+
+
+def load_dip_days(data_dir: Path = DATA) -> pd.DataFrame | None:
+    """Day of the month each account's balance is lowest, per month, from transactions.csv (None if absent).
+    About 5 s and 1M rows: callers cache it once."""
+    f = data_dir / "transactions.csv"
+    if not f.exists():
+        return None
+    tx = pd.read_csv(f, usecols=["account_id", "date", "balance"])
+    tx["month"] = tx.date.str[:7]
+    low = tx.loc[tx.groupby(["account_id", "month"]).balance.idxmin(), ["account_id", "month", "date"]]
+    return pd.DataFrame({"account_id": low.account_id.to_numpy(), "month": low.month.to_numpy(),
+                         "day": low.date.str[8:10].astype(int).to_numpy()}).sort_values(["account_id", "month"], ignore_index=True)
+
+
 def make_plan(acct: int, d: dict, sc: Scenario) -> dict:
     """Goal plan + backup plan, every number from this customer's own data."""
     p = profile(acct, d)
@@ -365,7 +432,8 @@ def make_plan(acct: int, d: dict, sc: Scenario) -> dict:
     combo = -(0.20 * r.flexible + r.loan_payments)
     if combo < 0:
         lever("Combined: 20% reduction + loan deferral", "Both levers together", combo)
-    return {"goal": goal, "backup": {"base_runway": base, "levers": levers}, "profile": p, "realistic": r}
+    return {"cushion": cushion(acct, d), "goal": goal, "backup": {"base_runway": base, "levers": levers},
+            "profile": p, "realistic": r}
 
 
 # ---------------------------------------------------------------------------
@@ -438,7 +506,9 @@ def net_flow_filter(acct: int, d: dict) -> dict:
     if len(lvl) > 7 and sd[-1] > 0:
         drift = float((lvl[-1] - lvl[-7]) / max(sd[-1], 1.0))   # change over 6 months, in filter s.d.
     return {"month": a.month.tolist(), "net": net.tolist(), "level": lvl.tolist(), "sd": sd.tolist(),
-            "q": k["q"], "obs_sd": k["obs_sd"], "drift_sd": drift}
+            "q": k["q"], "obs_sd": k["obs_sd"], "drift_sd": drift,
+            "has_trend": bool(k["q"] > 1e-5 * 1.0001),   # q on the grid floor = month-to-month swings are noise
+            "band_from": 2}                               # first 2 months' sd is the diffuse start, don't draw it
 
 
 def optimize_cuts(acct: int, d: dict, sc: Scenario, horizon: int = 12, max_cut_share: float = 0.5,
@@ -494,7 +564,8 @@ def watchlist(d: dict) -> pd.DataFrame:
     """Advisor view: every account ranked by liquidity trough, with plain reason codes."""
     P = all_profiles(d)
     t = ltr_table(d)
-    out = P[["I", "S", "B", "H"]].join(t).join(realistic_vec(d))
+    out = P[["I", "S", "B", "H"]].join(t)
+    out["realistic_runway_ei"] = realistic_runway_vec(d, Scenario(job_loss=True))   # same as realistic_runway()
     out["answer_key_runway_ei"] = runway_vec(P, Shock(income_factor=0.55))
     last = d["monthly"].groupby("account_id").month.max()
     def reasons(r):

@@ -56,7 +56,7 @@ def render(c):
                 st.caption(f"In backtests, the riskiest 10% by this ratio had a first overdraft the next year "
                            f"{yr['low10_rate']:.1%} of the time vs {yr['rest_rate']:.2%} for everyone else ({yr['risk_ratio']:.1f}×).")
     if ASOF_VAL:
-        nxt = E.what_happened_next(acct, d, ASOF_VAL, 12)
+        nxt = E.what_happened_next(acct, c.d_full, ASOF_VAL, 12)
         if len(nxt):
             st.markdown(f"**Time Machine reveal: what happened after {ASOF_VAL}**")
             fr = go.Figure()
