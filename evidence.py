@@ -58,6 +58,7 @@ def main(n_boot=1000, seed=0):
     ev["trough"] = trough_evidence(d, n_boot=n_boot, seed=seed)
     ev["loans"] = loan_evidence(d)
     ev["formula_holes"] = formula_holes(d)
+    ev["confounders"] = confounders(d)
     json.dump(ev, open("evidence.json", "w"), indent=2)
     return ev
 
@@ -129,6 +130,34 @@ def trough_evidence(d, n_boot=1000, seed=0):
                             "jan_2025_days_below_zero": int(ex.loc["2025-01"].days_below_zero), "feb_2025_days_below_zero": int(ex.loc["2025-02"].days_below_zero),
                             "lowest_2025": float(ex.loc["2025-01":"2025-12"].min_balance.min())}
     return out
+
+
+def confounders(d):
+    """Does the bottom-10% trough flag still predict a first 2025 overdraft after controlling for
+    balance size, account age and district unemployment? Same population as the 2025 backtest."""
+    import statsmodels.api as sm
+    m = d["monthly"]
+    nv, pre, y, ltr, low = _ltr_backtest(m, 2025)
+    avg = pre[(pre.month >= "2024-07") & pre.account_id.isin(nv)].groupby("account_id").avg_daily_balance.mean()
+    acc = pd.read_csv(E.DATA / "accounts.csv").set_index("account_id")
+    unemp = acc.district_id.map(pd.read_csv(E.DATA / "districts.csv").set_index("district_id").unemployment_rate_2023)
+    X = pd.DataFrame({"bottom_10_trough": low.astype(float), "log_avg_balance": np.log(avg.reindex(nv)),
+                      "months_of_history": pre.groupby("account_id").size().reindex(nv).astype(float),
+                      "district_unemployment_2023": unemp.reindex(nv)})
+    def fit(cols):
+        r = sm.Logit(y.astype(float), sm.add_constant(X[cols])).fit(disp=0)
+        lo, hi = r.conf_int().loc["bottom_10_trough"]
+        return {"odds_ratio": float(np.exp(r.params["bottom_10_trough"])), "or_ci95": [float(np.exp(lo)), float(np.exp(hi))],
+                "p_value": float(r.pvalues["bottom_10_trough"])}, r
+    unadj, _ = fit(["bottom_10_trough"])
+    adj, r = fit(list(X.columns))
+    return {"model": "statsmodels Logit: first overdraft in 2025 ~ bottom-10% trough flag + log(avg balance, Jul-Dec 2024) "
+                     "+ months of history to Dec 2024 + district unemployment 2023",
+            "population": "complete 2024 and 2025, never below zero before 2025 (same as trough by_year 2025)",
+            "accounts": int(len(y)), "events": int(y.sum()), "flagged": int(low.sum()),
+            "unadjusted": unadj, "adjusted": adj,
+            "controls_odds_ratios": {k: float(np.exp(r.params[k])) for k in X.columns if k != "bottom_10_trough"},
+            "pseudo_r2": float(r.prsquared)}
 
 
 def loan_evidence(d):
