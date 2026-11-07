@@ -8,6 +8,26 @@ import pandas as pd
 from sklearn.metrics import roc_auc_score
 import engine as E
 
+
+def _p_boot(diffs):
+    """Two-sided bootstrap p-value that a difference is 0 (add-one so it is never exactly 0)."""
+    x = np.asarray(diffs)
+    return float(min(1.0, 2 * (min((x <= 0).sum(), (x >= 0).sum()) + 1) / (len(x) + 1)))
+
+
+def _p_auc(auc, n_pos, n_neg):
+    """Two-sided Mann-Whitney normal approximation for AUC = 0.5 (used when only the AUC was logged)."""
+    from scipy.stats import norm
+    se0 = np.sqrt((n_pos + n_neg + 1) / (12 * n_pos * n_neg))
+    return float(2 * norm.sf(abs(auc - 0.5) / se0))
+
+
+def _p_ci(est, lo, hi):
+    """Two-sided p-value from a logged 95% CI, assuming normality."""
+    from scipy.stats import norm
+    return float(2 * norm.sf(abs(est) / ((hi - lo) / 3.92)))
+
+
 def main(n_boot=1000, seed=0):
     d = E.load(); m = d["monthly"]; P = E.all_profiles(d); g = m.groupby("account_id")
     ev = {}
@@ -53,12 +73,13 @@ def main(n_boot=1000, seed=0):
     lo, hi = np.percentile(diffs, [2.5, 97.5])
     ev["out_of_time"] = {"n_accounts": int(n), "events": int(y.sum()), "auc_answer_key": float(roc_auc_score(y, key)),
                          "auc_realistic": float(roc_auc_score(y, real)), "diff": float(roc_auc_score(y, real) - roc_auc_score(y, key)),
-                         "diff_ci95": [float(lo), float(hi)], "n_boot": len(diffs),
+                         "diff_ci95": [float(lo), float(hi)], "n_boot": len(diffs), "diff_p_boot": _p_boot(diffs),
                          "design": "features from months <= 2024-12; outcome = any negative-balance day in 2025; accounts with >= 12 months history"}
     ev["trough"] = trough_evidence(d, n_boot=n_boot, seed=seed)
     ev["loans"] = loan_evidence(d)
     ev["formula_holes"] = formula_holes(d)
     ev["confounders"] = confounders(d)
+    ev["multiple_testing"] = multiple_testing(ev, d)
     json.dump(ev, open("evidence.json", "w"), indent=2)
     return ev
 
@@ -102,11 +123,20 @@ def trough_evidence(d, n_boot=1000, seed=0):
              "Lowest balance, last 6 months": -pre[(pre.month >= "2024-07") & pre.account_id.isin(nv)].groupby("account_id").min_balance.min().reindex(nv).to_numpy(),
              "Liquidity Trough Ratio": -ltr.to_numpy()}
     out["head_to_head_2025"] = {k: float(roc_auc_score(yv, v)) for k, v in cands.items()}
-    rng = np.random.default_rng(seed); s = cands["Liquidity Trough Ratio"]; boots = []
+    s = cands["Liquidity Trough Ratio"]
+    rivals = {k: v for k, v in cands.items() if k != "Liquidity Trough Ratio"}
+    combo = (pd.Series(s).rank() + pd.Series(cands["Realistic runway (EI capped, dip-aware)"]).rank()).to_numpy()  # findings_log #8
+    out["rank_average_runway_trough_auc"] = float(roc_auc_score(yv, combo))
+    rng = np.random.default_rng(seed); boots, vs = [], {k: [] for k in [*rivals, "combo"]}
     for _ in range(n_boot):
         i = rng.integers(0, len(yv), len(yv))
-        if yv[i].sum() > 0: boots.append(roc_auc_score(yv[i], s[i]))
+        if yv[i].sum() > 0:
+            a = roc_auc_score(yv[i], s[i]); boots.append(a)
+            for k, v in rivals.items(): vs[k].append(a - roc_auc_score(yv[i], v[i]))
+            vs["combo"].append(roc_auc_score(yv[i], combo[i]) - a)
     out["ltr_auc_2025_ci95"] = [float(x) for x in np.percentile(boots, [2.5, 97.5])]
+    out["trough_minus_rival_p_boot"] = {k: _p_boot(vs[k]) for k in rivals}
+    out["rank_average_minus_trough_p_boot"] = _p_boot(vs["combo"])
     sens = []
     for wdw in (3, 6, 12):
         _, _, y2, l2, _ = _ltr_backtest(m, 2025, window=wdw)
@@ -158,6 +188,65 @@ def confounders(d):
             "unadjusted": unadj, "adjusted": adj,
             "controls_odds_ratios": {k: float(np.exp(r.params[k])) for k in X.columns if k != "bottom_10_trough"},
             "pseudo_r2": float(r.prsquared)}
+
+
+def _watchlist_hits(d, asof, top=50):
+    """Time Machine: first-time overdrafts in the next 12 months among the watchlist's top `top`."""
+    m = d["monthly"]; dd = {"monthly": m[m.month <= asof], "loans": d["loans"]}
+    w = E.watchlist(dd)
+    w = w[w.scorable & ~(dd["monthly"].groupby("account_id").days_below_zero.sum() > 0).reindex(w.index)]
+    end = f"{int(asof[:4]) + 1}-12"
+    hit = (m[(m.month > asof) & (m.month <= end)].groupby("account_id").days_below_zero.sum() > 0).reindex(w.index).fillna(False)
+    return int(hit.head(top).sum()), top, float(hit.mean())
+
+
+def multiple_testing(ev, d, q=0.10):
+    """Benjamini-Hochberg across every statistical test in docs/findings_log.md, failures included.
+    Rows #4 (policy fact), #6 (reproduction), #13 (counts) and #14 (one account) make no statistical claim."""
+    from scipy.stats import binomtest, fisher_exact
+    from statsmodels.stats.multitest import multipletests
+    m = d["monthly"]; P = E.all_profiles(d); rows = []
+    def add(i, h, test, p, src="data"): rows.append({"log_row": i, "hypothesis": h, "test": test, "p": float(p), "source": src})
+    def fisher(a, n1, c, n0): return fisher_exact([[a, n1 - a], [c, n0 - c]])[1]
+    mi = ev["mislabel"]; k = round(mi["flagged_actually_net_positive"] * mi["flagged_deficit"])
+    add(1, "Median 'money out > money in' flag marks real deficits (it doesn't: most are net positive)", "sign test", binomtest(k, mi["flagged_deficit"]).pvalue)
+    flag = P.S > P.I; neg = (m.groupby("account_id").days_below_zero.max() > 0).reindex(P.index)
+    add(2, "Flagged accounts have more negative-balance months", "Fisher exact",
+        fisher(int((neg & flag).sum()), int(flag.sum()), int((neg & ~flag).sum()), int((~flag).sum())))
+    ot = ev["out_of_time"]; n1 = ot["events"]; n0 = ot["n_accounts"] - n1
+    for name, auc in [("judges' runway (EI 55%)", 0.783), ("mean-based runway", 0.837), ("10th pct of monthly min balance", 0.874),
+                      ("buffer / spend", 0.786), ("income CV", 0.741), ("prior negative", 0.758), ("low-income-month share", 0.703),
+                      ("median gap", 0.611), ("mean gap", 0.697)]:
+        add(3, f"{name} predicts a 2025 overdraft (AUC {auc})", "Mann-Whitney (logged AUC)", _p_auc(auc, n1, n0), "findings_log")
+    for name, est, lo, hi in [("mean flows", 0.054, 0.030, 0.081), ("+ cap + pension", 0.028, 0.002, 0.057), ("+ dip", 0.039, 0.016, 0.065)]:
+        add(5, f"Realistic variant '{name}' beats the answer key", "normal from logged 95% CI", _p_ci(est, lo, hi), "findings_log")
+    add(5, "Chosen realistic runway (last 12 months, cap, pension, dip) beats the answer key", "bootstrap AUC difference", ot["diff_p_boot"])
+    for r in ev["trough"]["by_year"]:
+        add(7, f"Bottom-10% trough -> more first overdrafts in {r['predicted_year']}", "Fisher exact",
+            fisher(r["low10_events"], r["low10_n"], r["new_overdrafts"] - r["low10_events"], r["accounts"] - r["low10_n"]))
+    for k2, p in ev["trough"]["trough_minus_rival_p_boot"].items():
+        add(8, f"Trough beats {k2} (2025)", "bootstrap AUC difference", p)
+    add(8, f"Rank-average of realistic runway + trough differs from trough alone (it is worse: AUC "
+           f"{ev['trough']['rank_average_runway_trough_auc']:.3f} vs {ev['trough']['head_to_head_2025']['Liquidity Trough Ratio']:.3f})",
+        "bootstrap AUC difference", ev["trough"]["rank_average_minus_trough_p_boot"])
+    for asof in ("2023-12", "2024-12"):
+        hits, top, base = _watchlist_hits(d, asof)
+        add(9, f"Watchlist top {top} as of {asof}: {hits} first overdrafts vs {base:.1%} base rate", "binomial", binomtest(hits, top, base).pvalue)
+    lo_ = ev["loans"]
+    add(10, "Ever overdrawn -> loan default (status D partly definitional)", "Fisher exact",
+        fisher(lo_["overdrawn_and_defaulted"], lo_["overdrawn_borrowers"], lo_["never_overdrawn_defaulted"], lo_["never_overdrawn_borrowers"]))
+    add(11, "Loan granted while already overdrawn -> default", "Fisher exact", lo_["fisher_p"])
+    ps = lo_["pre_loan_signal"]
+    add(12, "Lowest-20% pre-loan trough -> default", "Fisher exact",
+        fisher(ps["low20_defaults"], ps["low20_n"], ps["defaults"] - ps["low20_defaults"], ps["loans"] - ps["low20_n"]))
+    add(12, "Payment / money in predicts default", "Mann-Whitney (AUC)", _p_auc(ps["auc_payment_to_money_in"], ps["defaults"], ps["loans"] - ps["defaults"]))
+    add("E4", "Trough flag predicts after balance, history and unemployment", "Logit Wald", ev["confounders"]["adjusted"]["p_value"])
+    reject, p_bh, _, _ = multipletests([r["p"] for r in rows], alpha=q, method="fdr_bh")
+    for r, rej, pa in zip(rows, reject, p_bh): r["p_bh"] = float(pa); r["survives"] = bool(rej)
+    trough = [r for r in rows if r["log_row"] in (7, "E4") or r["hypothesis"].startswith("Trough beats")]
+    return {"method": f"Benjamini-Hochberg, q = {q}", "tests": len(rows), "survive": int(sum(reject)),
+            "trough_tests_survive": f"{sum(r['survives'] for r in trough)} of {len(trough)}",
+            "did_not_survive": [r["hypothesis"] for r in rows if not r["survives"]], "rows": rows}
 
 
 def loan_evidence(d):
