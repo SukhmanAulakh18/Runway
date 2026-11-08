@@ -81,7 +81,11 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
         <div className="card ink">
           {c.risk.validated_population
             ? <Kpi tip={GLOSSARY.risk} label="Chance of a first overdraft, next 12 months" value={pct(c.risk.p_12m, 1)} note="Calibrated on 2024, checked on 2025. If nothing changes." />
-            : <Kpi label="First-overdraft forecast" value="n/a" size="md" note="Only for customers with 12+ months who were never overdrawn" />}
+            : c.repeat
+              ? <Kpi tip="Tested out of time: among customers overdrawn this much in one year, the share overdrawn again the next year."
+                  label="Overdrawn again within a year" value={pct(c.repeat.rate)}
+                  note={`Below $0 on ${c.repeat.days_below_zero_12m} days in the last 12 months. Of ${c.repeat.similar_accounts} customers like this (${c.repeat.tested_on}), ${pct(c.repeat.rate)} were overdrawn again, vs ${pct(c.repeat.never_overdrawn_rate, 1)} of those never overdrawn.`} />
+              : <Kpi label="First-overdraft forecast" value="n/a" size="md" note="Needs 12+ months of history" />}
         </div>
         <div className="card ours">
           <Kpi tip={GLOSSARY.trough} label="Liquidity trough (lowest ÷ average, 6 mo)" value={t ? pct(t.ltr) : "–"}

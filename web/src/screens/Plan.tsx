@@ -39,7 +39,8 @@ export default function Plan({ nav }: { nav: Nav }) {
           {im ? <>
             <p style={{ margin: "10px 0 6px" }}>For the riskiest 10% at Dec 2024, a cushion like this fully covered <b>{im.buffer.covered_in_full} of {im.caught}</b> caught first overdrafts.</p>
             <p style={{ margin: "6px 0" }}>Only <b>{kmoney(im.buffer.drawn_total)}</b> of <b>{kmoney(im.buffer.limits_total)}</b> in limits was ever used: it works as a limit, not cash.</p>
-            <p style={{ margin: "6px 0 0" }}>The personal alert fired before <b>{im.alert.fired_before} of {im.caught}</b>, a median {im.alert.median_lead_months} months early. A $100 alert: {im.alert.generic_100_fired_before}.</p>
+            <p style={{ margin: "6px 0 0" }}>The personal alert fired before <b>{im.alert.fired_before} of {im.caught}</b>, a median {im.alert.median_lead_months} months early. A $100 alert: {im.alert.generic_100_fired_before}.
+              {im.alert.fired_for_quiet_share != null && <> It pinged only {pct(im.alert.fired_for_quiet_share)} of flagged customers who never went overdrawn.</>}</p>
           </> : <Loading h={100} />}
         </div>
       </section>

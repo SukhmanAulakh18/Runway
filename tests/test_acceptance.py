@@ -368,3 +368,42 @@ def test_verdict(d, acct, sc, answer, top):
     if top:
         want = 1 if answer == "yes" else -1
         assert next(x for x in v["drivers"] if x["direction"] == want)["driver"] == top
+
+def test_verdict_fragile_when_most_futures_fail(d):
+    """93172 + furnace: averages say 'no shortfall' with $392 usable left; the simulation says no future lasts 6 months."""
+    s = E.Scenario(one_off_months_of_spending=1.0)
+    p, r = E.profile(93172, d), E.realistic_profile(93172, d)
+    v = E.verdict(p, E.runway(p, s.to_answer_key_shock()), E.realistic_runway(r, s), r, s, E.simulate(93172, d, s))
+    assert v["answer"] == "fragile" and v["headline"].startswith("Fragile.") and "$392" in v["headline"]
+
+def test_repeat_overdraft_rates_out_of_time(d):
+    r25, r24 = E.repeat_rates(d["monthly"], 2025), E.repeat_rates(d["monthly"], 2024)
+    for r in (r24, r25):   # overdrawn last year -> far likelier again than the never-overdrawn base rate
+        assert r["8+ days"]["rate"] > 10 * r["never_overdrawn_rate"] and r["1-7 days"]["rate"] > 10 * r["never_overdrawn_rate"]
+    rep = E.repeat_overdraft(93172, d, r25)   # 21 days below zero in 2025
+    assert rep["tier"] == "8+ days" and rep["tested_on"] == "2024 -> 2025"
+    assert E.repeat_overdraft(20176, d, r25) is None   # never overdrawn
+
+
+def test_simulation_runway_range_is_ordered(d):
+    s = E.simulate(20111, d, E.Scenario(job_loss=True, bills_increase_pct=0.15))
+    assert s["months_to_zero_p10"] <= s["months_to_zero_p50"] <= (s["months_to_zero_p90"] or 99)
+@pytest.mark.slow
+def test_evidence_self_correction_and_extended_bh(d):
+    import evidence
+    sc = evidence.self_correction(d)
+    assert len(sc["rows"]) == 4 and all(r["gap"] > 0.1 and r["share_accounts_positive"] > 0.8 for r in sc["rows"])
+    full = evidence.main(n_boot=200)
+    ext = full["multiple_testing_extended"]
+    assert ext["tests"] == full["multiple_testing"]["tests"] + 8
+    assert all(r["survives"] for r in ext["rows"] if r["log_row"] in (7, "E4", 15))   # trough + steering hold
+    assert full["impact"]["2024-12"]["alert"]["quiet_flagged"] > 0
+
+@pytest.mark.slow
+def test_evidence_segment_profile(d):
+    import evidence
+    s = {r["trait"]: r for r in evidence.segment_profile(d)["rows"]}
+    assert s["money in per month"]["riskiest_10"] > 2 * s["money in per month"]["everyone_else"]   # not poor: high flow
+    assert s["has a loan"]["differs"] and s["has a loan"]["riskiest_10"] > 2 * s["has a loan"]["everyone_else"]
+    assert s["pensioner"]["differs"] and s["pensioner"]["riskiest_10"] < 0.02
+    assert not s["district average salary"]["differs"] and not s["joint account"]["differs"]   # region doesn't matter

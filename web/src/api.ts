@@ -25,12 +25,13 @@ export interface Customer {
   realistic_runway: RunwayRes; trough: Trough | null; risk: { p_12m: number; validated_population: boolean };
   cushion: Cushion; last_activity: string; history: Month[];
   committed: { total: number; orders: number; by_purpose: Record<string, number> } | null;  // standing orders, today only
+  repeat: { days_below_zero_12m: number; tier: string; rate: number; similar_accounts: number; tested_on: string; never_overdrawn_rate: number } | null;
   loan: { amount: number; monthly_payment: number; status_meaning: string; defaulted: boolean; overdrawn_before_loan: boolean; loan_start: string } | null;
   what_happened_next?: { month: string; days_below_zero: number; min_balance: number }[];
 }
 export interface Sim { months: number[]; p10: number[]; p50: number[]; p90: number[]; dip: number; start: number;
   p_survive_6: number; p_survive_12: number; insufficient_history: boolean; n_paths: number; history_months: number }
-export interface Verdict { answer: "yes" | "no" | "paper"; headline: string; reason: string | null; futures: string | null;
+export interface Verdict { answer: "yes" | "no" | "paper" | "fragile"; headline: string; reason: string | null; futures: string | null;
   drivers: { driver: string; what: string; direction: number; months: number | null }[]; threshold_months: number }
 export interface ShockRes { scenario: Scenario; standard: RunwayRes; realistic: RunwayRes; why_different: string[]; simulation: Sim; verdict: Verdict;
   judge_check: { I: number; S: number; B: number; H: number } }

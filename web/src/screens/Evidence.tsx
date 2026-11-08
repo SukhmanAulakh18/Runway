@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, pct } from "../api";
+import { api, money, pct } from "../api";
 import { Legend, PairBars } from "../charts";
 import { Failed, Kpi, Loading } from "./ui";
 
@@ -12,7 +12,10 @@ export default function Evidence() {
   const rr = e.trough.by_year.map((r: { risk_ratio: number }) => r.risk_ratio);
   const cal = e.sim_calibration.validate;
   const bins = e.sim_calibration.bins.map((b: { predicted: number; observed: number }, i: number) => ({ x: `Group ${i + 1}`, a: b.predicted, b: b.observed }));
-  const cf = e.confounders.adjusted, mt = e.multiple_testing, L = e.loans;
+  const cf = e.confounders.adjusted, mt = e.multiple_testing_extended ?? e.multiple_testing, L = e.loans;
+  type SC = { predicted_year: number; low_month_cutoff: number; rebuild_after_low_real: number; rebuild_after_low_shuffled: number; share_accounts_positive: number };
+  const steer: SC[] = (e.self_correction?.rows ?? []).filter((r: SC) => r.low_month_cutoff === 0.2);
+  const steerBars = steer.map((r) => ({ x: String(r.predicted_year - 1), a: r.rebuild_after_low_real, b: r.rebuild_after_low_shuffled }));
 
   return (
     <main className="page fade">
@@ -42,6 +45,35 @@ export default function Evidence() {
           <Legend items={[{ label: "Predicted", kind: "ours" }, { label: "Actually overdrawn", kind: "ink" }]} />
         </div>
       </section>
+
+      {steer.length > 0 && (
+        <section className="grid g-7-5" style={{ alignItems: "start" }}>
+          <div className="card">
+            <h2>After a low month, {pct(Math.min(...steer.map((r) => r.share_accounts_positive)))} of customers steer back faster than chance</h2>
+            <p className="sub" style={{ marginBottom: 8 }}>How much more often money in beats money out the month after a low than after a normal month (percentage points). Real months vs the same months in random order: customers aren't a random walk.</p>
+            <PairBars data={steerBars} a={{ key: "a", name: "Real customers" }} b={{ key: "b", name: "Same months, random order" }} fmt={(v) => `+${Math.round(v * 100)} pts`} />
+            <Legend items={[{ label: "Real customers", kind: "ours" }, { label: "Same months, random order", kind: "soft" }]} />
+          </div>
+          <div className="card">
+            <h2>Why it matters</h2>
+            <p style={{ margin: "8px 0" }}>A simulation that replays months in random order can't steer back, so it predicted {pct(cal.raw_mean)} would go overdrawn when {pct(cal.observed_rate, 1)} did. That's why we calibrate it, and why the dip, not the average, is what to watch.</p>
+            <p className="callout">Follow-up we don't claim: weak steering predicting who in the riskiest 10% goes overdrawn held in 2025 but not in 2024.</p>
+          </div>
+        </section>
+      )}
+
+      {e.segment && (
+        <section className="card">
+          <h2>Who the riskiest 10% are: every trait we checked, including the ones that don't matter</h2>
+          <p className="sub" style={{ marginBottom: 8 }}>{e.segment.riskiest_10_n} flagged vs {e.segment.everyone_else_n} others (Dec 2024 data). Medians for amounts, shares for yes/no. Multiple-testing corrected.</p>
+          <table className="tbl"><thead><tr><th>Trait</th><th className="num">Riskiest 10%</th><th className="num">Everyone else</th><th>Different?</th></tr></thead>
+            <tbody>{(e.segment.rows as { trait: string; kind: string; riskiest_10: number; everyone_else: number; differs: boolean }[]).map((r) => {
+              const f = (v: number) => r.kind === "bin" || r.trait.includes("share") ? pct(v, 1) : r.trait.includes("age") ? v.toFixed(1) : money(v);
+              return <tr key={r.trait}><td>{r.trait}</td><td className="num">{f(r.riskiest_10)}</td><td className="num">{f(r.everyone_else)}</td>
+                <td>{r.differs ? <span className="chip ours">Yes</span> : <span className="chip">No difference</span>}</td></tr>;
+            })}</tbody></table>
+        </section>
+      )}
 
       <section className="grid g2" style={{ alignItems: "start" }}>
         <div className="card">
