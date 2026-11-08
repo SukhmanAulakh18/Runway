@@ -12,7 +12,22 @@ import json
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
+
+def _load_env(path: Path) -> None:
+    """KEY=value lines from a gitignored .env into os.environ, so nobody has to `source .env` on demo day.
+    Real environment variables win; an unreadable file is ignored."""
+    try:
+        for line in path.read_text().splitlines():
+            k, sep, v = line.strip().partition("=")
+            if sep and k and not k.startswith("#"):
+                os.environ.setdefault(k.strip(), v.strip().strip("'\""))
+    except OSError:
+        pass
+
+
+_load_env(Path(__file__).resolve().parent / ".env")
 # gemini-2.5-flash returns 404 for new keys (Nov 2026); 3.7/3.8-flash were overloaded (503/504) in testing,
 # 3.5/3.6-flash answered every call in 3-4 s.
 MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
