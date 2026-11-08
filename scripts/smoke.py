@@ -31,7 +31,7 @@ CHECKS = [
     ("evidence: survival, challenger, buffer confidence present",
      lambda: all(k in call("/api/evidence")[0] for k in ("survival", "challenger", "buffer_confidence", "out_of_time"))),
     ("twist card reads job loss", lambda: call("/api/twist", {"text": "They lose their job"})[0]["settings"]["job_loss"]),
-    ("plan answers in under 10 s", lambda: call("/api/plan/93172?asof=2024-12", {"scenario": {}})[1] < 10),
+    ("plan answers in under 10 s", lambda: call("/api/plan/93172", {"scenario": {}, "asof": "2024-12"})[1] < 10),
 ]
 
 failed = 0

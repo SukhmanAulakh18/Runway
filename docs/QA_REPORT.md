@@ -57,7 +57,7 @@ tested rate, from the same cohort the whole-book card already uses). Two new tes
 | 01 Who's at risk | The finding in one line; the whole book (10% of customers → 58–68% of next year's overdrafts); the call list; the loan rule | "Who the riskiest are" also appears on Why trust it |
 | 02 Know the customer | The 4-step story strip, tier badge, both runways, the cause and the action, "When?", the loan check | none |
 | 03 Stress test | The verdict + biggest reason is the best answer to the live twist; the AI/rules disagreement flag | Exposure profile (uncalibrated; folded away) |
-| 04 Make a plan | Cause first, free steps first, real Tangerine cost, the backtested cushion and risk appetite | The cuts chart can ask for large cuts (93172: about $3,787 a month); "needs a bridge first" under a shock is honest but not a pitch moment |
+| 04 Make a plan | Cause first, free steps first, real Tangerine cost, the backtested cushion and risk appetite | The cuts chart can ask for large cuts (93172 at Dec 2024: about $7,330 a month on average); now folded behind a click; "needs a bridge first" under a shock is honest but not a pitch moment |
 | 05 Why trust it | Runway vs formula, model health, 3-year backtest, calibration, survival, challenger, fairness, failures and limits | Dense (about 2,000 words); point at the headline cards only |
 
 ## 4. Where we stand

@@ -68,10 +68,11 @@ export default function Plan({ nav }: { nav: Nav }) {
       </section>
 
       <section className="grid g-7-5" style={{ alignItems: "start" }}>
-        <div className="card">
-          <h2>{o.protected_months > o.base_months
+        <details className="card fold">   {/* folded: the cut sizes can look large; the backup levers are the pitch */}
+          <summary><h2>{o.protected_months > o.base_months
             ? `Smallest cuts that keep them out of overdraft: ${o.protected_months} months instead of ${o.base_months > 0 ? o.base_months : "less than 1"}`
             : o.base_months >= o.horizon ? `No cuts needed: safe for all ${o.horizon} months, even in ${o.outcome}` : `Cuts alone can't protect month ${o.base_months + 1}: they need a bridge first`}</h2>
+            <span className="sub">Linear program, month by month. Show the cuts</span></summary>
           <p className="sub" style={{ marginBottom: 8 }}>
             Linear program over the simulated path for {o.outcome}{shocked ? ", under your shock" : ""}. Bills and insurance are never cut; at most {money(o.max_monthly_cut)}/month.
             {o.protected_months > o.base_months && <> Average cut {money(o.avg_monthly_cut)}/month.</>}
@@ -79,7 +80,7 @@ export default function Plan({ nav }: { nav: Nav }) {
           </p>
           <OptimiserChart path={o.path} protectedPath={o.protected_path} cuts={o.cuts} dip={o.dip} />
           <Legend items={[{ label: "With the cuts", kind: "ours" }, { label: "Without changes", kind: "std" }, { label: "Monthly cut", kind: "soft" }, { label: "Overdraft line", kind: "bad" }]} />
-        </div>
+        </details>
         <div className="card">
           <h2>Backup plan if the shock hits</h2>
           <p className="sub">Ranked by months of runway each action buys. Current realistic runway: {p.backup.base_runway} months.</p>
