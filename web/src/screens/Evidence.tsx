@@ -31,6 +31,28 @@ export default function Evidence() {
         <div className="card"><Kpi label="Ever-overdrawn borrowers who defaulted" value={`${L.overdrawn_and_defaulted} of ${L.overdrawn_borrowers}`} note={`${L.pre_loan_overdrawn} of ${L.pre_loan_overdrawn} lent to while already overdrawn defaulted (p = ${L.fisher_p.toExponential(1)})`} /></div>
       </section>
 
+      {e.out_of_time && e.mislabel && e.ei_cap && e.formula_holes && (
+        <section className="card">
+          <h2>Our runway vs the judges' formula: better at predicting overdrafts, and why</h2>
+          <p className="sub">The judges' formula is kept exactly (it is the answer key). These are the holes our realistic runway fixes, each tested on the data.</p>
+          <table className="tbl" style={{ marginTop: 8 }}><thead><tr><th>What we tested</th><th>Judges' formula</th><th>Realistic runway</th></tr></thead>
+            <tbody>
+              <tr><td>Predicting who goes overdrawn in 2025 (out of time, {e.out_of_time.n_accounts.toLocaleString()} customers)</td>
+                <td>AUC {e.out_of_time.auc_answer_key.toFixed(2)}</td>
+                <td><b>AUC {e.out_of_time.auc_realistic.toFixed(2)}</b> (+{e.out_of_time.diff.toFixed(3)}, 95% CI {e.out_of_time.diff_ci95[0].toFixed(3)}–{e.out_of_time.diff_ci95[1].toFixed(3)}, p = {e.out_of_time.diff_p_boot.toFixed(3)})</td></tr>
+              <tr><td>Customers the formula labels "in deficit" (typical money out above money in)</td>
+                <td>{pct(e.mislabel.flagged_share)} of customers</td>
+                <td>{pct(e.mislabel.flagged_actually_net_positive)} of them actually had more money in than out; {pct(e.mislabel.flagged_balance_grew)} saw their balance grow</td></tr>
+              <tr><td>EI is capped at {money(e.ei_cap.ei_monthly_max)}/month: {pct(e.ei_cap.capped_share)} of customers would hit the cap</td>
+                <td>{pct(e.ei_cap.capped_survive6_card)} of them last 6 months on a job loss</td>
+                <td><b>{pct(e.ei_cap.capped_survive6_real)}</b> do</td></tr>
+              <tr><td>EI stops after 6 months (the formula pays it forever)</td>
+                <td>{pct(e.formula_holes.ei_forever.survive12_formula)} last 12 months on a job loss</td>
+                <td><b>{pct(e.formula_holes.ei_forever.survive12_ei_stops_6)}</b> do; {e.formula_holes.ei_forever.flip_from_no_shortfall} customers lose their "no shortfall"</td></tr>
+            </tbody></table>
+        </section>
+      )}
+
       {e.monitoring && (
         <section className="card">
           <div className="card-head">
