@@ -211,9 +211,14 @@ def _book(asof: Optional[str]) -> dict:
             for k, (lab, act_txt) in E.BOOK_TIERS.items()]
     n = int(len(tiers))
     focus = [r for r in rows if r["tier"] in ("overdrawn", "act")]
+    # the sentence "X% of customers produced Y% of overdrafts" must describe ONE population: the tested cohort
+    tt = tested["tiers"] if tested else None
+    tested_n = sum(v["with_full_next_year"] for v in tt.values()) if tt else None
     summary = {"focus_customers": sum(r["customers"] for r in focus), "focus_customer_share": sum(r["customers"] for r in focus) / n,
-               "focus_overdraft_share": sum(r["tested_share_of_overdrafts"] or 0 for r in focus) if tested else None,
-               "stable_customer_share": next(r["customers"] for r in rows if r["tier"] == "stable") / n}
+               "stable_customer_share": next(r["customers"] for r in rows if r["tier"] == "stable") / n,
+               "tested_focus_customer_share": (sum(tt[k]["with_full_next_year"] for k in ("overdrawn", "act")) / tested_n) if tt else None,
+               "tested_focus_overdraft_share": sum(tt[k]["share_of_overdrafts"] or 0 for k in ("overdrawn", "act")) if tt else None,
+               "tested_stable_rate": tt["stable"]["rate"] if tt else None}
     return {"asof": asof, "customers": n, "tiers": rows, "act_causes": causes, "summary": summary,
             "tested_on": f"Dec {max(usable)[:4]} → {tested['outcome_year']}" if tested else None}
 

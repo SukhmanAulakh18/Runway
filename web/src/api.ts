@@ -55,7 +55,8 @@ export interface Watch { asof: string | null; n_in_view: number; rows: WatchRow[
 export interface BookTier { tier: "overdrawn" | "act" | "watch" | "stable" | "new"; label: string; action: string; customers: number;
   tested_rate: number | null; tested_share_of_overdrafts: number | null }
 export interface Book { asof: string | null; customers: number; tiers: BookTier[]; act_causes: Record<string, number>; tested_on: string | null;
-  summary: { focus_customers: number; focus_customer_share: number; focus_overdraft_share: number | null; stable_customer_share: number } }
+  summary: { focus_customers: number; focus_customer_share: number; stable_customer_share: number;
+    tested_focus_customer_share: number | null; tested_focus_overdraft_share: number | null; tested_stable_rate: number | null } }
 export interface Twist { settings: Scenario; source: string; disagree: string[]; chips: string[] }
 // evidence.json is large; screens read the fields they need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

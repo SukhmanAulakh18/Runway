@@ -149,10 +149,10 @@ function BookCard({ nav }: { nav: Nav }) {
       <div className="card-head"><div>
         <h2>The whole book: {b.customers.toLocaleString("en-CA")} customers, one action each</h2>
         <p className="sub">
-          {s.focus_overdraft_share != null
-            ? <>{pct(s.focus_customer_share)} of customers (already overdrawn + riskiest 10%) produced <b>{pct(s.focus_overdraft_share)}</b> of next year's overdrafts. {pct(s.stable_customer_share)} are stable and need nothing.</>
-            : <>{pct(s.focus_customer_share)} of customers need an advisor; {pct(s.stable_customer_share)} are stable.</>}
-          {b.tested_on && <> Rates tested on {b.tested_on}, a year already over at this date.</>}
+          {pct(s.focus_customer_share)} of customers at this date need an advisor (already overdrawn or riskiest 10%); {pct(s.stable_customer_share)} are stable and need nothing.
+          {s.tested_focus_overdraft_share != null && s.tested_focus_customer_share != null && s.tested_stable_rate != null &&
+            <> Tested on {b.tested_on}: those two tiers were <b>{pct(s.tested_focus_customer_share)}</b> of customers and produced <b>{pct(s.tested_focus_overdraft_share)}</b> of the next year's overdrafts; the stable tier overdrew {pct(s.tested_stable_rate, 1)}.</>}
+          {b.tested_on && <> Rates come from a year already over at this date.</>}
         </p></div></div>
       <div className="bookbar" role="img" aria-label={b.tiers.map((t) => `${t.label}: ${t.customers}`).join("; ")}>
         {b.tiers.filter((t) => t.customers > 0).map((t) => (

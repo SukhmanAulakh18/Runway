@@ -121,3 +121,9 @@ def test_book_covers_every_customer_without_lookahead():
     tiers = {t["tier"]: t for t in b["tiers"]}
     assert tiers["stable"]["tested_rate"] < 0.01 < tiers["act"]["tested_rate"] < tiers["overdrawn"]["tested_rate"]
     assert client.get("/api/book").json()["tested_on"] == "Dec 2024 → 2025"
+
+
+def test_book_sentence_uses_one_population():
+    s = client.get("/api/book").json()["summary"]             # today: tested on the Dec 2024 cohort -> 2025
+    assert s["tested_focus_customer_share"] == pytest.approx(0.085, abs=0.003)
+    assert s["tested_focus_overdraft_share"] == pytest.approx(0.60, abs=0.01) and s["tested_stable_rate"] < 0.01
