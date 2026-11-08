@@ -111,7 +111,7 @@ def customer(acct: int, asof: Optional[str] = ASOF):
                      "days_below_zero", "household_bills", "insurance", "loan_payments", "pension_in"]]
     out = {"account_id": acct, "asof": asof, "owner_age": c.age, "flags": c.flags,
            "profile": c.p, "standard_runway": c.key_res, "realistic": c.r, "realistic_runway": c.real_res,
-           "trough": c.lt, "loan": c.LR, "risk": c.risk, "cushion": c.cushion, "committed": c.committed, "repeat": c.repeat,
+           "trough": c.lt, "loan": c.LR, "risk": c.risk, "cushion": c.cushion, "committed": c.committed, "repeat": c.repeat, "diagnosis": c.diagnosis,
            "last_activity": c.a_rows.month.max(), "history": hist}
     if asof:
         out["what_happened_next"] = E.what_happened_next(acct, c.d_full, asof, 12)
@@ -137,7 +137,7 @@ def plan(acct: int, req: PlanReq):
     pl = E.make_plan(acct, c.d, sc)
     pl["cushion"] = c.cushion                        # same cushion as the customer view (includes the dip day)
     opt = E.optimize_cuts(acct, c.d, sc, max_cut_share=req.max_cut_share, pessimistic=req.pessimistic)
-    return clean({"cushion": c.cushion, "goal": pl["goal"], "backup": pl["backup"], "optimiser": opt,
+    return clean({"cushion": c.cushion, "diagnosis": c.diagnosis, "goal": pl["goal"], "backup": pl["backup"], "optimiser": opt,
                   "facts": ai.plan_facts(pl, c.key_res, c.real_res, c.sim, opt, c.risk)})
 
 
@@ -149,7 +149,7 @@ def write_plan(facts: dict):
 
 def _facts(acct: int, asof: Optional[str]) -> dict:
     c = ctx(acct, asof, E.Scenario())
-    return ai.customer_facts(acct, c.p, c.r, c.lt, c.risk, c.cushion, c.key_res, c.real_res, c.flags, c.committed, asof)
+    return ai.customer_facts(acct, c.p, c.r, c.lt, c.risk, c.cushion, c.key_res, c.real_res, c.flags, c.committed, asof, c.diagnosis)
 
 
 @app.post("/api/ai/brief/{acct}")

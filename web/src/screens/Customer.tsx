@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { api, money, monthName, pct, type Asof } from "../api";
+import { api, kmoney, money, monthName, pct, type Asof, type Diagnosis } from "../api";
 import type { Nav } from "../App";
 import { BalanceChart, Legend } from "../charts";
-import { Failed, GLOSSARY, Info, Kpi, Loading } from "./ui";
+import { Failed, GLOSSARY, Kpi, Loading } from "./ui";
 
 function Source({ s }: { s: string }) {
   return <span className={`src ${s.startsWith("AI") ? "" : "tpl"}`}>{s.startsWith("AI") ? "AI · every number checked" : "Template (AI off or unsure)"}</span>;
@@ -50,13 +50,49 @@ function Assistant({ acct, asof }: { acct: number; asof: Asof }) {
   );
 }
 
+
+/** Why this customer is at risk and what the bank can do, most urgent first. The engine picks and sizes each action. */
+function NextBestAction({ dx, nav, tested }: { dx: Diagnosis; nav: Nav; tested: Record<string, string> }) {
+  const [first, ...rest] = dx.all;
+  return (
+    <section className="card nba">
+      <div className="card-head"><div><h2>Why they're at risk, and what to do</h2>
+        <p className="sub">Most urgent first. Every amount comes from this customer's own numbers.</p></div>
+        <button className="btn ours" onClick={() => nav.go("plan")}>Open the plan →</button></div>
+      <div className="nba-first">
+        <span className="badge ours">Do this first</span>
+        <h3>{first.title}</h3>
+        <p className="why">{first.why}</p>
+        <p className="act"><b>Action:</b> {first.action}</p>
+        {tested[first.code] && <p className="sub tested">{tested[first.code]}</p>}
+      </div>
+      {rest.length > 0 && <div className="list">
+        {rest.map((g) => (
+          <div key={g.code} className="list-row">
+            <b>{g.title}</b><span className="chip">{g.code === "dip" ? "Always" : "Also"}</span>
+            <span className="how">{g.why} <b>Action:</b> {g.action}{tested[g.code] ? ` (${tested[g.code]})` : ""}</span>
+          </div>))}
+      </div>}
+    </section>
+  );
+}
+
 export default function CustomerScreen({ nav }: { nav: Nav }) {
   const q = useQuery({ queryKey: ["customer", nav.acct, nav.asof], queryFn: () => api.customer(nav.acct, nav.asof) });
+  const ev = useQuery({ queryKey: ["evidence"], queryFn: api.evidence, staleTime: Infinity });
   if (q.isPending) return <main className="page"><Loading h={90} /><Loading h={140} /><Loading h={320} /></main>;
   if (q.isError) return <main className="page"><Failed error={q.error} /></main>;
   const c = q.data, t = c.trough, r = c.realistic;
   const next = c.what_happened_next ?? [];
   const overdrawnNext = next.filter((m) => m.days_below_zero > 0);
+  // tested notes for each diagnosis, straight from evidence.json (2025 out-of-time results); display only
+  const g25 = ev.data?.diagnoses?.by_year?.find((y: { year: number }) => y.year === 2025)?.groups;
+  const im = ev.data?.impact?.["2024-12"];
+  const tested: Record<string, string> = {};
+  if (g25?.income_drop) tested.income_drop = `Tested: in 2025, flagged customers whose money in fell overdrew ${pct(g25.income_drop.rate)} vs ${pct(g25.income_drop.flagged_without_rate)} of other flagged customers.`;
+  if (g25?.swing) tested.swing = `Tested: in 2025, flagged customers with big swings overdrew ${pct(g25.swing.rate)} vs ${pct(g25.swing.flagged_without_rate)}.`;
+  if (im) tested.dip = `Tested: a buffer like this fully covered ${im.buffer.covered_in_full} of ${im.caught} caught first overdrafts in 2025; only ${kmoney(im.buffer.drawn_total)} of ${kmoney(im.buffer.limits_total)} in limits was ever used.`;
+  if (c.repeat) tested.repeat = `Tested: ${pct(c.repeat.rate)} of customers like this were overdrawn again within a year (${c.repeat.tested_on}).`;
 
   return (
     <main className="page fade">
@@ -71,8 +107,9 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
       </div>
 
       <p className="summary">
-        Over the last {r.window_months} months they brought in about <b>{money(r.income)}</b> a month and sent out <b>{money(r.spending)}</b>,
+        Over the last {r.window_months} months they brought in about <b>{money(r.income)}</b> a month and sent out <b>{money(r.spending_history)}</b>,
         {" "}with <b>{money(c.profile.buffer)}</b> on average in the account.
+        {r.loan_adjust >= 1 && <> A new loan now costs <b>{money(r.loan_payments)}</b> a month, which isn't in that history yet.</>}
         {t?.scorable && <> But their balance dipped to <b>{money(t.min_balance)}</b>, {pct(t.ltr)} of the average.</>}
         {" "}Standard runway: <span className="s">{c.standard_runway.label}</span>. Realistic: <span className="o">{c.realistic_runway.label}</span>.
       </p>
@@ -94,6 +131,8 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
         <div className="card"><Kpi swatch="std" tip={GLOSSARY.standard} label="Standard runway (no shock)" value={c.standard_runway.label} size="md" note="Judges' formula, medians" /></div>
         <div className="card"><Kpi swatch="ours" tip={GLOSSARY.realistic} label="Realistic runway (no shock)" value={c.realistic_runway.label} size="md" note="Last 12 months, dip-aware" /></div>
       </section>
+
+      {c.diagnosis && <NextBestAction dx={c.diagnosis} nav={nav} tested={tested} />}
 
       <Assistant key={`${c.account_id}-${c.asof}`} acct={c.account_id} asof={c.asof as Asof} />
 
@@ -125,12 +164,6 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
               </div>
             </div>
           )}
-          <div className="card ours">
-            <h2>The fix: a cushion sized to their own dip <Info tip={GLOSSARY.cushion} /></h2>
-            <p style={{ margin: "8px 0 12px" }}>Keep <b>{money(c.cushion.buffer)}</b> available (overdraft protection or an auto-transfer), the size of their usual in-month dip, and alert them before the balance gets that low.
-              {c.cushion.dip_day_reliable && c.cushion.dip_day && <> Their balance usually bottoms out around day {c.cushion.dip_day}.</>}</p>
-            <button className="btn ours" onClick={() => nav.go("plan")}>Open the plan →</button>
-          </div>
           {c.committed && (
             <div className="card">
               <h3>Leaves every month by standing order: {money(c.committed.total)}</h3>

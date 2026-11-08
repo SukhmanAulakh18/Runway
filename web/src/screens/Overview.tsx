@@ -26,10 +26,10 @@ export default function Overview({ nav }: { nav: Nav }) {
         </p>
       </div>
 
-      <section className="how" aria-label="How it works">
+      <section className="howto" aria-label="How it works">
         {[["Spot", "Flag customers whose balance keeps dipping near $0, even when the average looks fine."],
           ["Explain", "Show why in plain words: the dip, the risk, and what a job loss or repair would do."],
-          ["Act", "Offer a cushion sized to their own dip, with an alert and a message ready in English or French."]].map(([h, t], i) => (
+          ["Act", "Match the action to the cause: a call when money in falls, a loan review, auto-saving good months, and a cushion with an alert sized to their own dip. Message ready in English or French."]].map(([h, t], i) => (
           <div key={h} className="card"><span className="n">{i + 1}</span><div><h2>{h}</h2><p className="sub" style={{ marginTop: 4 }}>{t}</p></div></div>
         ))}
       </section>
