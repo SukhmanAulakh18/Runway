@@ -26,3 +26,8 @@ schema didn't ask for exact decimals) and "unemployed for 4 months, then back to
 say the field counts months out of work, which is how `engine.simulate` uses it). The definitions in `ai.SCENARIO_FIELDS`
 were clarified afterwards, so a re-run of Gemini on those two v2 cards is no longer blind: report any change on them
 separately, not as a held-out improvement.
+
+Re-run after the clarification (Nov 8, not blind on those two cards): Gemini 22/22 tuned, 15/16 dev, 14/16 held-out v2,
+timeouts down from 2 to 1. "4 months, then back to work" now gives return month 4 but EI months 6 (want 4); "a third"
+now gives 0.3333 (scored as a miss because the scorer requires an exact match; its effect on the engine is negligible).
+The scorer was not changed after seeing results. Headline stays 14/16 (88%).
