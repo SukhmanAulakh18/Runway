@@ -177,3 +177,10 @@ def test_not_found_says_what_to_do():
     r = client.get("/api/customer/77040", params={"asof": "2023-12"})
     assert r.status_code == 404 and "later date" in r.json()["detail"]
     assert "isn't in the data" in client.get("/api/customer/1").json()["detail"]
+
+
+def test_measured_ai_accuracy_is_served_when_present():
+    ev = client.get("/api/evidence").json()
+    if "ai_eval" in ev:   # written by scripts/eval_ai.py; the Stress screen shows it next to the twist card
+        a = ev["ai_eval"]
+        assert a["held_out_cards"] == 16 and 0 <= a["rules_correct"] <= 16 and (a["ai_correct"] is None or 0 <= a["ai_correct"] <= 16)

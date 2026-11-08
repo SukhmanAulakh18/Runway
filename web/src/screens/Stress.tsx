@@ -63,6 +63,7 @@ export default function Stress({ nav }: { nav: Nav }) {
   const [sc, setSc] = useState<Scenario>(nav.scenario);
   const [text, setText] = useState("");
   const [read, setRead] = useState<Twist | null>(null);
+  const aiEval = useQuery({ queryKey: ["evidence"], queryFn: api.evidence, staleTime: Infinity }).data?.ai_eval;
   useEffect(() => { const t = setTimeout(() => nav.setScenario(sc), 250); return () => clearTimeout(t); }, [sc]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (patch: Partial<Scenario>) => setSc({ ...sc, ...patch });
 
@@ -81,7 +82,8 @@ export default function Stress({ nav }: { nav: Nav }) {
       <section className="grid g-7-5" style={{ alignItems: "start" }}>
         <div className="card">
           <h2>Twist card</h2>
-          <p className="sub" style={{ marginBottom: 10 }}>Type it as the judge reads it. The engine only runs on the settings you see below.</p>
+          <p className="sub" style={{ marginBottom: 10 }}>Type it as the judge reads it. The engine only runs on the settings you see below.
+            {aiEval && <> Measured on {aiEval.held_out_cards} cards never used for tuning: {aiEval.ai_correct != null ? `Gemini read ${aiEval.ai_correct}, ` : ""}the offline rules {aiEval.rules_correct}. Neither is perfect, so check the chips.</>}</p>
           <textarea className="card-input" value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. Laid off, EI pays 55% for 6 months, and the furnace dies"
             onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) readCard(text); }} />
           <div className="chips" style={{ marginTop: 10, alignItems: "center" }}>
