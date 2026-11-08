@@ -19,3 +19,10 @@ then used to generalise the rules. Held-out v2: frozen before that change and ne
 - **Gemini on Vertex AI (gemini-3.5-flash), dev cards (old held-out)**: "They're furloughed for three months with EI at 55%": return_to_work_month: invented 4
 - **Gemini on Vertex AI (gemini-3.5-flash), held-out v2 (never tuned on)**: "Hours reduced by a third": income_cut: got 0.33, want 0.3333333333333333
 - **Gemini on Vertex AI (gemini-3.5-flash), held-out v2 (never tuned on)**: "Unemployed for 4 months with EI at 55%, then back to work": ei_months: got 6, want 4; return_to_work_month: got 5, want 4
+
+## Note (Nov 8): field definitions clarified after the Gemini run
+Gemini's two held-out misses came from ambiguous schema definitions, not model errors: "a third" read as 0.33 (the
+schema didn't ask for exact decimals) and "unemployed for 4 months, then back to work" read as month 5 (the schema didn't
+say the field counts months out of work, which is how `engine.simulate` uses it). The definitions in `ai.SCENARIO_FIELDS`
+were clarified afterwards, so a re-run of Gemini on those two v2 cards is no longer blind: report any change on them
+separately, not as a held-out improvement.

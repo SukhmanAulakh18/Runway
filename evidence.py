@@ -94,6 +94,7 @@ def main(n_boot=1000, seed=0):
     ev["new_accounts"] = new_accounts(d)   # before the extended family: its 12 tests belong in it
     ev["multiple_testing_extended"] = multiple_testing_extended(ev)
     ev["book"] = book(d)
+    ev["buffer_confidence"] = buffer_confidence(d)
     ev["lessons"] = lessons(ev)   # last: reads diagnoses and the extended multiple-testing family
     return ev
 
@@ -511,6 +512,33 @@ def new_accounts(d):
             "chosen": "money in swing (sd)", "best_by_year": {str(k): v for k, v in pick.items()},
             "confirmed_2025": by_year[-1]["candidates"]["money in swing (sd)"], "trough_on_new_accounts_auc": "0.55-0.71 (weak, inconsistent)",
             "by_year": by_year, "tests": tests}
+
+
+def buffer_confidence(d):
+    """Risk appetite for the buffer: size it at the q-th percentile of each flagged customer's own monthly dip (last 12
+    months, data up to Dec of year N); outcome = first overdrafts in N+1. Coverage vs limits offered vs money drawn."""
+    m = d["monthly"].sort_values(["account_id", "month"]); out = {}
+    for asof in ("2023-12", "2024-12"):
+        y = str(int(asof[:4]) + 1)
+        past = m[m.month <= asof]; nxt = m[m.month.str[:4] == y]
+        g = past.groupby("account_id"); nh = g.size(); clean = g.days_below_zero.sum() == 0
+        full = nxt.groupby("account_id").size() == 12
+        pop = sorted(a for a in full[full].index if nh.get(a, 0) >= E.LTR_MIN_HISTORY and clean.get(a, False))
+        flag = E.ltr_table(d, asof=asof).loc[pop].ltr.rank(pct=True) <= 0.10
+        fl = [a for a in pop if flag[a]]
+        ng = nxt[nxt.account_id.isin(fl)].groupby("account_id")
+        need = (-ng.min_balance.min()).clip(lower=0).reindex(fl); ev_ = (ng.days_below_zero.sum() > 0).reindex(fl)
+        w = past[past.account_id.isin(fl)].groupby("account_id").tail(E.WINDOW)
+        dips = (w.avg_daily_balance - w.min_balance).groupby(w.account_id)
+        rows = []
+        for name, q in (("median dip (default)", 0.5), ("75th percentile dip (conservative)", E.BUFFER_CONSERVATIVE_Q),
+                        ("90th percentile dip", 0.9), ("largest dip", 1.0)):
+            buf = dips.quantile(q).reindex(fl)
+            rows.append({"level": name, "q": q, "covered": int(((buf >= need) & ev_).sum()), "overdrafts": int(ev_.sum()),
+                         "limits_total": float(buf.sum()), "limit_median": float(buf.median()),
+                         "drawn_total": float(np.minimum(buf, need).sum())})
+        out[asof] = {"outcome_year": int(y), "flagged": len(fl), "rows": rows}
+    return out
 
 
 def book(d):

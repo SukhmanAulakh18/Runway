@@ -549,3 +549,21 @@ def test_evidence_survival_and_challenger(d):
     ch = evidence.challenger(d)
     assert ch["top_features"][0]["feature"] == "trough"          # the challenger's most important input is the trough
     assert ch["mcnemar_p"] > 0.05 and ch["auc_diff_p_boot"] > 0.05   # statistically tied: champion stays
+
+
+# ---------------------------------------------------------------- Risk appetite and haircut (Nov 8)
+def test_conservative_buffer_and_haircut(d):
+    m = d["monthly"]; dd = {"monthly": m[m.month <= "2024-12"], "loans": d["loans"]}
+    c = E.cushion(93172, dd)
+    assert c["buffer_conservative"] >= c["buffer"] > 0
+    lt = E.liquidity_trough(93172, dd, asof="2024-12")
+    assert lt["haircut"] == pytest.approx(1 - lt["ltr"]) and lt["haircut"] > 0.95
+
+@pytest.mark.slow
+def test_evidence_buffer_confidence_curve(d):
+    import evidence
+    for v in evidence.buffer_confidence(d).values():
+        rows = v["rows"]
+        assert [r["q"] for r in rows] == sorted(r["q"] for r in rows)
+        assert all(a["covered"] <= b["covered"] and a["limits_total"] < b["limits_total"] for a, b in zip(rows, rows[1:]))
+        assert all(r["drawn_total"] < 0.05 * r["limits_total"] for r in rows)   # a limit, not cash

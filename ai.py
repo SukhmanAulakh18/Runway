@@ -75,12 +75,12 @@ SCENARIO_FIELDS = {
     "job_loss": "true if the customer loses their job / is laid off",
     "ei_rate": "share of usual income EI pays, e.g. 0.55 (default 0.55)",
     "ei_months": "months EI is paid (default 6)",
-    "income_cut": "for a pay cut without job loss, the share lost, e.g. 0.2",
+    "income_cut": "for a pay cut without job loss, the share lost as an exact decimal, e.g. 0.2; a third = 0.3333, half = 0.5",
     "bills_increase_pct": "household bills / rent / utilities increase as a share, e.g. 0.15",
     "spending_increase": "extra monthly spending in dollars (negative for a cut)",
     "one_off_cost": "one-time cost in dollars, e.g. a $3,000 repair",
     "one_off_months_of_spending": "one-time cost expressed in months of typical spending, e.g. 1.0",
-    "return_to_work_month": "month number they find a new job, or null",
+    "return_to_work_month": "months out of work before pay restarts, as a whole number, or null (e.g. \"unemployed for 4 months, then back to work\" = 4; \"new job in month 4\" = 4)",
 }
 
 # Typed output for Gemini (structured output): every field has a type, so the model can't return prose or strings.
