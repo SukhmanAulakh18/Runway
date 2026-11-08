@@ -1,17 +1,17 @@
-# Graph Report - tangerine-resilience-engine-94bfb1  (2026-11-08)
+# Graph Report - runway  (2026-11-08)
 
 ## Corpus Check
-- 78 files · ~89,765 words
+- 77 files · ~90,941 words
 - Verdict: corpus is large enough that graph structure adds value.
-- Unclassified: 7 file(s) not represented in the graph (top: (none) 5, .ini 1, .css 1)
+- Unclassified: 6 file(s) not represented in the graph (top: (none) 4, .ini 1, .css 1)
 
 ## Summary
-- 921 nodes · 1893 edges · 77 communities (58 shown, 19 thin omitted)
-- Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 245 edges (avg confidence: 0.95)
+- 927 nodes · 1904 edges · 80 communities (61 shown, 19 thin omitted)
+- Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 246 edges (avg confidence: 0.95)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `396ef434`
+- Built from commit: `638f3d0d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -24,7 +24,7 @@
 - FRONTEND.md: how the React app connects to the logic
 - Part A. Strategy and setup
 - test_app_smoke.py
-- Scenario
+- engine.py
 - Data pipeline: from raw files to every number on screen
 - Contributing: getting started, Git, and Claude Code
 - Architecture: the tech, and how everything works
@@ -60,34 +60,37 @@
 - pytest
 - main
 - with
-- pandas
-- sim_calibration
+- realistic_runway_vec
+- numpy
 - data.py
 - M2. Answer-key engine (the judges' formula)
-- evidence.py
+- pandas
 - confounders
 - Model card: Runway liquidity early warning
 - monitoring
 - Judge Q&A: one-line answers, with the number to point at
 - test_ai_cards.py
 - eval_ai.py
-- Log (newest last; one line per merged change, both lanes)
+- overdraft_risk
 - _correction_scores
 - M10. AI layer
-- _numbers
-- lessons
-- challenger
-- engine.py
+- runway
+- load_all
+- trough_evidence
+- Log (newest last; one line per merged change, both lanes)
 - Twist-card reader evaluation
 - fixture
 - 6. Function contract (don't rename without telling everyone)
-- load_dip_days
+- parse_twist
+- Part A. Strategy and setup
+- M4b. Credit view and bank view
+- _load_env
 
 ## God Nodes (most connected - your core abstractions)
 1. `Log (newest last; one line per merged change, both lanes)` - 36 edges
 2. `6. Function contract (don't rename without telling everyone)` - 32 edges
 3. `C2. Integration contract` - 29 edges
-4. `main()` - 27 edges
+4. `main()` - 28 edges
 5. `Scenario` - 23 edges
 6. `3. Definitions (engine.py)` - 22 edges
 7. `load_all()` - 19 edges
@@ -96,6 +99,8 @@
 10. `ltr_table()` - 16 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `Should fix` --references--> `parse_twist()`  [INFERRED]
+  docs/HANDOFF.md → ai.py
 - `Step 4 · Load (`engine.load()`)` --references--> `load()`  [INFERRED]
   docs/DATA_PIPELINE.md → engine.py
 - `2. Which IDE: see everything that's happening` --references--> `runway()`  [INFERRED]
@@ -104,13 +109,11 @@
   docs/CONTRIBUTING.md → engine.py
 - `Make a plan: `POST /api/plan/{acct}` then `POST /api/write-plan`` --references--> `runway()`  [INFERRED]
   docs/FRONTEND.md → engine.py
-- `Step 7 · Show it (`ui/`)` --references--> `Scenario`  [INFERRED]
-  docs/DATA_PIPELINE.md → engine.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (77 total, 19 thin omitted)
+## Communities (80 total, 19 thin omitted)
 
 ### Community 0 - "Runway React frontend: plan and rules"
 Cohesion: 0.22
@@ -118,11 +121,11 @@ Nodes (8): API (full spec in openapi.json, live docs at /docs), Claude Code prom
 
 ### Community 1 - "test_acceptance.py"
 Cohesion: 0.11
-Nodes (11): test_evidence_confounders(), test_evidence_fairness_and_lessons(), test_evidence_impact(), test_evidence_loan_policy(), test_evidence_monitoring_no_breaches(), test_evidence_multiple_testing(), test_evidence_segment_profile(), test_evidence_self_correction_and_extended_bh() (+3 more)
+Nodes (12): test_evidence_buffer_confidence_curve(), test_evidence_confounders(), test_evidence_fairness_and_lessons(), test_evidence_impact(), test_evidence_loan_policy(), test_evidence_monitoring_no_breaches(), test_evidence_multiple_testing(), test_evidence_segment_profile() (+4 more)
 
 ### Community 2 - "app.py"
 Cohesion: 0.14
-Nodes (15): wl(), render(), render(), render(), render(), render(), apply_settings(), init_state() (+7 more)
+Nodes (16): pcurve(), wl(), render(), render(), render(), render(), render(), apply_settings() (+8 more)
 
 ### Community 3 - "Claude Code guide: what to give it, how to watch it, how to track progress"
 Cohesion: 0.22
@@ -133,23 +136,23 @@ Cohesion: 0.13
 Nodes (16): _generate(), plan_facts(), template_plan(), verify_numbers(), verify_wording(), _write(), write_plan(), M12. Differentiators if you're ahead (+8 more)
 
 ### Community 5 - "FRONTEND.md: how the React app connects to the logic"
-Cohesion: 0.12
-Nodes (16): 2. Run it, 3. App state: three things drive everything, 4. Endpoints, 5. Types (copy into `web/src/types.ts`), 6. Screen by screen: which call, which field, 7. Go/no-go checklist (midnight, see REACT_PLAN rule 4), 9. Paste-ready Claude Code prompts (Streamlit now; same rules apply to React), Bank view: `POST /api/portfolio {scenario, asof}` (+8 more)
+Cohesion: 0.11
+Nodes (17): 1. Rules (break one and the numbers on screen stop matching the judges'), 2. Run it, 3. App state: three things drive everything, 4. Endpoints, 5. Types (copy into `web/src/types.ts`), 6. Screen by screen: which call, which field, 7. Go/no-go checklist (midnight, see REACT_PLAN rule 4), 9. Paste-ready Claude Code prompts (Streamlit now; same rules apply to React) (+9 more)
 
 ### Community 6 - "Part A. Strategy and setup"
-Cohesion: 0.14
-Nodes (13): A1. How we win against ~200 people, A2. What we're building (architecture), A3. Tech stack and why, A4. How to work with Claude Code, A5. Build order and time budget, C1. Stats and algorithms cheat sheet, C3. Submission checklist, C4. Demo script, live-twist runbook, Q&A (+5 more)
+Cohesion: 0.25
+Nodes (7): C1. Stats and algorithms cheat sheet, C3. Submission checklist, C4. Demo script, live-twist runbook, Q&A, C5. What can go wrong, and the fallback, Contents, Part C. Reference, Runway build guide: every part, step by step, with Claude Code
 
 ### Community 7 - "test_app_smoke.py"
 Cohesion: 0.25
 Nodes (9): at(), _click(), _no_errors(), test_controls(), test_custom_twist_card(), test_presets_plan_reset(), test_random_accounts(), test_time_machine_and_demo_account() (+1 more)
 
-### Community 8 - "Scenario"
-Cohesion: 0.13
-Nodes (19): 2. What happens when someone clicks, 5.2 Our realistic runway (`realistic_profile`, `realistic_runway`), 5.6 "Do they make it?": Monte Carlo simulation (`simulate`), 5.7 Smallest cuts: optimiser (`optimize_cuts`), 5.8 The plan (`make_plan`), 5.9 AI (`ai.py`), 5. How each part works (plain English → the maths), ei_benefit() (+11 more)
+### Community 8 - "engine.py"
+Cohesion: 0.16
+Nodes (13): committed_outflows(), ei_benefit(), explain_difference(), make_plan(), lever(), Profile, Realistic, realistic_runway() (+5 more)
 
 ### Community 9 - "Data pipeline: from raw files to every number on screen"
-Cohesion: 0.20
+Cohesion: 0.18
 Nodes (10): Data pipeline: from raw files to every number on screen, How to add a new calculation (the safe way), Step 1 · Get the data, Step 2 · Check your setup, Step 3 · Audit the data, and the "cleaning" decisions, Step 4 · Load (`engine.load()`), Step 5 · Per-customer numbers (`engine.py`), Step 6 · Prove the findings (`evidence.py`) (+2 more)
 
 ### Community 10 - "Contributing: getting started, Git, and Claude Code"
@@ -169,8 +172,8 @@ Cohesion: 0.50
 Nodes (3): Checklist, Screenshot, What this changes
 
 ### Community 19 - "api.ts"
-Cohesion: 0.08
-Nodes (66): react, @tanstack/react-query, api, Asof, ASOF_LABEL, Book, BookTier, Cushion (+58 more)
+Cohesion: 0.07
+Nodes (75): @fontsource-variable/plus-jakarta-sans, react, react-dom, recharts, @tanstack/react-query, dependencies, @fontsource-variable/plus-jakarta-sans@^5.1.0, react@^19.1.0 (+67 more)
 
 ### Community 20 - "Part B. The modules"
 Cohesion: 0.15
@@ -185,11 +188,11 @@ Cohesion: 0.25
 Nodes (8): Commands, Data and sources, Event rules that affect the code, Quick start (10 minutes), Repo map, Runway 🍊, The four rules, What we're building (plain English)
 
 ### Community 23 - "package.json"
-Cohesion: 0.07
-Nodes (41): eslint, @eslint/js, eslint-plugin-react-hooks, eslint-plugin-react-refresh, @fontsource-variable/plus-jakarta-sans, globals, react-dom, recharts (+33 more)
+Cohesion: 0.08
+Nodes (32): eslint, @eslint/js, eslint-plugin-react-hooks, eslint-plugin-react-refresh, globals, @types/react, @types/react-dom, typescript (+24 more)
 
 ### Community 24 - "multiple_testing"
-Cohesion: 0.20
+Cohesion: 0.19
 Nodes (4): multiple_testing(), _p_auc(), _p_ci(), _watchlist_hits()
 
 ### Community 25 - "Ponytail"
@@ -202,7 +205,7 @@ Nodes (4): 1. Files, 2. Integrity checks, 3. Quirks, and what we do about each, 
 
 ### Community 28 - "api.py"
 Cohesion: 0.09
-Nodes (19): accounts(), book(), _book(), clean(), ctx(), customer(), evidence(), plan() (+11 more)
+Nodes (15): customer_facts(), brief(), clean(), ctx(), _facts(), message(), plan(), PlanReq (+7 more)
 
 ### Community 30 - "compilerOptions"
 Cohesion: 0.10
@@ -225,12 +228,12 @@ Cohesion: 0.25
 Nodes (8): Definition of done for any task, First 30 minutes (everyone), P1: Sukhman (engine and data lead), P2: Frontend A (Watchlist, Know, look and feel), P4: Evidence page + submission (optional 4th person), Tasks: who builds what, Timeline, Who owns which files
 
 ### Community 37 - "CLAUDE.md: Runway (Sheridan Datathon 2026, Tangerine track)"
-Cohesion: 0.29
-Nodes (6): CLAUDE.md: Runway (Sheridan Datathon 2026, Tangerine track), Commands, graphify, Start here, Where things live, Working style
+Cohesion: 0.20
+Nodes (8): CLAUDE.md: Runway (Sheridan Datathon 2026, Tangerine track), Commands, graphify, Start here, Two Claude Code sessions on this repo, Where things live, Working style, test_ai_engine_contract()
 
 ### Community 38 - "Runway: product and engineering spec (single source of truth)"
-Cohesion: 0.17
-Nodes (10): describe_scenario(), parse_twist_checked(), 2. Data, 4. What is proven (evidence.json), 5. Product: screens and API, 6. AI (ai.py), 7. Governance and engineering, 8. Status (Nov 8) (+2 more)
+Cohesion: 0.29
+Nodes (6): 2. Data, 4. What is proven (evidence.json), 5. Product: screens and API, 7. Governance and engineering, 8. Status (Nov 8), Runway: product and engineering spec (single source of truth)
 
 ### Community 39 - "Runway: a liquidity early warning for Tangerine (Devpost write-up draft)"
 Cohesion: 0.22
@@ -241,12 +244,12 @@ Cohesion: 0.33
 Nodes (5): Check it, Deploy (from the repo root, with the CSVs in ./data), Deploy Runway to Google Cloud Run (public demo link for Devpost), Once (about 10 minutes), Take it down after judging
 
 ### Community 41 - "parse_twist"
-Cohesion: 0.14
-Nodes (11): _load_env(), parse_twist_offline(), _sanitize(), Two Claude Code sessions on this repo, P3: Frontend B + AI (Shock, Plan, Gemini), test_ai_engine_contract(), test_card(), test_eval_harness_runs_offline_and_reports_held_out() (+3 more)
+Cohesion: 0.17
+Nodes (10): _num(), _numbers(), parse_twist_offline(), walk(), P3: Frontend B + AI (Shock, Plan, Gemini), test_card(), test_eval_harness_runs_offline_and_reports_held_out(), test_no_shock_card_stays_empty() (+2 more)
 
 ### Community 42 - "Handoff: review, decisions and next fixes (Sat Nov 7, 5 PM)"
-Cohesion: 0.18
-Nodes (9): parse_twist(), 8b. New backend pieces (round 3) the UI should use, Decisions, Handoff: review, decisions and next fixes (Sat Nov 7, 5 PM), Must fix (judges will see these), New files from this review, Pitch order, Should fix (+1 more)
+Cohesion: 0.25
+Nodes (7): Decisions, Handoff: review, decisions and next fixes (Sat Nov 7, 5 PM), Must fix (judges will see these), New files from this review, Pitch order, Should fix, Verified (don't re-check)
 
 ### Community 43 - "M3. Realistic runway"
 Cohesion: 0.20
@@ -260,41 +263,37 @@ Nodes (8): M4. Liquidity Trough Ratio, watchlist, Time Machine, reasons(), _ltr_
 Cohesion: 0.15
 Nodes (3): main(), out(), pytest_collection_modifyitems()
 
-### Community 46 - "ai.py"
-Cohesion: 0.16
-Nodes (6): customer_facts(), customer_message(), template_message(), brief(), _facts(), message()
-
 ### Community 47 - "pytest"
-Cohesion: 0.14
-Nodes (15): M4b. Credit view and bank view, M9. Evidence engine, test_calibration_is_monotone_and_bounded(), test_cushion_93172_time_machine(), test_dip_days(), test_evidence_loans_and_holes(), test_evidence_out_of_time(), test_extended_loan_payment_uses_data_fields_only() (+7 more)
+Cohesion: 0.18
+Nodes (11): M9. Evidence engine, test_calibration_is_monotone_and_bounded(), test_conservative_buffer_and_haircut(), test_cushion_93172_time_machine(), test_dip_days(), test_evidence_loans_and_holes(), test_evidence_out_of_time(), test_extended_loan_payment_uses_data_fields_only() (+3 more)
 
 ### Community 48 - "main"
-Cohesion: 0.17
-Nodes (5): formula_holes(), loan_evidence(), loan_policy(), main(), multiple_testing_extended()
+Cohesion: 0.13
+Nodes (6): lessons(), loan_evidence(), loan_policy(), main(), multiple_testing_extended(), new_accounts()
 
 ### Community 49 - "with"
 Cohesion: 0.10
 Nodes (23): run, jobs, python, web, name, on, pull_request, push (+15 more)
 
-### Community 50 - "pandas"
-Cohesion: 0.15
-Nodes (9): 1. Problem, users, use case, book_tiers(), loan_adjust_vec(), new_account_swing(), realistic_runway_vec(), realistic_vec(), survival_cohort(), impact() (+1 more)
+### Community 50 - "realistic_runway_vec"
+Cohesion: 0.24
+Nodes (5): 1. Problem, users, use case, book_tiers(), loan_adjust_vec(), new_account_swing(), realistic_runway_vec()
 
-### Community 51 - "sim_calibration"
-Cohesion: 0.40
-Nodes (3): 1. Rules (break one and the numbers on screen stop matching the judges'), sim_calibration(), _sim_cohort()
+### Community 51 - "numpy"
+Cohesion: 0.17
+Nodes (6): realistic_vec(), buffer_confidence(), impact(), sim_calibration(), _sim_cohort(), survival()
 
 ### Community 52 - "data.py"
-Cohesion: 0.29
-Nodes (11): health(), build_context(), Context, ai_backend(), dip_days(), load_all(), pcurve(), repeat_table() (+3 more)
+Cohesion: 0.36
+Nodes (8): build_context(), Context, ai_backend(), dip_days(), repeat_table(), standing_orders(), survival_table(), trough_table()
 
 ### Community 53 - "M2. Answer-key engine (the judges' formula)"
 Cohesion: 0.29
 Nodes (7): M2. Answer-key engine (the judges' formula), test_edge_case_counts(), test_profile_20111(), test_runway_rules(), test_twist_distribution(), test_twists_20111(), test_vectorised_matches_scalar()
 
-### Community 54 - "evidence.py"
-Cohesion: 0.22
-Nodes (3): book(), diagnoses(), new_accounts()
+### Community 54 - "pandas"
+Cohesion: 0.18
+Nodes (5): book(), challenger(), diagnoses(), _features(), formula_holes()
 
 ### Community 55 - "confounders"
 Cohesion: 0.25
@@ -309,8 +308,8 @@ Cohesion: 0.25
 Nodes (3): monitoring(), _psi(), test_psi_flags_drift_and_not_noise()
 
 ### Community 58 - "Judge Q&A: one-line answers, with the number to point at"
-Cohesion: 0.25
-Nodes (7): Bankers (Scotiabank, RBC, CIBC, Sun Life), Consultants (Accenture, EY, PwC): the pilot plan, Data platforms (Snowflake, Dataiku, Thomson Reuters), Judge Q&A: one-line answers, with the number to point at, Professor / methodology, Quant / risk (e.g. XVA, model risk, control backgrounds), The 60-second pitch (Pitch mode, press → five times)
+Cohesion: 0.22
+Nodes (8): Bankers (Scotiabank, RBC, CIBC, Sun Life), Consultants (Accenture, EY, PwC): the pilot plan, Data platforms (Snowflake, Dataiku, Thomson Reuters), Finance terms (if a banker or quant uses them), Judge Q&A: one-line answers, with the number to point at, Professor / methodology, Quant / risk (e.g. XVA, model risk, control backgrounds), The 60-second pitch (Pitch mode, press → five times)
 
 ### Community 59 - "test_ai_cards.py"
 Cohesion: 0.17
@@ -320,29 +319,45 @@ Nodes (7): advisor_brief(), template_brief(), _FakeGemini, test_gemini_brief_rej
 Cohesion: 0.48
 Nodes (3): correct(), main(), run()
 
-### Community 61 - "Log (newest last; one line per merged change, both lanes)"
-Cohesion: 0.12
-Nodes (17): 5.5 Signal vs noise: Kalman filter (`kalman_level`, `net_flow_filter`), Fixed today (engine and AI lanes, all tests green: 62 fast, 5 slow, 6 UI), Round 2: answering the "finding ≠ product" critique, Still open (ranked), What I found (strict), 8. Not in the API yet (ask P1, don't build in React), Log (newest last; one line per merged change, both lanes), _acct() (+9 more)
+### Community 61 - "overdraft_risk"
+Cohesion: 0.19
+Nodes (10): 5.5 Signal vs noise: Kalman filter (`kalman_level`, `net_flow_filter`), Fixed today (engine and AI lanes, all tests green: 62 fast, 5 slow, 6 UI), Round 2: answering the "finding ≠ product" critique, Still open (ranked), What I found (strict), 8. Not in the API yet (ask P1, don't build in React), calibrate_break(), kalman_level() (+2 more)
 
 ### Community 63 - "M10. AI layer"
 Cohesion: 0.29
 Nodes (5): backend(), M10. AI layer, test_number_verifier(), test_sql_trough_matches_engine(), test_twist_reader_offline()
 
-### Community 64 - "_numbers"
-Cohesion: 0.50
-Nodes (4): _num(), _numbers(), walk(), test_numbers_reads_french_formats()
+### Community 64 - "runway"
+Cohesion: 0.14
+Nodes (14): Hard rules, 2. What happens when someone clicks, 5.1 The judges' runway (`profile`, `runway`), 5.2 Our realistic runway (`realistic_profile`, `realistic_runway`), 5.4 Credit view and bank view (`loan_risk`, `portfolio_curve`), 5.6 "Do they make it?": Monte Carlo simulation (`simulate`), 5.8 The plan (`make_plan`), 5.9 AI (`ai.py`) (+6 more)
 
-### Community 66 - "challenger"
-Cohesion: 0.20
-Nodes (4): challenger(), _features(), _p_boot(), trough_evidence()
+### Community 65 - "load_all"
+Cohesion: 0.23
+Nodes (10): accounts(), book(), _book(), customer(), evidence(), health(), _tiers(), watchlist() (+2 more)
 
-### Community 67 - "engine.py"
+### Community 67 - "Log (newest last; one line per merged change, both lanes)"
 Cohesion: 0.12
-Nodes (14): Hard rules, 5.1 The judges' runway (`profile`, `runway`), 3. Definitions (engine.py), committed_outflows(), explain_difference(), loan_check(), overdraft_cost(), profile() (+6 more)
+Nodes (16): 5.7 Smallest cuts: optimiser (`optimize_cuts`), Log (newest last; one line per merged change, both lanes), 3. Definitions (engine.py), _acct(), cushion(), diagnose(), diagnosis_signals(), loan_check() (+8 more)
+
+### Community 68 - "Twist-card reader evaluation"
+Cohesion: 0.50
+Nodes (3): Misses, Note (Nov 8): field definitions clarified after the Gemini run, Twist-card reader evaluation
 
 ### Community 71 - "6. Function contract (don't rename without telling everyone)"
-Cohesion: 0.18
-Nodes (16): init(), 5.3 The warning score: Liquidity Trough Ratio (`ltr_table`, `liquidity_trough`, `watchlist`), 5.4 Credit view and bank view (`loan_risk`, `portfolio_curve`), 6. Function contract (don't rename without telling everyone), C2. Integration contract, M11. Streamlit app, all_profiles(), liquidity_trough() (+8 more)
+Cohesion: 0.15
+Nodes (16): init(), 5.3 The warning score: Liquidity Trough Ratio (`ltr_table`, `liquidity_trough`, `watchlist`), 6. Function contract (don't rename without telling everyone), C2. Integration contract, all_profiles(), liquidity_trough(), load(), load_dip_days() (+8 more)
+
+### Community 74 - "parse_twist"
+Cohesion: 0.27
+Nodes (7): describe_scenario(), parse_twist(), parse_twist_checked(), _sanitize(), 8b. New backend pieces (round 3) the UI should use, 6. AI (ai.py), test_chips_and_checked_parse_offline()
+
+### Community 77 - "Part A. Strategy and setup"
+Cohesion: 0.33
+Nodes (6): A1. How we win against ~200 people, A2. What we're building (architecture), A3. Tech stack and why, A4. How to work with Claude Code, A5. Build order and time budget, Part A. Strategy and setup
+
+### Community 78 - "M4b. Credit view and bank view"
+Cohesion: 0.40
+Nodes (5): M4b. Credit view and bank view, test_loan_risk_93172(), test_overdraft_splits_loan_book(), test_portfolio_curve(), test_realistic_vector_matches_scalar()
 
 ## Knowledge Gaps
 - **19 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
@@ -350,17 +365,17 @@ Nodes (16): init(), 5.3 The warning score: Liquidity Trough Ratio (`ltr_table`, 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `C2. Integration contract` connect `6. Function contract (don't rename without telling everyone)` to `engine.py`, `write_plan`, `Part A. Strategy and setup`, `Scenario`, `Handoff: review, decisions and next fixes (Sat Nov 7, 5 PM)`, `main`, `pandas`, `Log (newest last; one line per merged change, both lanes)`?**
+- **Why does `C2. Integration contract` connect `6. Function contract (don't rename without telling everyone)` to `runway`, `Log (newest last; one line per merged change, both lanes)`, `write_plan`, `Part A. Strategy and setup`, `engine.py`, `parse_twist`, `main`, `realistic_runway_vec`, `numpy`, `overdraft_risk`?**
   _High betweenness centrality (0.052) - this node is a cross-community bridge._
 - **Are the 35 inferred relationships involving `Log (newest last; one line per merged change, both lanes)` (e.g. with `describe_scenario()` and `parse_twist_checked()`) actually correct?**
   _`Log (newest last; one line per merged change, both lanes)` has 35 INFERRED edges - model-reasoned connections that need verification._
 - **Should `test_acceptance.py` be split into smaller, more focused modules?**
-  _Cohesion score 0.11 - nodes in this community are weakly interconnected._
-- **Why does `Log (newest last; one line per merged change, both lanes)` connect `Log (newest last; one line per merged change, both lanes)` to `test_acceptance.py`, `write_plan`, `Scenario`, `test_api.py`, `Runway: product and engineering spec (single source of truth)`, `parse_twist`, `Handoff: review, decisions and next fixes (Sat Nov 7, 5 PM)`, `pytest`, `main`, `pandas`, `sim_calibration`, `evidence.py`, `confounders`, `monitoring`, `lessons`, `challenger`, `engine.py`, `6. Function contract (don't rename without telling everyone)`, `load_dip_days`?**
-  _High betweenness centrality (0.050) - this node is a cross-community bridge._
+  _Cohesion score 0.1076923076923077 - nodes in this community are weakly interconnected._
+- **Why does `Log (newest last; one line per merged change, both lanes)` connect `Log (newest last; one line per merged change, both lanes)` to `runway`, `test_acceptance.py`, `test_api.py`, `write_plan`, `6. Function contract (don't rename without telling everyone)`, `engine.py`, `Handoff: review, decisions and next fixes (Sat Nov 7, 5 PM)`, `parse_twist`, `pytest`, `main`, `realistic_runway_vec`, `numpy`, `pandas`, `confounders`, `monitoring`, `overdraft_risk`?**
+  _High betweenness centrality (0.051) - this node is a cross-community bridge._
 - **Are the 31 inferred relationships involving `6. Function contract (don't rename without telling everyone)` (e.g. with `init()` and `all_profiles()`) actually correct?**
   _`6. Function contract (don't rename without telling everyone)` has 31 INFERRED edges - model-reasoned connections that need verification._
 - **Should `app.py` be split into smaller, more focused modules?**
-  _Cohesion score 0.14082503556187767 - nodes in this community are weakly interconnected._
-- **Why does `runway()` connect `engine.py` to `Claude Code guide: what to give it, how to watch it, how to track progress`, `FRONTEND.md: how the React app connects to the logic`, `6. Function contract (don't rename without telling everyone)`, `Scenario`, `Contributing: getting started, Git, and Claude Code`, `sim_calibration`, `M2. Answer-key engine (the judges' formula)`?**
+  _Cohesion score 0.1417004048582996 - nodes in this community are weakly interconnected._
+- **Why does `runway()` connect `runway` to `Claude Code guide: what to give it, how to watch it, how to track progress`, `Log (newest last; one line per merged change, both lanes)`, `FRONTEND.md: how the React app connects to the logic`, `6. Function contract (don't rename without telling everyone)`, `engine.py`, `Contributing: getting started, Git, and Claude Code`, `M2. Answer-key engine (the judges' formula)`?**
   _High betweenness centrality (0.041) - this node is a cross-community bridge._

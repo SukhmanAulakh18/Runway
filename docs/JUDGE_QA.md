@@ -64,3 +64,12 @@ Rule for the table: answer in one sentence, point at the screen, stop. Never cla
 | You list a Kalman filter: does it work? | We tested a local-level model with a maximum-likelihood signal-to-noise ratio: for about half of accounts the noise ratio sat at the grid floor (no detectable trend), so we dropped it from the product rather than show noise. |
 | Is "riskiest 10%" a probability or a rank? | Both are shown: the trough is a rank (the flag); the per-customer chance comes from the calibrated simulation (predicted 1.6% vs 1.6% actual in 2025). |
 | What about new customers? | The trough needs 12 months and fails on new accounts (AUC 0.55–0.71), so they get their own test: swings in money in, chosen on 2023 + 2024, confirmed on 2025 (top 10% catch 13 of 32 first overdrafts, 18.6% vs 3.0%). |
+
+## Finance terms (if a banker or quant uses them)
+| Question | Answer |
+|---|---|
+| Do you measure volatility? | Yes, twice, both tested: cash-flow swings (sd of monthly net flow ÷ balance) pick the "auto-save good months" action inside the riskiest 10%; swings in money in score new accounts (top 10% catch 13 of 32 first overdrafts in 2025). |
+| Is there a haircut? | The trough is one: for 93172 at Dec 2024 the average balance takes a **98.7% haircut** at the low point. The realistic runway also haircuts the buffer by the typical in-month dip before counting it as usable. |
+| What confidence level is the buffer set at? | A risk-appetite choice, backtested: the median dip (default) covers 79% of caught first overdrafts; the 75th-percentile dip covers 85% (90% in 2024) for ~$5K more actually drawn ($78K → $83K); 90th and the largest dip add limits, not coverage. The 75th is the knee. |
+| Expected loss (PD × EAD × LGD)? | We have PD (calibrated chance, 1.6% vs 1.6% actual) and exposure (money drawn on the buffer, and the exposure profile). Loss given default isn't in the data, so we don't invent it. |
+| Portfolio VaR / correlation? | Not modelled: the data has no common shocks to estimate correlation from, so a book-level tail number would be an assumption, not a finding. The bank view shows how the whole book moves under one shared shock instead. |

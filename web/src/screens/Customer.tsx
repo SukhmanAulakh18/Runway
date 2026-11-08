@@ -142,7 +142,7 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
         </div>
         <div className="card ours">
           <Kpi tip={GLOSSARY.trough} label="Liquidity trough (lowest ÷ average, 6 mo)" value={t ? pct(t.ltr) : "–"}
-            note={t?.pct_rank != null ? `Riskier than ${pct(1 - t.pct_rank)} of customers` : "Needs 12+ months of history"} />
+            note={t?.pct_rank != null ? `Riskier than ${pct(1 - t.pct_rank)} of customers.${t.haircut != null ? ` A ${pct(t.haircut)} haircut: that share of the average balance is gone at the low point.` : ""}` : "Needs 12+ months of history"} />
         </div>
         <div className="card"><Kpi swatch="std" tip={GLOSSARY.standard} label="Standard runway (no shock)" value={c.standard_runway.label} size="md" note="Judges' formula, medians" /></div>
         <div className="card"><Kpi swatch="ours" tip={GLOSSARY.realistic} label="Realistic runway (no shock)" value={c.realistic_runway.label} size="md" note="Last 12 months, dip-aware" /></div>

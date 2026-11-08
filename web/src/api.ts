@@ -12,9 +12,9 @@ export const NO_SHOCK: Scenario = {
 };
 export interface RunwayRes { runway: number; label: string; income_after: number; spending_after: number; one_off: number;
   buffer_left?: number; usable_buffer?: number; monthly_gap: number; ei_monthly?: number; ei_capped?: boolean }
-export interface Trough { ltr: number; min_balance: number; avg_balance: number; pct_rank: number | null; bottom_10: boolean;
+export interface Trough { ltr: number; haircut?: number; min_balance: number; avg_balance: number; pct_rank: number | null; bottom_10: boolean;
   neg_days_recent: number; scorable: boolean; n_months: number }
-export interface Cushion { buffer: number; alert_level: number; top_up_now: number; last_balance: number; as_of: string;
+export interface Cushion { buffer: number; buffer_conservative?: number; alert_level: number; top_up_now: number; last_balance: number; as_of: string;
   dip_day: number | null; dip_day_share: number | null; dip_day_reliable: boolean }
 export interface Dx { code: "repeat" | "income_drop" | "new_loan" | "swing" | "dip"; title: string; why: string; action: string; short?: string }
 export interface Diagnosis { primary: Dx; all: Dx[]; signals?: { new_loan: { payment: number; start: string; amount: number } | null } }

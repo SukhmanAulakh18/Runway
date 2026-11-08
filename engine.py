@@ -538,6 +538,7 @@ def overdraft_risk(acct: int, d: dict) -> dict:
 # an alert at the customer's own dip level fires before 23 of 34 of them (median 3 months early), a $100 alert 1 of 34.
 # A cushion from the last 6 months' lowest balance is $0 for exactly these customers (they were never negative).
 # ---------------------------------------------------------------------------
+BUFFER_CONSERVATIVE_Q = 0.75   # risk-appetite option for the buffer: the knee of the coverage-vs-limits curve
 DIP_DAY_RELIABLE = 0.70   # share of months within +-5 days of the usual dip day to call the timing reliable
 
 
@@ -546,7 +547,12 @@ def cushion(acct: int, d: dict, dip_table: pd.DataFrame | None = None) -> dict:
     a = _acct(acct, d)
     r = realistic_profile(acct, d)
     last = float(a.month_end_balance.iloc[-1])
+    w = a.tail(WINDOW)
     out = {"buffer": r.dip,                        # overdraft protection / auto-transfer limit = typical in-month dip
+           # conservative option: the dip of a 1-in-4 bad month. Backtest (evidence.json -> buffer_confidence): covers
+           # 85-90% of caught first overdrafts vs 75-79% for the median, for ~$5K more actually drawn; higher levels add
+           # limits, not coverage. The median stays the default because it was fixed before those years were tested.
+           "buffer_conservative": float((w.avg_daily_balance - w.min_balance).quantile(BUFFER_CONSERVATIVE_Q)),
            "alert_level": r.dip,                   # below this, a normal month can take the balance under $0
            "top_up_now": max(r.dip - last, 0.0),   # move this to chequing now to be covered this month
            "last_balance": last, "as_of": a.month.iloc[-1],
@@ -767,7 +773,8 @@ def liquidity_trough(acct: int, d: dict, table: pd.DataFrame | None = None, asof
     ok = bool(row.scorable)
     return {"ltr": float(row.ltr), "min_balance": float(row.min_balance), "avg_balance": float(row.avg_balance),
             "pct_rank": float(row.ltr_pct_rank) if ok else None, "bottom_10": ok and bool(row.ltr_pct_rank <= 0.10),
-            "neg_days_recent": int(row.neg_days_recent), "scorable": ok, "n_months": int(row.n_months)}
+            "neg_days_recent": int(row.neg_days_recent), "scorable": ok, "n_months": int(row.n_months),
+            "haircut": float(1 - row.ltr) if row.ltr >= 0 else 1.0}   # banker's framing: share of the average gone at the low point
 
 
 def kalman_level(y: np.ndarray, q_grid: np.ndarray | None = None) -> dict:
