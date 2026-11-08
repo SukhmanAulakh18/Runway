@@ -96,8 +96,8 @@ export default function Evidence() {
       })()}
 
       {e.segment && (
-        <section className="card">
-          <h2>Who the riskiest 10% are: every trait we checked, including the ones that don't matter</h2>
+        <details className="card fold">
+          <summary><h2>Who the riskiest 10% are: not poor, but running hot</h2><span className="sub">3 big differences (money in, loans, pensioners); where they live doesn't matter. Show all {e.segment.rows.length} traits</span></summary>
           <p className="sub" style={{ marginBottom: 8 }}>{e.segment.riskiest_10_n} flagged vs {e.segment.everyone_else_n} others (Dec 2024 data). Medians for amounts, shares for yes/no. Multiple-testing corrected.</p>
           <table className="tbl"><thead><tr><th>Trait</th><th className="num">Riskiest 10%</th><th className="num">Everyone else</th><th>Difference</th></tr></thead>
             <tbody>{(e.segment.rows as { trait: string; kind: string; riskiest_10: number; everyone_else: number; differs: boolean; effect?: string }[]).map((r) => {
@@ -107,7 +107,7 @@ export default function Evidence() {
               return <tr key={r.trait}><td>{r.trait}</td><td className="num">{f(r.riskiest_10)}</td><td className="num">{f(r.everyone_else)}</td>
                 <td>{r.effect === "big" ? <span className="chip ours">Big difference</span> : r.effect === "small" ? <span className="chip">Small (real but minor)</span> : <span className="chip">No difference</span>}</td></tr>;
             })}</tbody></table>
-        </section>
+        </details>
       )}
 
       {e.diagnoses && (
@@ -132,11 +132,11 @@ export default function Evidence() {
       )}
 
       <section className="grid g2" style={{ alignItems: "start" }}>
-        <div className="card">
-          <h2>What didn't survive, said out loud</h2>
+        <details className="card fold">
+          <summary><h2>What didn't survive, said out loud</h2><span className="sub">{mt.did_not_survive.length} of {mt.tests} ideas didn't hold up. Show them</span></summary>
           <div className="list">{mt.did_not_survive.map((d: string) => <div key={d} className="list-row"><span>{d}</span><span className="chip">Not significant</span></div>)}</div>
           <p className="callout" style={{ marginTop: 10 }}>The trough and the plain lowest balance are statistically tied. Our claim is the low point beats both runway formulas, not that the ratio beats the low point.</p>
-        </div>
+        </details>
         <div className="card">
           <h2>Limits</h2>
           <div className="list">

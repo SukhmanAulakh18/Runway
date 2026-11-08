@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, kmoney, money, monthName, pct, NO_SHOCK } from "../api";
 import type { Nav } from "../App";
 import { Legend, PortfolioChart } from "../charts";
-import { Failed, Kpi, Loading } from "./ui";
+import { CountUp, Failed, Kpi, Loading } from "./ui";
 
 export default function Overview({ nav }: { nav: Nav }) {
   const ev = useQuery({ queryKey: ["evidence"], queryFn: api.evidence, staleTime: Infinity });
@@ -37,13 +37,13 @@ export default function Overview({ nav }: { nav: Nav }) {
 
       {ev.isPending ? <Loading h={130} /> : ev.isError ? <Failed error={ev.error} /> : im && y25 && (
         <section className="grid g4" aria-label="Headline results">
-          <div className="card hero"><Kpi label="Flag 10% of customers, catch" value={pct(im.caught_share)}
+          <div className="card hero"><Kpi label="Flag 10% of customers, catch" value={<CountUp text={pct(im.caught_share)} />}
             note={`${im.caught} of ${im.first_overdrafts} first overdrafts in 2025, tested on data the model never saw`} /></div>
-          <div className="card"><Kpi label="Risk vs everyone else" value={`${y25.risk_ratio.toFixed(1)}×`}
+          <div className="card"><Kpi label="Risk vs everyone else" value={<CountUp text={`${y25.risk_ratio.toFixed(1)}×`} />}
             note={`${pct(y25.low10_rate, 1)} vs ${pct(y25.rest_rate, 2)}. Holds in 2023, 2024 and 2025`} /></div>
-          <div className="card ours"><Kpi label="Dip-sized buffer covers" value={pct(im.buffer.covered_share)}
+          <div className="card ours"><Kpi label="Dip-sized buffer covers" value={<CountUp text={pct(im.buffer.covered_share)} />}
             note={`${kmoney(im.buffer.drawn_total)} drawn of ${kmoney(im.buffer.limits_total)} in limits`} /></div>
-          <div className="card"><Kpi label="Personal alert warns" value={`${im.alert.median_lead_months} mo early`}
+          <div className="card"><Kpi label="Personal alert warns" value={<CountUp text={`${im.alert.median_lead_months} mo early`} />}
             note={`${im.alert.fired_before} of ${im.caught}; a $100 alert: ${im.alert.generic_100_fired_before}.${im.alert.fired_for_quiet_share != null ? ` Pinged ${pct(im.alert.fired_for_quiet_share)} of flagged customers who never needed it` : ""}`} /></div>
         </section>
       )}
