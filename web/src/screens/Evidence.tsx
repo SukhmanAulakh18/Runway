@@ -54,13 +54,10 @@ export default function Evidence() {
       )}
 
       {e.monitoring && (
-        <section className="card">
-          <div className="card-head">
-            <div>
-              <h2>Model health: {e.monitoring.breaches.length === 0 ? "no breaches" : `${e.monitoring.breaches.length} breach${e.monitoring.breaches.length > 1 ? "es" : ""}, re-validate`}</h2>
-              <p className="sub">What a deployed model reports each period: input drift, accuracy and data quality against stated thresholds. {e.monitoring.note}</p>
-            </div>
-          </div>
+        <details className="card fold">
+          <summary><h2>Model health: {e.monitoring.breaches.length === 0 ? "no breaches" : `${e.monitoring.breaches.length} breach${e.monitoring.breaches.length > 1 ? "es" : ""}, re-validate`}</h2>
+            <span className="sub">{e.monitoring.rows.length} monitors (drift, accuracy, calibration, fairness, data quality) against stated thresholds. Show them</span></summary>
+          <p className="sub">What a deployed model reports each period: input drift, accuracy and data quality against stated thresholds. {e.monitoring.note}</p>
           <table className="tbl"><thead><tr><th>Monitor</th><th className="num">Value</th><th>Threshold</th><th>Status</th></tr></thead>
             <tbody>{(e.monitoring.rows as { metric: string; value: number; threshold: string; status: string }[]).map((r) => (
               <tr key={r.metric}><td>{r.metric}</td>
@@ -68,7 +65,7 @@ export default function Evidence() {
                 <td className="muted">{r.threshold}</td>
                 <td>{r.status === "ok" ? <span className="chip good">OK</span> : r.status === "watch" ? <span className="chip amber">Watch</span> : <span className="chip warn">Breach</span>}</td></tr>))}</tbody></table>
           <p className="sub" style={{ marginTop: 8 }}>Model documentation in the OSFI E-23 format: docs/MODEL_CARD.md. Every pull request is checked by CI.</p>
-        </section>
+        </details>
       )}
 
       <section className="grid g2">
@@ -133,8 +130,8 @@ export default function Evidence() {
       )}
 
       {e.diagnoses && (
-        <section className="card">
-          <h2>Why they're at risk: which reasons hold up inside the riskiest 10%</h2>
+        <details className="card fold">
+          <summary><h2>Why they're at risk: which reasons hold up inside the riskiest 10%</h2><span className="sub">Each reason picks the action (call, auto-save, loan review, alert); money in falling and big swings held in 2025. Show the table</span></summary>
           <p className="sub">Each reason picks an action. Overdraft rate the next year for flagged customers with the reason vs flagged customers without it.
             Combining these reasons with the trough did not catch more overdrafts ({e.diagnoses.combined_model.catch_at_10pct.combined} vs {e.diagnoses.combined_model.catch_at_10pct.trough_only} of {e.diagnoses.combined_model.catch_at_10pct.events}), so they choose the action, they don't replace the score.</p>
           <table className="tbl"><thead><tr><th>Reason → action</th><th className="num">2024</th><th className="num">2025</th></tr></thead>
@@ -150,7 +147,7 @@ export default function Evidence() {
                 <td key={y.year} className="num">{pct(y.rejected_bill_timing.rate, 1)} vs {pct(y.rejected_bill_timing.others_rate, 1)} (n={y.rejected_bill_timing.accounts})</td>)}</tr>
             </tbody></table>
           <p className="sub" style={{ marginTop: 8 }}>✓ = significant on its own (one-sided Fisher, p &lt; 0.05). All of these tests are in the multiple-testing count above.</p>
-        </section>
+        </details>
       )}
 
       {e.survival && (() => {
@@ -195,8 +192,8 @@ export default function Evidence() {
       })()}
 
       {e.fairness && (
-        <section className="card">
-          <h2>Fairness: does it treat women and men alike?</h2>
+        <details className="card fold">
+          <summary><h2>Fairness: does it treat women and men alike?</h2><span className="sub">Flag-rate ratio women ÷ men {(e.fairness.by_year as { flag_rate_ratio_women_to_men: number }[]).map((y) => y.flag_rate_ratio_women_to_men.toFixed(2)).join(" and ")}, inside the 0.8–1.25 band; no consistent gap in overdrafts caught. Show the table</span></summary>
           <p className="sub" style={{ marginBottom: 8 }}>{e.fairness.verdict} {e.fairness.note}</p>
           <table className="tbl"><thead><tr><th>Predicting</th><th className="num">Flagged: women / men</th><th className="num">Ratio</th><th className="num">Overdrafts caught: women / men</th><th className="num">Gap p-value</th></tr></thead>
             <tbody>{(e.fairness.by_year as { predicted_year: number; flag_rate_ratio_women_to_men: number; catch_gap_p: number; groups: Record<string, { flag_rate: number; caught: number; first_overdrafts: number; catch_rate: number }> }[]).map((y) => {
@@ -207,7 +204,7 @@ export default function Evidence() {
                 <td className="num">{y.catch_gap_p.toFixed(2)}</td></tr>;
             })}</tbody></table>
           <p className="sub" style={{ marginTop: 8 }}>Ratio band 0.8–1.25 is the "four-fifths rule" convention. Gender and age are never inputs to the score. Both are now monitored in Model health.</p>
-        </section>
+        </details>
       )}
 
       {e.lessons && (
