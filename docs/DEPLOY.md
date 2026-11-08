@@ -48,7 +48,7 @@ gcloud run deploy runway --image $IMG --region us-central1 --allow-unauthenticat
 ```
 `.gcloudignore` makes `--source` upload `data/` (without it gcloud falls back to `.gitignore` and the app has no data).
 
-**Live now:** https://runway-1085585470420.us-central1.run.app (revision `runway-00001`, image from `main` `a2a0746`).
+**Live now:** https://runway-1085585470420.us-central1.run.app (revision `runway-00002`, image from `46e2d2b`, the QA-run fixes).
 To ship a new version, repeat the four commands above from an up-to-date `main`.
 
 ## 3. Check it
