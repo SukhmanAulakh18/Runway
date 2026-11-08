@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 import engine as E
-from ui.data import dip_days, trough_table
+from ui.data import dip_days, standing_orders, trough_table
 
 
 @dataclass
@@ -28,6 +28,7 @@ class Context:
     d_full: dict | None = None   # uncut data, only for the Time Machine reveal (what happened after asof)
     risk: dict | None = None     # engine.overdraft_risk: calibrated chance of a first overdraft in 12 months
     cushion: dict | None = None  # engine.cushion: buffer, personal alert level, top-up now, usual dip day
+    committed: dict | None = None  # engine.committed_outflows: standing orders (today only; None when asof is set)
 
 
 def build_context(d, people, EV, accounts, acct, asof, sc) -> Context:
@@ -71,4 +72,5 @@ def build_context(d, people, EV, accounts, acct, asof, sc) -> Context:
     return Context(d=d, EV=EV, accounts=accounts, acct=acct, asof=asof, p=p, r=r, sc=sc,
                    key_res=E.runway(p, sc.to_answer_key_shock()), real_res=E.realistic_runway(r, sc),
                    a_rows=a_rows, lt=lt, LR=LR, sim=E.simulate(acct, d, sc), age=age, flags=flags, d_full=d_full,
-                   risk=E.overdraft_risk(acct, d), cushion=E.cushion(acct, d, dip_table=dip_days()))
+                   risk=E.overdraft_risk(acct, d), cushion=E.cushion(acct, d, dip_table=dip_days()),
+                   committed=None if asof else E.committed_outflows(acct, standing_orders()))

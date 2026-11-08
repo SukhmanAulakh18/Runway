@@ -38,7 +38,7 @@ export default function Evidence() {
         <div className="card">
           <h2>When we say {pct(cal.calibrated_mean, 1)} chance, about that many go overdrawn</h2>
           <p className="sub" style={{ marginBottom: 8 }}>Monte Carlo calibrated on 2023→2024, checked on 2024→2025, by risk group. Raw simulation said {pct(cal.raw_mean)}: 8× too pessimistic, so we calibrated it.</p>
-          <PairBars data={bins} a={{ key: "a", name: "Predicted" }} b={{ key: "b", name: "Actually overdrawn", color: "#16140f" }} />
+          <PairBars data={bins} a={{ key: "a", name: "Predicted" }} b={{ key: "b", name: "Actually overdrawn", color: "#0f172a" }} />
           <Legend items={[{ label: "Predicted", kind: "ours" }, { label: "Actually overdrawn", kind: "ink" }]} />
         </div>
       </section>

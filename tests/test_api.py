@@ -57,3 +57,23 @@ def test_portfolio_and_evidence():
     pts = client.post("/api/portfolio", json={"scenario": {"job_loss": True}}).json()
     assert pts[0]["month"] == 0 and len(pts) == 25
     assert client.get("/api/evidence").json()["multiple_testing"]["survive"] == 28
+
+
+def test_committed_outflows_today_only():
+    today = client.get("/api/customer/93172").json()["committed"]
+    assert today is None or today["total"] > 0
+    assert client.get("/api/customer/93172", params={"asof": "2024-12"}).json()["committed"] is None   # 2025 snapshot: no lookahead
+
+
+@pytest.mark.parametrize("lang", ["en", "fr"])
+def test_brief_and_message_offline_templates_verify(lang):
+    import ai
+    b = client.post("/api/ai/brief/93172", params={"asof": "2024-12"}).json()
+    m = client.post("/api/ai/message/93172", params={"asof": "2024-12", "lang": lang}).json()
+    assert b["source"] == m["source"] == "template" and "$6,527" in b["text"]
+    facts = api._facts(93172, "2024-12")
+    assert ai.verify_numbers(b["text"], facts) and ai.verify_wording(b["text"], facts)
+    msg_facts = {k: facts[k] for k in ("lowest_balance_6_months", "cushion")}
+    assert ai.verify_numbers(m["text"], msg_facts) and ai.verify_wording(m["text"], msg_facts)
+    assert "%" not in m["text"]   # no risk numbers go to the customer
+    assert client.post("/api/ai/message/93172", params={"lang": "de"}).status_code == 422

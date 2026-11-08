@@ -1,8 +1,54 @@
-import { useQuery } from "@tanstack/react-query";
-import { api, money, monthName, pct } from "../api";
+import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { api, money, monthName, pct, type Asof } from "../api";
 import type { Nav } from "../App";
 import { BalanceChart, Legend } from "../charts";
 import { Failed, Kpi, Loading } from "./ui";
+
+function Source({ s }: { s: string }) {
+  return <span className={`src ${s.startsWith("AI") ? "" : "tpl"}`}>{s.startsWith("AI") ? "AI · every number checked" : "Template (AI off or unsure)"}</span>;
+}
+
+/** AI helps the advisor talk: it writes words from engine numbers, never calculates. */
+function Assistant({ acct, asof }: { acct: number; asof: Asof }) {
+  const [lang, setLang] = useState<"en" | "fr">("en");
+  const [copied, setCopied] = useState(false);
+  const brief = useMutation({ mutationFn: () => api.brief(acct, asof) });
+  const msg = useMutation({ mutationFn: (l: "en" | "fr") => api.message(acct, asof, l) });
+  const copy = async (t: string) => { try { await navigator.clipboard.writeText(t); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* clipboard blocked */ } };
+  return (
+    <section className="card">
+      <div className="card-head">
+        <div><h2>Advisor assistant</h2>
+          <p className="sub">Gemini turns the engine's numbers into words. It never calculates: any number not in the engine's facts and the text is replaced by a template.</p></div>
+      </div>
+      <div className="grid g2">
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <h3>Brief me before I call</h3>
+            <button className="btn primary sm" onClick={() => brief.mutate()} disabled={brief.isPending}>{brief.isPending ? "Writing…" : "Brief me"}</button>
+          </div>
+          {brief.data && <div className="ai-box fade"><p style={{ margin: "0 0 8px" }}>{brief.data.text}</p><Source s={brief.data.source} /></div>}
+          {brief.isError && <Failed error={brief.error} />}
+        </div>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <h3>Message to the customer</h3>
+            <div className="seg" role="group" aria-label="Language">
+              {(["en", "fr"] as const).map((l) => <button key={l} className={lang === l ? "on" : ""} onClick={() => setLang(l)}>{l === "en" ? "English" : "Français"}</button>)}
+            </div>
+            <button className="btn ours sm" onClick={() => msg.mutate(lang)} disabled={msg.isPending}>{msg.isPending ? "Writing…" : "Draft message"}</button>
+          </div>
+          {msg.data && <div className="ai-box fade"><p style={{ margin: "0 0 8px" }}>{msg.data.text}</p>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}><Source s={msg.data.source} />
+              <button className="btn sm" onClick={() => copy(msg.data!.text)}>{copied ? "Copied" : "Copy"}</button>
+              <span className="muted" style={{ fontSize: 12 }}>No risk numbers go to the customer.</span></div></div>}
+          {msg.isError && <Failed error={msg.error} />}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export default function CustomerScreen({ nav }: { nav: Nav }) {
   const q = useQuery({ queryKey: ["customer", nav.acct, nav.asof], queryFn: () => api.customer(nav.acct, nav.asof) });
@@ -45,6 +91,8 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
         <div className="card"><Kpi swatch="ours" label="Realistic runway (no shock)" value={c.realistic_runway.label} size="md" note="Last 12 months, dip-aware" /></div>
       </section>
 
+      <Assistant key={`${c.account_id}-${c.asof}`} acct={c.account_id} asof={c.asof as Asof} />
+
       <section className="grid g-7-5" style={{ alignItems: "start" }}>
         <div className="card">
           <div className="card-head">
@@ -75,10 +123,17 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
           )}
           <div className="card ours">
             <h2>The fix: a cushion sized to their own dip</h2>
-            <p style={{ margin: "8px 0 12px" }}>Overdraft protection of <b>{money(c.cushion.buffer)}</b>, and an alert when the balance falls below <b>{money(c.cushion.alert_level)}</b>.
+            <p style={{ margin: "8px 0 12px" }}>Keep <b>{money(c.cushion.buffer)}</b> available (overdraft protection or an auto-transfer), the size of their usual in-month dip, and alert them before the balance gets that low.
               {c.cushion.dip_day_reliable && c.cushion.dip_day && <> Their balance usually bottoms out around day {c.cushion.dip_day}.</>}</p>
             <button className="btn ours" onClick={() => nav.go("plan")}>Open the plan →</button>
           </div>
+          {c.committed && (
+            <div className="card">
+              <h3>Leaves every month by standing order: {money(c.committed.total)}</h3>
+              <p className="sub" style={{ margin: "4px 0 8px" }}>Fixed commitments the customer can't cut. From the end-2025 snapshot, so hidden in Time Machine mode.</p>
+              <div className="chips">{Object.entries(c.committed.by_purpose).map(([k, v]) => <span key={k} className="chip">{k} {money(v)}</span>)}</div>
+            </div>
+          )}
           {c.flags.length > 0 && (
             <div className="card">
               <h3 style={{ marginBottom: 8 }}>Things to know before you explain the numbers</h3>

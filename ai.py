@@ -243,6 +243,9 @@ def plan_facts(plan: dict, key_res: dict, real_res: dict, sim: dict, opt: dict, 
 
 
 def _numbers(text: str) -> list[float]:
+    # French formats: "6 527 $" (space thousands) -> 6527; "4,0 %" (comma decimal, 1-2 digits) -> 4.0. English "6,527" unchanged.
+    text = re.sub(r"(?<=\d)[ \u00a0\u202f](?=\d{3}\b)", "", text)
+    text = re.sub(r"(\d),(\d{1,2})\b", r"\1.\2", text)
     return [_num(x) for x in re.findall(r"\d[\d,]*(?:\.\d+)?", text)]
 
 
@@ -306,3 +309,105 @@ def write_plan(facts: dict) -> tuple[str, str]:
         except Exception:
             pass
     return template_plan(facts), "template"
+
+
+# ---------------------------------------------------------------- advisor brief + customer message
+def customer_facts(acct, p, r, lt, risk, cushion, key_res, real_res, flags, committed=None, asof=None) -> dict:
+    """The only numbers the brief / message may use, picked and rounded from engine outputs (no new maths)."""
+    scored = bool(lt and lt.get("scorable"))
+    return {
+        "account": acct, "as_of": asof or "2025-12",
+        "money_in_per_month": round(r.income), "money_out_per_month": round(r.spending), "average_balance": round(p.buffer),
+        "lowest_balance_6_months": round(lt["min_balance"]) if lt else None,
+        "lowest_as_pct_of_average": round(lt["ltr"] * 100, 1) if lt else None,
+        "riskiest_pct_of_customers": round(lt["pct_rank"] * 100, 1) if scored else None,
+        "overdraft_risk_pct": round(risk["p_12m"] * 100, 1) if risk and risk.get("validated_population") else None,
+        "standard_runway": key_res["label"], "realistic_runway": real_res["label"],
+        "cushion": {"amount": round(cushion["buffer"]), "move_now": round(cushion["top_up_now"]),
+                    "dip_day": cushion["dip_day"] if cushion.get("dip_day_reliable") else None},
+        "committed_by_standing_order_per_month": round(committed["total"]) if committed else None,
+        "flags": flags,
+    }
+
+
+_BRIEF_PROMPT = """You brief a bank advisor before they contact a customer. Write exactly 3 short sentences, plain English:
+1) who this customer is in money terms (money in, money out, average balance);
+2) the risk and why: their balance dips close to $0 even though the average looks fine (use lowest_balance_6_months,
+   riskiest_pct_of_customers and overdraft_risk_pct if present; overdraft_risk_pct is "a X% chance of a first overdraft in
+   the next 12 months");
+3) the one action to offer: a cushion (overdraft protection or an automatic transfer) of cushion.amount, plus moving
+   cushion.move_now now if it is above 0.
+Use ONLY numbers that appear in the facts. Dollars with $ and commas. Never mention field names. No headings or bullets.
+FACTS (JSON):
+{facts}"""
+
+_MESSAGE_PROMPT = {
+    "en": """Write a short, warm message (3 sentences, second person "you") that a bank advisor could send to this customer.
+Say their balance has been dipping close to $0 during the month (lowest_balance_6_months), offer to set up a cushion of
+cushion.amount (overdraft protection or an automatic transfer) and an alert before the balance gets that low, and invite them
+to reply. Do not mention risk, chance, percentages, simulations or runways. Use ONLY numbers in the facts, dollars with $ and
+commas. Never mention field names. No subject line, no signature.
+FACTS (JSON):
+{facts}""",
+    "fr": """Rédige un message court et chaleureux (3 phrases, vouvoiement) qu'un conseiller bancaire pourrait envoyer à ce client.
+Dis que son solde descend près de 0 $ pendant le mois (lowest_balance_6_months), propose de mettre en place un coussin de
+cushion.amount (protection de découvert ou virement automatique) et une alerte avant que le solde descende aussi bas, et
+invite-le à répondre. Ne parle pas de risque, de probabilité, de pourcentages, de simulations ni de « runway ».
+Utilise UNIQUEMENT les nombres des faits; écris les montants sans séparateur de milliers, ainsi : 6527 $.
+Ne mentionne jamais les noms des champs. Pas d'objet, pas de signature.
+FAITS (JSON) :
+{facts}""",
+}
+
+
+def template_brief(f: dict) -> str:
+    s = [f"Brings in about ${f['money_in_per_month']:,} a month, sends out ${f['money_out_per_month']:,}, "
+         f"and averages ${f['average_balance']:,} in the account."]
+    if f.get("lowest_balance_6_months") is not None:
+        s.append(f"But the balance dipped to ${f['lowest_balance_6_months']:,}, {f['lowest_as_pct_of_average']}% of the average"
+                 + (f", putting them in the riskiest {f['riskiest_pct_of_customers']}% of customers" if f.get("riskiest_pct_of_customers") is not None else "")
+                 + (f", with a {f['overdraft_risk_pct']}% chance of a first overdraft in the next 12 months." if f.get("overdraft_risk_pct") is not None else "."))
+    cu = f["cushion"]
+    s.append(f"Offer a cushion of ${cu['amount']:,} (overdraft protection or an automatic transfer)"
+             + (f" and suggest moving ${cu['move_now']:,} into chequing now." if cu["move_now"] else "."))
+    return " ".join(s)
+
+
+def template_message(f: dict, lang: str = "en") -> str:
+    cu, low = f["cushion"], f.get("lowest_balance_6_months")
+    if lang == "fr":
+        s = [f"Bonjour, nous avons remarqué que votre solde descend parfois jusqu'à {low} $ en cours de mois." if low is not None
+             else "Bonjour, nous avons regardé l'évolution de votre solde en cours de mois."]
+        s.append(f"Nous pouvons mettre en place un coussin de {cu['amount']} $ (protection de découvert ou virement automatique) "
+                 "et une alerte avant que votre solde ne descende aussi bas.")
+        s.append("Répondez simplement à ce message si cela vous intéresse.")
+    else:
+        s = [f"Hi, we noticed your balance sometimes dips as low as ${low:,} during the month." if low is not None
+             else "Hi, we've been looking at how your balance moves during the month."]
+        s.append(f"We can set up a cushion of ${cu['amount']:,} (overdraft protection or an automatic transfer) "
+                 "and an alert before your balance gets that low.")
+        s.append("Just reply to this message if you'd like us to set it up.")
+    return " ".join(s)
+
+
+def _write(prompt: str, facts: dict, fallback: str) -> tuple[str, str]:
+    if _client is not None:
+        try:
+            text = _generate(prompt.format(facts=json.dumps(facts, default=str, ensure_ascii=False))).strip()
+            if verify_numbers(text, facts) and verify_wording(text, facts):
+                return text, "AI (numbers verified)"
+        except Exception:
+            pass
+    return fallback, "template"
+
+
+def advisor_brief(facts: dict) -> tuple[str, str]:
+    """3-sentence advisor briefing. AI text only if every number checks out, otherwise a template."""
+    return _write(_BRIEF_PROMPT, facts, template_brief(facts))
+
+
+def customer_message(facts: dict, lang: str = "en") -> tuple[str, str]:
+    """A message the advisor could send, in English or French. No risk numbers go to the customer."""
+    lang = "fr" if lang == "fr" else "en"
+    f = {k: facts[k] for k in ("lowest_balance_6_months", "cushion")}   # the customer sees only these
+    return _write(_MESSAGE_PROMPT[lang], f, template_message(f, lang))

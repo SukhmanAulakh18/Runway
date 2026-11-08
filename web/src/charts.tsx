@@ -3,7 +3,7 @@ import {
 } from "recharts";
 import { kmoney, money, monthName, pct, type Month, type Sim } from "./api";
 
-const C = { ours: "#d9660a", oursSoft: "#f6c9a0", std: "#6a7fa6", bad: "#c2362f", ink: "#16140f", ink3: "#8a8476", line: "#e6e0d4" };
+const C = { ours: "#f26a1b", oursSoft: "#ffc9a3", std: "#64748b", bad: "#dc2626", ink: "#0f172a", ink3: "#8a94a6", line: "#e6e8ee" };
 const axis = { stroke: C.ink3, fontSize: 11.5, tickLine: false, axisLine: false } as const;
 const grid = <CartesianGrid stroke={C.line} vertical={false} />;
 
@@ -116,8 +116,8 @@ export function PairBars({ data, a, b, height = 230, fmt = (v: number) => pct(v,
         <XAxis dataKey="x" {...axis} />
         <YAxis {...axis} tickFormatter={fmt} width={48} />
         <Bar dataKey={a.key} name={a.name} fill={a.color ?? C.ours} radius={[4, 4, 0, 0]} barSize={26} />
-        <Bar dataKey={b.key} name={b.name} fill={b.color ?? "#c9c1b2"} radius={[4, 4, 0, 0]} barSize={26} />
-        <Tooltip cursor={{ fill: "#f1ece3" }} content={<Tip rows={(r) => [[a.name, fmt(r[a.key] as number)], [b.name, fmt(r[b.key] as number)]]} />} />
+        <Bar dataKey={b.key} name={b.name} fill={b.color ?? "#cbd2dd"} radius={[4, 4, 0, 0]} barSize={26} />
+        <Tooltip cursor={{ fill: "#f1f3f7" }} content={<Tip rows={(r) => [[a.name, fmt(r[a.key] as number)], [b.name, fmt(r[b.key] as number)]]} />} />
       </ComposedChart>
     </ResponsiveContainer>
   );
@@ -131,7 +131,7 @@ export function Legend({ items }: { items: { label: string; kind: "ours" | "std"
   return (
     <div className="chips" style={{ gap: 14 }}>
       {items.map((i) => (
-        <span key={i.label} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#4d493f" }}>
+        <span key={i.label} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "#475569" }}>
           <span style={{ width: 16, height: 3, borderRadius: 2, ...style(i.kind) }} />{i.label}
         </span>
       ))}

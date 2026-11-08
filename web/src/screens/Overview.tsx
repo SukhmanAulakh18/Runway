@@ -19,14 +19,22 @@ export default function Overview({ nav }: { nav: Nav }) {
         <p className="eyebrow">01 · The finding</p>
         <h1 className="title">Banks watch the average balance. <em>Overdrafts happen at the low point.</em></h1>
         <p className="lede">
-          Some customers look healthy on average but dip close to $0 every month. Runway measures that dip (the liquidity trough),
-          flags who is about to have a first overdraft, stress-tests them, and sizes the cheapest fix.
+          Built for a bank's customer-care and risk teams. Some customers look healthy on average but dip close to $0 every
+          month. Runway finds them before their first overdraft and tells the advisor exactly what to offer.
         </p>
       </div>
 
+      <section className="how" aria-label="How it works">
+        {[["Spot", "Flag customers whose balance keeps dipping near $0, even when the average looks fine."],
+          ["Explain", "Show why in plain words: the dip, the risk, and what a job loss or repair would do."],
+          ["Act", "Offer a cushion sized to their own dip, with an alert and a message ready in English or French."]].map(([h, t], i) => (
+          <div key={h} className="card"><span className="n">{i + 1}</span><div><h2>{h}</h2><p className="sub" style={{ marginTop: 4 }}>{t}</p></div></div>
+        ))}
+      </section>
+
       {ev.isPending ? <Loading h={130} /> : ev.isError ? <Failed error={ev.error} /> : im && y25 && (
         <section className="grid g4" aria-label="Headline results">
-          <div className="card ink"><Kpi label="Flag 10% of customers, catch" value={pct(im.caught_share)}
+          <div className="card hero"><Kpi label="Flag 10% of customers, catch" value={pct(im.caught_share)}
             note={`${im.caught} of ${im.first_overdrafts} first overdrafts in 2025, tested on data the model never saw`} /></div>
           <div className="card"><Kpi label="Risk vs everyone else" value={`${y25.risk_ratio.toFixed(1)}×`}
             note={`${pct(y25.low10_rate, 1)} vs ${pct(y25.rest_rate, 2)}. Holds in 2023, 2024 and 2025`} /></div>
@@ -68,7 +76,7 @@ export default function Overview({ nav }: { nav: Nav }) {
                         <span style={{ width: 40 }}>{pct(r.ltr)}</span></div></td>
                       <td className="num">{r.ltr_pct_rank != null ? pct(r.ltr_pct_rank, 1) : "–"}</td>
                       <td className="num">{money(r.min_balance)}</td>
-                      <td><div className="chips">{r.reasons.split("; ").filter(Boolean).slice(0, 2).map((x) => <span key={x} className="chip">{x}</span>)}</div></td>
+                      <td><div className="chips">{r.reasons.split("; ").filter(Boolean).slice(0, 1).map((x) => <span key={x} className="chip" title={r.reasons}>{x}</span>)}</div></td>
                       {nav.asof && <td>{r.overdraft_next_12m ? <span className="badge bad">Overdrawn</span> : <span className="muted">Stayed above $0</span>}</td>}
                     </tr>
                   ))}

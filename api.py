@@ -111,7 +111,7 @@ def customer(acct: int, asof: Optional[str] = ASOF):
                      "days_below_zero", "household_bills", "insurance", "loan_payments", "pension_in"]]
     out = {"account_id": acct, "asof": asof, "owner_age": c.age, "flags": c.flags,
            "profile": c.p, "standard_runway": c.key_res, "realistic": c.r, "realistic_runway": c.real_res,
-           "trough": c.lt, "loan": c.LR, "risk": c.risk, "cushion": c.cushion,
+           "trough": c.lt, "loan": c.LR, "risk": c.risk, "cushion": c.cushion, "committed": c.committed,
            "last_activity": c.a_rows.month.max(), "history": hist}
     if asof:
         out["what_happened_next"] = E.what_happened_next(acct, c.d_full, asof, 12)
@@ -144,6 +144,25 @@ def plan(acct: int, req: PlanReq):
 def write_plan(facts: dict):
     text, source = ai.write_plan(facts)
     return {"text": text, "source": source}
+
+
+def _facts(acct: int, asof: Optional[str]) -> dict:
+    c = ctx(acct, asof, E.Scenario())
+    return ai.customer_facts(acct, c.p, c.r, c.lt, c.risk, c.cushion, c.key_res, c.real_res, c.flags, c.committed, asof)
+
+
+@app.post("/api/ai/brief/{acct}")
+def brief(acct: int, asof: Optional[str] = ASOF):
+    """3-sentence advisor briefing; every number verified against the engine, or a template."""
+    text, source = ai.advisor_brief(_facts(acct, asof))
+    return {"text": text, "source": source}
+
+
+@app.post("/api/ai/message/{acct}")
+def message(acct: int, asof: Optional[str] = ASOF, lang: str = Query("en", pattern="^(en|fr)$")):
+    """A message the advisor could send the customer, English or French. No risk numbers reach the customer."""
+    text, source = ai.customer_message(_facts(acct, asof), lang)
+    return {"text": text, "source": source, "lang": lang}
 
 
 @app.post("/api/twist")

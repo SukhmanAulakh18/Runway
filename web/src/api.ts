@@ -24,6 +24,7 @@ export interface Customer {
   standard_runway: RunwayRes; realistic: { income: number; spending: number; dip: number; window_months: number; protected_income: number };
   realistic_runway: RunwayRes; trough: Trough | null; risk: { p_12m: number; validated_population: boolean };
   cushion: Cushion; last_activity: string; history: Month[];
+  committed: { total: number; orders: number; by_purpose: Record<string, number> } | null;  // standing orders, today only
   loan: { amount: number; monthly_payment: number; status_meaning: string; defaulted: boolean; overdrawn_before_loan: boolean; loan_start: string } | null;
   what_happened_next?: { month: string; days_below_zero: number; min_balance: number }[];
 }
@@ -66,6 +67,9 @@ export const api = {
   plan: (a: number, asof: Asof, scenario: Scenario) => call<PlanRes>(`/api/plan/${a}`, { scenario, asof }),
   writePlan: (facts: Record<string, unknown>) => call<{ text: string; source: string }>("/api/write-plan", facts),
   twist: (text: string) => call<Twist>("/api/twist", { text }),
+  brief: (a: number, asof: Asof) => call<{ text: string; source: string }>(`/api/ai/brief/${a}${q(asof)}`, {}),
+  message: (a: number, asof: Asof, lang: "en" | "fr") =>
+    call<{ text: string; source: string }>(`/api/ai/message/${a}${asof ? `?asof=${asof}&lang=${lang}` : `?lang=${lang}`}`, {}),
   watchlist: (asof: Asof) => call<Watch>(`/api/watchlist${q(asof)}`),
   portfolio: (scenario: Scenario) => call<{ month: number; standard: number; realistic: number }[]>("/api/portfolio", { scenario }),
   evidence: () => call<Evidence>("/api/evidence"),

@@ -382,6 +382,23 @@ def cushion(acct: int, d: dict, dip_table: pd.DataFrame | None = None) -> dict:
     return out
 
 
+def load_standing_orders(data_dir: Path = DATA) -> pd.DataFrame | None:
+    """standing_orders.csv: an undated end-of-2025 snapshot. Use for today's view only, never in backtests (lookahead)."""
+    f = data_dir / "standing_orders.csv"
+    return pd.read_csv(f) if f.exists() else None
+
+
+def committed_outflows(acct: int, orders: pd.DataFrame | None) -> dict | None:
+    """Money that leaves every month by standing order (household bills, insurance, loan, leasing, other): it can't be cut."""
+    if orders is None:
+        return None
+    rows = orders[orders.account_id == acct]
+    if rows.empty:
+        return None
+    by = rows.groupby(rows.purpose.fillna("other")).amount.sum().sort_values(ascending=False)
+    return {"total": float(rows.amount.sum()), "orders": int(len(rows)), "by_purpose": {k: float(v) for k, v in by.items()}}
+
+
 def load_dip_days(data_dir: Path = DATA) -> pd.DataFrame | None:
     """Day of the month each account's balance is lowest, per month, from transactions.csv (None if absent).
     About 5 s and 1M rows: callers cache it once."""

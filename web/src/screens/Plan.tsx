@@ -25,12 +25,12 @@ export default function Plan({ nav }: { nav: Nav }) {
       </div>
 
       <section className="grid g-7-5">
-        <div className="card ink">
-          <p className="eyebrow" style={{ color: "#b9b2a3" }}>Goal plan · do this now</p>
+        <div className="card hero">
+          <p className="eyebrow" style={{ color: "#ffe7d6" }}>Goal plan · do this now</p>
           <div className="grid g3" style={{ marginTop: 12 }}>
-            <Kpi label="Overdraft protection / auto-transfer" value={money(cu.buffer)} note="Sized to their own typical in-month dip" />
-            <Kpi label="Alert them below" value={money(cu.alert_level)} note="Their danger level, not a generic $100" />
-            <Kpi label="Move to chequing now" value={money(cu.top_up_now)} note={`Balance ${money(cu.last_balance)} at ${monthName(cu.as_of)}`} />
+            <Kpi label="Cushion: overdraft protection or auto-transfer" value={money(cu.buffer)} note="Sized to their own typical in-month dip" />
+            <Kpi label="Alert them" value="Before it's needed" size="md" note={`When the balance falls below ${money(cu.alert_level)}: their danger level, not a generic $100`} />
+            <Kpi label="Move to chequing now" value={cu.top_up_now > 0 ? money(cu.top_up_now) : "Nothing"} size={cu.top_up_now > 0 ? undefined : "md"} note={`Balance ${money(cu.last_balance)} at ${monthName(cu.as_of)}`} />
           </div>
           {cu.dip_day_reliable && cu.dip_day && <p style={{ margin: "14px 0 0" }}>Their balance usually bottoms out around <b>day {cu.dip_day}</b> of the month ({pct(cu.dip_day_share)} of months): time the alert for then.</p>}
         </div>

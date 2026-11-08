@@ -80,6 +80,8 @@ export default function Stress({ nav }: { nav: Nav }) {
             {sc.job_loss && <>
               <Slider label="EI pays" value={sc.ei_rate} min={0} max={1} step={0.05} fmt={(v) => pct(v)} on={(v) => set({ ei_rate: v })} />
               <Slider label="EI lasts" value={sc.ei_months} min={0} max={10} step={1} fmt={(v) => `${v} months`} on={(v) => set({ ei_months: v })} />
+              <Slider label="Share of money in that is pay" value={sc.employment_share} min={0.2} max={1} step={0.1} fmt={(v) => pct(v)} on={(v) => set({ employment_share: v })} />
+              <p className="sub" style={{ marginTop: -6 }}>Our biggest assumption: most money in is cash, so we can't see what is salary. 100% = a job loss stops all non-pension money in.</p>
             </>}
             <Slider label="Household bills" value={sc.bills_increase_pct} min={0} max={0.5} step={0.05} fmt={(v) => `+${pct(v)}`} on={(v) => set({ bills_increase_pct: v })} />
             <Slider label="One-off repair" value={sc.one_off_cost} min={0} max={20000} step={500} fmt={money} on={(v) => set({ one_off_cost: v })} />

@@ -1,8 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import "@fontsource-variable/fraunces/index.css";
-import "@fontsource-variable/inter-tight/index.css";
+import "@fontsource-variable/plus-jakarta-sans/index.css";
 import "./styles.css";
 import App from "./App";
 

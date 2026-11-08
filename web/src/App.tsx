@@ -57,8 +57,8 @@ export default function App() {
     <div className="app">
       <aside className="rail">
         <div className="brand">
-          <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden><rect width="32" height="32" rx="8" fill="#16140f" />
-            <path d="M7 22c4-9 8-9 9-2s5 4 9-9" stroke="#d9660a" strokeWidth="3" fill="none" strokeLinecap="round" /></svg>
+          <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden><rect width="32" height="32" rx="8" fill="#f26a1b" />
+            <path d="M7 22c4-9 8-9 9-2s5 4 9-9" stroke="#ffffff" strokeWidth="3" fill="none" strokeLinecap="round" /></svg>
           <div><b>Runway</b><small>Liquidity early warning</small></div>
         </div>
         <nav className="steps" aria-label="Steps">
