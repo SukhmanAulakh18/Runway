@@ -35,6 +35,22 @@ gcloud run deploy runway --source . --region us-central1 --allow-unauthenticated
 - `--min-instances 1` keeps one copy warm so a judge never waits for a cold start (a few dollars for the weekend).
 - `--max-instances 3` caps the bill if the link is shared widely.
 
+**If `--source` fails with PERMISSION_DENIED** (new projects: the build account can't read the uploaded source),
+build on your laptop instead; this needs no extra permissions and is how the live link was deployed (Nov 8):
+```bash
+IMG=us-central1-docker.pkg.dev/runway-datathon-11072341/cloud-run-source-deploy/runway:$(git rev-parse --short HEAD)
+docker build --platform linux/amd64 -t $IMG .
+gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+docker push $IMG
+gcloud run deploy runway --image $IMG --region us-central1 --allow-unauthenticated \
+  --memory 4Gi --cpu 2 --min-instances 1 --max-instances 3 --timeout 120 \
+  --set-env-vars GOOGLE_CLOUD_PROJECT=runway-datathon-11072341,GOOGLE_CLOUD_LOCATION=global
+```
+`.gcloudignore` makes `--source` upload `data/` (without it gcloud falls back to `.gitignore` and the app has no data).
+
+**Live now:** https://runway-1085585470420.us-central1.run.app (revision `runway-00001`, image from `main` `a2a0746`).
+To ship a new version, repeat the four commands above from an up-to-date `main`.
+
 ## 3. Check it
 ```bash
 python scripts/smoke.py https://YOUR-URL.run.app
