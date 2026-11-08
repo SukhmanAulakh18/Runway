@@ -146,3 +146,34 @@ def test_template_plan_always_verifies():
                               E.simulate(a, d, sc), E.optimize_cuts(a, d, sc), E.overdraft_risk(a, d))
             t = ai.template_plan(f)
             assert ai.verify_numbers(t, f) and ai.verify_wording(t, f), (a, sc, t)
+
+
+def test_slow_gemini_falls_back_to_rules_fast(monkeypatch):
+    """On stage a hung Gemini call must not stall the demo: after AI_TIMEOUT_S the rules answer instead."""
+    import time
+
+    class _Slow(_FakeGemini):
+        def generate_content(self, model, contents, config=None):
+            time.sleep(2)
+            return super().generate_content(model, contents, config)
+
+    monkeypatch.setattr(ai, "_client", _Slow('{"job_loss": true}'))
+    monkeypatch.setattr(ai, "AI_TIMEOUT_S", 0.2)
+    t = time.time()
+    s, source = ai.parse_twist("They lose their job (EI at 55%) and their household bills go up 15% in the same month.")
+    assert source == "rules" and s["bills_increase_pct"] == 0.15 and time.time() - t < 1.0
+
+
+def test_load_env_file(tmp_path, monkeypatch):
+    f = tmp_path / ".env"
+    f.write_text("# comment\nRUNWAY_TEST_A=one\nRUNWAY_TEST_B='two'\nRUNWAY_TEST_C=from_file\n")
+    monkeypatch.delenv("RUNWAY_TEST_A", raising=False)
+    monkeypatch.delenv("RUNWAY_TEST_B", raising=False)
+    monkeypatch.setenv("RUNWAY_TEST_C", "from_env")
+    ai._load_env(f)
+    ai._load_env(tmp_path / "missing.env")   # no file: no error
+    import os
+    assert os.environ["RUNWAY_TEST_A"] == "one" and os.environ["RUNWAY_TEST_B"] == "two"
+    assert os.environ["RUNWAY_TEST_C"] == "from_env"   # the real environment wins
+    for k in ("RUNWAY_TEST_A", "RUNWAY_TEST_B"):
+        monkeypatch.delenv(k)
