@@ -70,8 +70,8 @@ export default function Plan({ nav }: { nav: Nav }) {
       <section className="grid g-7-5" style={{ alignItems: "start" }}>
         <div className="card">
           <h2>{o.protected_months > o.base_months
-            ? `Smallest cuts that keep them out of overdraft: ${o.protected_months} months instead of ${o.base_months}`
-            : o.base_months >= o.horizon ? `No cuts needed: safe for all ${o.horizon} months in a ${o.outcome}` : `Cuts alone can't protect month ${o.base_months + 1}: they need a bridge first`}</h2>
+            ? `Smallest cuts that keep them out of overdraft: ${o.protected_months} months instead of ${o.base_months > 0 ? o.base_months : "less than 1"}`
+            : o.base_months >= o.horizon ? `No cuts needed: safe for all ${o.horizon} months, even in ${o.outcome}` : `Cuts alone can't protect month ${o.base_months + 1}: they need a bridge first`}</h2>
           <p className="sub" style={{ marginBottom: 8 }}>
             Linear program over the simulated path for {o.outcome}{shocked ? ", under your shock" : ""}. Bills and insurance are never cut; at most {money(o.max_monthly_cut)}/month.
             {o.protected_months > o.base_months && <> Average cut {money(o.avg_monthly_cut)}/month.</>}

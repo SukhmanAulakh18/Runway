@@ -26,7 +26,7 @@ export interface Customer {
   standard_runway: RunwayRes; realistic: { income: number; spending: number; spending_history: number; loan_adjust: number; loan_payments: number; dip: number; window_months: number; protected_income: number };
   realistic_runway: RunwayRes; trough: Trough | null; risk: { p_12m: number; validated_population: boolean };
   cushion: Cushion; diagnosis: Diagnosis | null; last_activity: string; history: Month[];
-  tier?: { key: string; label: string; action: string } | null;
+  tier?: { key: string; label: string; action: string; tested_rate?: number | null; tested_on?: string | null } | null;
   committed: { total: number; orders: number; by_purpose: Record<string, number> } | null;  // standing orders, today only
   when: { group: string; within_6: number; within_12: number; within_24: number; customers: number; cohort: string } | null;
   repeat: { days_below_zero_12m: number; tier: string; rate: number; similar_accounts: number; tested_on: string; never_overdrawn_rate: number } | null;

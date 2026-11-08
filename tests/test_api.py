@@ -162,3 +162,18 @@ def test_plan_carries_cost_and_cushion():
     p = client.post("/api/plan/93172", params={"asof": "2024-12"}, json={"scenario": {}}).json()
     assert p["cushion"]["alert_level"] == p["cushion"]["buffer"]                     # alert at their own dip, not $100
     assert p["limit_cost"]["total"] > 0 and p["optimiser"]["horizon"] == 12
+
+
+def test_unforecast_customers_get_their_tiers_tested_rate():
+    """93172 at Dec 2023 is too new for a forecast; 85080 today was overdrawn before. Both show their tier's tested rate."""
+    for acct, asof in ((93172, "2023-12"), (85080, None)):
+        c = client.get(f"/api/customer/{acct}", params={"asof": asof} if asof else {}).json()
+        assert not c["risk"]["validated_population"] and c["repeat"] is None
+        assert 0 < c["tier"]["tested_rate"] < 1 and c["tier"]["tested_on"]
+    assert client.get("/api/customer/93172", params={"asof": "2023-12"}).json()["tier"]["tested_on"] == "Dec 2022 → 2023"   # no lookahead
+
+
+def test_not_found_says_what_to_do():
+    r = client.get("/api/customer/77040", params={"asof": "2023-12"})
+    assert r.status_code == 404 and "later date" in r.json()["detail"]
+    assert "isn't in the data" in client.get("/api/customer/1").json()["detail"]
