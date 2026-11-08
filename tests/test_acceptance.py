@@ -353,3 +353,18 @@ def test_evidence_impact(d):
     assert (i["first_overdrafts"], i["caught"]) == (55, 34)
     assert i["buffer"]["covered_in_full"] == 27 and i["alert"]["fired_before"] == 23 and i["alert"]["generic_100_fired_before"] == 1
     assert i["buffer"]["drawn_total"] < 0.05 * i["buffer"]["limits_total"]
+
+@pytest.mark.parametrize("acct,sc,answer,top", [
+    (20111, dict(job_loss=True, bills_increase_pct=0.15), "no", "Recent months"),   # answer key 3.4, realistic 1.3
+    (20176, dict(job_loss=True), "yes", "Pension keeps coming"),                  # pensioner
+    (68235, dict(job_loss=True), "paper", None),                                  # standard fine, realistic not
+    (66325, dict(job_loss=True), "no", None),                                     # savings already below zero
+])
+def test_verdict(d, acct, sc, answer, top):
+    s = E.Scenario(**sc)
+    p, r = E.profile(acct, d), E.realistic_profile(acct, d)
+    v = E.verdict(p, E.runway(p, s.to_answer_key_shock()), E.realistic_runway(r, s), r, s)
+    assert v["answer"] == answer and v["headline"] and v["reason"]
+    if top:
+        want = 1 if answer == "yes" else -1
+        assert next(x for x in v["drivers"] if x["direction"] == want)["driver"] == top

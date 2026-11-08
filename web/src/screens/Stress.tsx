@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
-import { api, money, monthName, NO_SHOCK, pct, type Scenario, type Twist } from "../api";
+import { api, money, monthName, NO_SHOCK, pct, type Scenario, type Twist, type Verdict } from "../api";
 import type { Nav } from "../App";
 import { FanChart, Legend } from "../charts";
-import { Failed, Kpi, Loading } from "./ui";
+import { Failed, GLOSSARY, Info, Kpi, Loading } from "./ui";
 
 const PRESETS: { label: string; text: string }[] = [
   { label: "Job loss, EI 55%", text: "This customer was laid off. EI pays 55% of their usual income for 6 months." },
@@ -20,6 +20,33 @@ function Futures({ p, months }: { p: number; months: number }) {
       </div>
       <p style={{ margin: "8px 0 0", fontWeight: 600 }}>{n} of 10 simulated futures stay above the overdraft line for {months} months</p>
     </div>
+  );
+}
+
+function VerdictCard({ v }: { v: Verdict }) {
+  const scale = Math.max(1, ...v.drivers.map((x) => Math.abs(x.months ?? 0)));
+  return (
+    <section className={`verdict ${v.answer} fade`} aria-live="polite">
+      <div className="verdict-tag">{v.answer === "yes" ? "Yes" : v.answer === "paper" ? "Only on paper" : "No"}</div>
+      <div>
+        <p className="eyebrow">Do they make it {v.threshold_months} months?</p>
+        <h2 className="verdict-h">{v.headline}</h2>
+        {v.reason && <p style={{ margin: 0 }}>{v.reason}</p>}
+        {v.futures && <p className="sub" style={{ marginTop: 6 }}>{v.futures}</p>}
+      </div>
+      {v.drivers.length > 0 && (
+        <div className="drivers">
+          <h3>What moves the answer <Info tip="Each bar flips one of our realistic choices back to the standard formula and measures how many months of runway it moves." /></h3>
+          {v.drivers.map((x) => (
+            <div key={x.driver} className="row">
+              <span>{x.driver}</span>
+              <div className="track"><div className={`fill ${x.direction > 0 ? "up" : ""}`} style={{ width: `${x.months == null ? 100 : (Math.abs(x.months) / scale) * 100}%` }} /></div>
+              <b>{x.months == null ? "decisive" : `${x.months > 0 ? "+" : ""}${x.months} mo`}</b>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -94,11 +121,12 @@ export default function Stress({ nav }: { nav: Nav }) {
         const s = q.data, sim = s.simulation, k = s.standard;
         return (
           <div className="grid fade" style={{ gap: 16, opacity: q.isPlaceholderData ? 0.6 : 1, transition: "opacity .2s" }}>
+            <VerdictCard v={s.verdict} />
             <section className="grid g3">
-              <div className="card"><Kpi swatch="std" label="Standard runway (judges' formula)" value={k.label} note={`Money in ${money(k.income_after)} vs money out ${money(k.spending_after)} a month`} /></div>
-              <div className="card ours"><Kpi swatch="ours" label="Realistic runway" value={s.realistic.label}
+              <div className="card"><Kpi swatch="std" tip={GLOSSARY.standard} label="Standard runway (judges' formula)" value={k.label} note={`Money in ${money(k.income_after)} vs money out ${money(k.spending_after)} a month`} /></div>
+              <div className="card ours"><Kpi swatch="ours" tip={GLOSSARY.realistic} label="Realistic runway" value={s.realistic.label}
                 note={s.realistic.ei_capped ? `EI capped at ${money(s.realistic.ei_monthly)}/month (2026 maximum)` : "Last 12 months, EI stops, pensions kept, dip-aware"} /></div>
-              <div className="card ink"><Futures p={sim.p_survive_6} months={6} />
+              <div className="card ink"><span className="kpi"><span className="label">Simulated futures<Info tip={GLOSSARY.futures} /></span></span><Futures p={sim.p_survive_6} months={6} />
                 <p className="sub" style={{ marginTop: 6 }}>{Math.round(sim.p_survive_12 * 10)} of 10 last 12 months. {sim.n_paths.toLocaleString()} futures replayed from their own last {sim.history_months} months.</p></div>
             </section>
 
