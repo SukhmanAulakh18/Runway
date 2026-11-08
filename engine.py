@@ -337,7 +337,13 @@ def verdict(p: Profile, key_res: dict, real_res: dict, r: Realistic, sc: Scenari
         effect("In-month dip", f"the balance dips ${r.dip:,.0f} within a typical month", replace(r, dip=0.0), sc)
     drivers.sort(key=lambda x: -1e9 if x["months"] is None else -abs(x["months"]))
     answer = "yes" if real >= MAKE_IT_MONTHS else ("paper" if std >= MAKE_IT_MONTHS else "no")
-    if answer == "yes":
+    # Averages can say yes while the low point says no: if most simulated futures fail, the honest answer is "fragile".
+    if answer == "yes" and sim is not None and sim["p_survive_6"] < 0.5:
+        answer = "fragile"
+    if answer == "fragile":
+        headline = (f"Fragile. On average money in covers money out, but only ${max(real_res['usable_buffer'], 0):,.0f} of usable "
+                    f"savings is left, so most futures run out within {MAKE_IT_MONTHS} months.")
+    elif answer == "yes":
         headline = ("Yes. Money in still covers money out after this shock." if real >= RUNWAY_CAP
                     else f"Yes. Realistically they last {real_res['label']}.")
     elif answer == "paper":
@@ -345,7 +351,7 @@ def verdict(p: Profile, key_res: dict, real_res: dict, r: Realistic, sc: Scenari
     else:
         headline = ("No. This shock wipes out their usable savings straight away." if real <= 0
                     else f"No. Realistically they run out in about {real_res['label']} ({key_res['label']} on the standard formula).")
-    want = 1 if answer == "yes" else -1
+    want = 1 if answer == "yes" else -1   # fragile / no / paper: name what shortens the runway
     top = next((x for x in drivers if x["direction"] == want), None)
     if real <= 0 and r.buffer - r.dip <= 0:
         reason = f"Their usable savings were already gone before the shock (average balance {'-' if r.buffer < 0 else ''}${abs(r.buffer):,.0f})."
@@ -355,6 +361,13 @@ def verdict(p: Profile, key_res: dict, real_res: dict, r: Realistic, sc: Scenari
     else:
         reason = None
     futures = f"{round(sim['p_survive_6'] * 10)} of 10 simulated futures last 6 months." if sim else None
+    if sim and sim.get("months_to_zero_p50") is not None:
+        hi = sim.get("months_to_zero_p90")
+        futures += (f" Most likely they run out around month {sim['months_to_zero_p50']:.0f} "
+                    f"(between month {sim['months_to_zero_p10']:.0f} and {f'{hi:.0f}' if hi is not None else 'beyond 24'} in 8 of 10 futures).")
+    if sim and answer in ("no", "paper") and sim["p_survive_6"] >= 0.7:   # the two methods look apart: say why
+        futures += (f" The simulation is more hopeful because it starts from today's balance (${sim['start']:,.0f}), not the 6-month average."
+                    if sim["start"] > r.buffer else " The simulation is more hopeful because their good months often make up for the bad ones.")
     return {"answer": answer, "headline": headline, "reason": reason, "futures": futures, "drivers": drivers,
             "threshold_months": MAKE_IT_MONTHS}
 
@@ -382,6 +395,10 @@ def simulate(acct: int, d: dict, sc: Scenario, months: int = 24, n_paths: int = 
         "start": start, "dip": r.dip,
         "p_survive_6": p_survive(6), "p_survive_12": p_survive(12),
         "median_months_to_zero": float(np.median(first)) if (first <= months).mean() >= 0.5 else None,
+        # range of when futures run out (months; None = beyond the horizon): a band, not a single number
+        "months_to_zero_p10": (float(np.percentile(first, 10)) if np.percentile(first, 10) <= months else None),
+        "months_to_zero_p50": (float(np.percentile(first, 50)) if np.percentile(first, 50) <= months else None),
+        "months_to_zero_p90": (float(np.percentile(first, 90)) if np.percentile(first, 90) <= months else None),
         "n_paths": n_paths, "history_months": n,
     }
 
@@ -397,6 +414,33 @@ def calibrate_break(p_raw: float) -> float:
     """Raw simulated P(break within 12 months) -> calibrated P(first overdraft within 12 months)."""
     p = min(max(float(p_raw), 1e-3), 1 - 1e-3)
     return float(1 / (1 + np.exp(-(SIM_CAL_A + SIM_CAL_B * np.log(p / (1 - p))))))
+
+
+REPEAT_TIERS = [(1, 7, "1-7 days"), (8, 10_000, "8+ days")]
+
+
+def repeat_rates(m: pd.DataFrame, year: int) -> dict:
+    """Out of time: among accounts overdrawn in year-1 (complete both years), share overdrawn again in `year`, by tier
+    of days below zero. Use year = the Time Machine year (2025 for today) so no future data is used."""
+    a = m[m.month.between(f"{year - 1}-01", f"{year - 1}-12")].groupby("account_id")
+    b = m[m.month.between(f"{year}-01", f"{year}-12")].groupby("account_id")
+    full = a.size()[a.size() == 12].index.intersection(b.size()[b.size() == 12].index)
+    prev, again = a.days_below_zero.sum().reindex(full), b.days_below_zero.sum().reindex(full) > 0
+    out = {"year": year, "never_overdrawn_rate": float(again[prev == 0].mean())}
+    for lo, hi, name in REPEAT_TIERS:
+        sel = prev.between(lo, hi)
+        out[name] = {"rate": float(again[sel].mean()), "accounts": int(sel.sum())}
+    return out
+
+
+def repeat_overdraft(acct: int, d: dict, rates: dict) -> dict | None:
+    """For a customer overdrawn in the last 12 months: the tested share of similar customers overdrawn again next year."""
+    days = int(_acct(acct, d).tail(12).days_below_zero.sum())
+    if days == 0:
+        return None
+    name = next(n for lo, hi, n in REPEAT_TIERS if lo <= days <= hi)
+    return {"days_below_zero_12m": days, "tier": name, "rate": rates[name]["rate"], "similar_accounts": rates[name]["accounts"],
+            "tested_on": f"{rates['year'] - 1} -> {rates['year']}", "never_overdrawn_rate": rates["never_overdrawn_rate"]}
 
 
 def overdraft_risk(acct: int, d: dict) -> dict:

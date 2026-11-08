@@ -12,6 +12,8 @@ export default function Overview({ nav }: { nav: Nav }) {
   const im = ev.data?.impact?.["2024-12"];
   const y25 = ev.data?.trough?.by_year?.find((r: { predicted_year: number }) => r.predicted_year === 2025);
   const at6 = pc.data?.find((p) => p.month === 6);
+  type Trait = { trait: string; riskiest_10: number; everyone_else: number };
+  const seg = ev.data?.segment ? Object.fromEntries((ev.data.segment.rows as Trait[]).map((r) => [r.trait, r])) as Record<string, Trait> : null;
 
   return (
     <main className="page fade">
@@ -41,7 +43,7 @@ export default function Overview({ nav }: { nav: Nav }) {
           <div className="card ours"><Kpi label="Dip-sized buffer covers" value={pct(im.buffer.covered_share)}
             note={`${kmoney(im.buffer.drawn_total)} drawn of ${kmoney(im.buffer.limits_total)} in limits`} /></div>
           <div className="card"><Kpi label="Personal alert warns" value={`${im.alert.median_lead_months} mo early`}
-            note={`${im.alert.fired_before} of ${im.caught}. A $100 alert: ${im.alert.generic_100_fired_before} of ${im.caught}`} /></div>
+            note={`${im.alert.fired_before} of ${im.caught}; a $100 alert: ${im.alert.generic_100_fired_before}.${im.alert.fired_for_quiet_share != null ? ` Pinged ${pct(im.alert.fired_for_quiet_share)} of flagged customers who never needed it` : ""}`} /></div>
         </section>
       )}
 
@@ -105,6 +107,17 @@ export default function Overview({ nav }: { nav: Nav }) {
             )}
             <button className="btn" style={{ marginTop: 12 }} onClick={() => nav.go("evidence")}>See the evidence →</button>
           </div>
+          {seg && (
+            <div className="card">
+              <h2>Who the riskiest 10% are: not poor, but running hot</h2>
+              <div className="list" style={{ marginTop: 6 }}>
+                <div className="list-row"><span>Money in per month (median)</span><b>{money(seg["money in per month"].riskiest_10)} vs {money(seg["money in per month"].everyone_else)}</b></div>
+                <div className="list-row"><span>Carry a loan</span><b>{pct(seg["has a loan"].riskiest_10)} vs {pct(seg["has a loan"].everyone_else)}</b></div>
+                <div className="list-row"><span>Pensioners</span><b>{pct(seg["pensioner"].riskiest_10, 1)} vs {pct(seg["pensioner"].everyone_else)}</b></div>
+              </div>
+              <p className="sub" style={{ marginTop: 8 }}>Where they live, joint accounts and district salaries make no difference. Descriptive, tested; not causal.</p>
+            </div>
+          )}
         </div>
       </section>
     </main>

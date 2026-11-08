@@ -114,7 +114,7 @@ export function PairBars({ data, a, b, height = 230, fmt = (v: number) => pct(v,
       <ComposedChart data={data} margin={{ top: 10, right: 8, left: 4, bottom: 0 }} barGap={2}>
         {grid}
         <XAxis dataKey="x" {...axis} />
-        <YAxis {...axis} tickFormatter={fmt} width={48} />
+        <YAxis {...axis} tickFormatter={fmt} width={62} />
         <Bar dataKey={a.key} name={a.name} fill={a.color ?? C.ours} radius={[4, 4, 0, 0]} barSize={26} />
         <Bar dataKey={b.key} name={b.name} fill={b.color ?? "#cbd2dd"} radius={[4, 4, 0, 0]} barSize={26} />
         <Tooltip cursor={{ fill: "#f1f3f7" }} content={<Tip rows={(r) => [[a.name, fmt(r[a.key] as number)], [b.name, fmt(r[b.key] as number)]]} />} />

@@ -27,7 +27,7 @@ function VerdictCard({ v }: { v: Verdict }) {
   const scale = Math.max(1, ...v.drivers.map((x) => Math.abs(x.months ?? 0)));
   return (
     <section className={`verdict ${v.answer} fade`} aria-live="polite">
-      <div className="verdict-tag">{v.answer === "yes" ? "Yes" : v.answer === "paper" ? "Only on paper" : "No"}</div>
+      <div className="verdict-tag">{({ yes: "Yes", no: "No", paper: "Only on paper", fragile: "Fragile" } as const)[v.answer]}</div>
       <div>
         <p className="eyebrow">Do they make it {v.threshold_months} months?</p>
         <h2 className="verdict-h">{v.headline}</h2>

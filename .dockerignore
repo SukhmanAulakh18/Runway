@@ -1,0 +1,12 @@
+# never ship secrets or local environments
+.env
+.env.*
+.venv/
+.git/
+**/__pycache__/
+.pytest_cache/
+web/node_modules/
+web/dist/
+graphify-out/cache/
+.claude/
+# data/ is intentionally NOT ignored: the container needs the CSVs (they are gitignored, not committed)

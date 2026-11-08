@@ -59,3 +59,8 @@ def dip_days():
 @st.cache_resource
 def standing_orders():
     return E.load_standing_orders()   # end-of-2025 snapshot: today's view only
+
+
+@st.cache_resource
+def repeat_table(year: int):
+    return E.repeat_rates(load_all()[0]["monthly"], year)   # out of time: year = the Time Machine year

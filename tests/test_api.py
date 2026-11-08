@@ -82,3 +82,14 @@ def test_brief_and_message_offline_templates_verify(lang):
 def test_shock_includes_verdict():
     v = client.post("/api/shock/20111", json={"scenario": {"job_loss": True, "bills_increase_pct": 0.15}}).json()["verdict"]
     assert v["answer"] == "no" and v["headline"].startswith("No.") and "1 of 10" in v["futures"]
+
+
+def test_repeat_uses_no_future_rates():
+    today = client.get("/api/customer/93172").json()["repeat"]
+    assert today["tested_on"] == "2024 -> 2025"
+    # Dec 2024 view of an account overdrawn in 2024 must use 2023 -> 2024 rates only
+    import engine as E
+    m = api.load_all()[0]["monthly"]
+    acct = int(m[(m.month.between("2024-01", "2024-12")) & (m.days_below_zero > 0)].account_id.iloc[0])
+    past = client.get(f"/api/customer/{acct}", params={"asof": "2024-12"}).json()["repeat"]
+    assert past is not None and past["tested_on"] == "2023 -> 2024"

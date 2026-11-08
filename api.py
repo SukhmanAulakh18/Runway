@@ -111,7 +111,7 @@ def customer(acct: int, asof: Optional[str] = ASOF):
                      "days_below_zero", "household_bills", "insurance", "loan_payments", "pension_in"]]
     out = {"account_id": acct, "asof": asof, "owner_age": c.age, "flags": c.flags,
            "profile": c.p, "standard_runway": c.key_res, "realistic": c.r, "realistic_runway": c.real_res,
-           "trough": c.lt, "loan": c.LR, "risk": c.risk, "cushion": c.cushion, "committed": c.committed,
+           "trough": c.lt, "loan": c.LR, "risk": c.risk, "cushion": c.cushion, "committed": c.committed, "repeat": c.repeat,
            "last_activity": c.a_rows.month.max(), "history": hist}
     if asof:
         out["what_happened_next"] = E.what_happened_next(acct, c.d_full, asof, 12)
