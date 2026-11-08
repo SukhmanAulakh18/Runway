@@ -270,9 +270,9 @@
     "semantic_hash": ""
   },
   "docs/HANDOFF.md": {
-    "mtime": 1794116282.0424976,
-    "seen": 1794116288.588731,
-    "ast_hash": "25c96c68c6679a1f830a39a8c5b8bb72",
+    "mtime": 1794116516.2996662,
+    "seen": 1794116524.8303728,
+    "ast_hash": "86171c4d99e46712af67d8c71628272a",
     "semantic_hash": ""
   },
   "docs/REACT_PLAN.md": {
@@ -324,9 +324,9 @@
     "semantic_hash": ""
   },
   "web/src/charts.tsx": {
-    "mtime": 1794114575.2543766,
-    "seen": 1794115061.3330698,
-    "ast_hash": "3a1fccbb141e1a6c35cc80617471e6e9",
+    "mtime": 1794116365.227582,
+    "seen": 1794116524.8303428,
+    "ast_hash": "0830ec7538a61e70c9a0c23e71282429",
     "semantic_hash": ""
   },
   "web/src/main.tsx": {
@@ -348,9 +348,9 @@
     "semantic_hash": ""
   },
   "web/src/screens/Overview.tsx": {
-    "mtime": 1794115702.151637,
-    "seen": 1794115942.818135,
-    "ast_hash": "628daddd8484222a4545856b1efa4720",
+    "mtime": 1794116367.4396608,
+    "seen": 1794116524.8303473,
+    "ast_hash": "05f19b892400f8c525f0657e2d25094c",
     "semantic_hash": ""
   },
   "web/src/screens/Plan.tsx": {
@@ -360,9 +360,9 @@
     "semantic_hash": ""
   },
   "web/src/screens/Stress.tsx": {
-    "mtime": 1794114575.2545803,
-    "seen": 1794115061.3330765,
-    "ast_hash": "7ca11d59efa3863366ab75026ed1a233",
+    "mtime": 1794116365.2295237,
+    "seen": 1794116524.8303492,
+    "ast_hash": "0f113023df194eb6ceb93652d4f5875b",
     "semantic_hash": ""
   },
   "web/src/screens/ui.tsx": {

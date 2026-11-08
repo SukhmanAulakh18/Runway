@@ -15,7 +15,7 @@ function Futures({ p, months }: { p: number; months: number }) {
   const n = Math.round(p * 10);
   return (
     <div>
-      <div className="dots" aria-label={`${n} of 10 simulated futures last ${months} months`}>
+      <div className="dots" role="img" aria-label={`${n} of 10 simulated futures last ${months} months`}>
         {Array.from({ length: 10 }, (_, i) => <span key={i} className={`dot ${i < n ? "on" : ""}`} />)}
       </div>
       <p style={{ margin: "8px 0 0", fontWeight: 600 }}>{n} of 10 simulated futures stay above the overdraft line for {months} months</p>

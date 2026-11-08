@@ -64,7 +64,7 @@ export default function Overview({ nav }: { nav: Nav }) {
           )}
           {!nav.asof && <p className="sub" style={{ marginBottom: 10 }}>Tip: set the Time Machine to Dec 2024 to see who actually went overdrawn next.</p>}
           {wl.isPending ? <Loading h={320} /> : wl.isError ? <Failed error={wl.error} /> : (
-            <div style={{ maxHeight: 520, overflow: "auto" }}>
+            <div style={{ maxHeight: 520, overflow: "auto" }} tabIndex={0} role="region" aria-label="Watchlist table, scrollable">
               <table className="tbl">
                 <thead><tr>
                   <th>Account</th><th>Lowest vs average (6 mo)</th><th className="num" title="Percentile rank: 1.6% = in the riskiest 1.6% of customers">Top %</th>
