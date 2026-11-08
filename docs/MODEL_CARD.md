@@ -89,6 +89,8 @@ A breach triggers re-validation and a review of the risk rating. CI checks every
 - Hard 6-second limit, then rules or template; tests use fakes, so they never call the live model.
 - Customer messages carry no risk percentages; credit is offered only after a call.
 
+- **Measured, not assumed.** `scripts/eval_ai.py` scores the twist-card reader on tuned and held-out cards (an invented shock counts as an error) and writes `docs/AI_EVAL.md`. Offline rules: 22/22 tuned, 8/16 held-out, so they are a fallback only.
+
 ## 8. Decommissioning (E-23 D.2)
 Retire on repeated monitoring breaches or a change in data or use. Keep the last version and its `evidence.json` as a
 benchmark. Delete the Vertex project (`gcloud projects delete <project>`) to stop the AI component.

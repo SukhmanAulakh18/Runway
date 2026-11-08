@@ -32,7 +32,7 @@ export interface Customer {
   loan_check: { hold: boolean; reasons: string[]; data_up_to: string; amount: number } | null;  // review rule at approval
   what_happened_next?: { month: string; days_below_zero: number; min_balance: number }[];
 }
-export interface Sim { months: number[]; p10: number[]; p50: number[]; p90: number[]; dip: number; start: number;
+export interface Sim { months: number[]; p10: number[]; p50: number[]; p90: number[]; dip: number; start: number; ee?: number[]; pfe95?: number[];
   p_survive_6: number; p_survive_12: number; insufficient_history: boolean; n_paths: number; history_months: number }
 export interface Verdict { answer: "yes" | "no" | "paper" | "fragile"; headline: string; reason: string | null; futures: string | null;
   drivers: { driver: string; what: string; direction: number; months: number | null }[]; threshold_months: number }
@@ -52,6 +52,10 @@ export interface WatchRow { account_id: number; ltr: number; ltr_pct_rank: numbe
   realistic_runway_ei: number; answer_key_runway_ei: number; reasons: string; overdraft_next_12m?: boolean | null;
   cause?: string | null; action?: string | null; cause_code?: string | null }
 export interface Watch { asof: string | null; n_in_view: number; rows: WatchRow[]; reveal?: { top_hit: number; base_rate: number }; calls?: Record<string, number> }
+export interface BookTier { tier: "overdrawn" | "act" | "watch" | "stable" | "new"; label: string; action: string; customers: number;
+  tested_rate: number | null; tested_share_of_overdrafts: number | null }
+export interface Book { asof: string | null; customers: number; tiers: BookTier[]; act_causes: Record<string, number>; tested_on: string | null;
+  summary: { focus_customers: number; focus_customer_share: number; focus_overdraft_share: number | null; stable_customer_share: number } }
 export interface Twist { settings: Scenario; source: string; disagree: string[]; chips: string[] }
 // evidence.json is large; screens read the fields they need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,6 +83,7 @@ export const api = {
   message: (a: number, asof: Asof, lang: "en" | "fr") =>
     call<{ text: string; source: string }>(`/api/ai/message/${a}${asof ? `?asof=${asof}&lang=${lang}` : `?lang=${lang}`}`, {}),
   watchlist: (asof: Asof) => call<Watch>(`/api/watchlist${q(asof)}`),
+  book: (asof: Asof) => call<Book>(`/api/book${q(asof)}`),
   portfolio: (scenario: Scenario) => call<{ month: number; standard: number; realistic: number }[]>("/api/portfolio", { scenario }),
   evidence: () => call<Evidence>("/api/evidence"),
 };

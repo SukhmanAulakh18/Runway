@@ -506,3 +506,13 @@ def test_evidence_fairness_and_lessons(d):
     ev = evidence.main(n_boot=200)
     assert {l["group"] for l in ev["lessons"]} == {"Rejected", "Not claimed", "One year only"}
     assert any(r["metric"].startswith("Fairness") for r in ev["monitoring"]["rows"]) and ev["monitoring"]["breaches"] == []
+
+
+# ---------------------------------------------------------------- The whole book (Nov 8)
+def test_book_tiers_partition_and_order(d):
+    t = E.book_tiers(d, "2024-12")
+    assert set(t.unique()) <= set(E.BOOK_TIERS) and len(t) == d["monthly"][d["monthly"].month <= "2024-12"].account_id.nunique()
+    assert t.loc[93172] == "act"
+    lt = E.ltr_table(d, asof="2024-12")
+    assert (lt.loc[t[t == "act"].index].ltr_pct_rank <= 0.10).all()
+    assert not lt.loc[t[t == "new"].index].scorable.any()

@@ -203,3 +203,14 @@ def test_brief_leads_with_the_matched_action_and_verifies():
     f = api._facts(93172, "2024-12")
     assert f["first_action"]["title"] == "Money in is falling" and not f["first_action"]["is_cushion"]
     assert ai.verify_numbers(b["text"], f)          # every number in the brief is an engine number
+
+
+def test_eval_harness_runs_offline_and_reports_held_out():
+    import sys, importlib
+    sys.path.insert(0, "scripts")
+    ev = importlib.import_module("eval_ai")
+    rules = lambda t: (ai._sanitize(ai.parse_twist_offline(t)), "rules")   # noqa: E731
+    tuned, held = ev.run("tuned", rules, ev.TUNED), ev.run("held", rules, ev.HELD_OUT)
+    assert tuned["accuracy"] == 1.0                     # the rules were fixed against these
+    assert held["n"] == 16 and 0 < held["accuracy"] < 1  # held-out is the honest number; never tune the rules to it
+    assert ev.correct({"job_loss": True, "one_off_cost": 50.0}, {"job_loss": True})[0] is False   # invented shocks count as errors

@@ -755,7 +755,9 @@ def net_flow_filter(acct: int, d: dict) -> dict:
 
 def optimize_cuts(acct: int, d: dict, sc: Scenario, horizon: int = 12, max_cut_share: float = 0.5,
                   pessimistic: bool = True, n_paths: int = 2000) -> dict:
-    """Constrained-optimal cut schedule (linear program, re-solved monthly = receding-horizon / MPC).
+    """Constrained-optimal cut schedule: one linear program over the next `horizon` months, solved once.
+    (Re-solving it every month as new data arrives would make it a receding-horizon / MPC policy; that is a
+    production step, not done here, and its stability is not analysed.)
 
     Finds the longest stretch T <= horizon for which the balance can be kept above the overdraft line
     (the customer's typical in-month dip) in a bad (10th percentile) or typical (median) outcome, and the
@@ -805,6 +807,32 @@ def realistic_vec(d: dict, window: int = WINDOW, ei_rate: float = EI_RATE) -> pd
     gap = out - (prot + np.minimum(ei_rate * earned, EI_MONTHLY_MAX))
     rw = np.where(usable <= 0, 0.0, np.where(gap <= 0, RUNWAY_CAP, np.minimum(usable / gap.where(gap > 0), RUNWAY_CAP)))
     return pd.DataFrame({"realistic_runway_ei": np.round(rw, 1)}, index=inc.index)
+
+
+# ---------------------------------------------------------------------------
+# The whole book: every customer gets one tier and one kind of action, so the bank sees its full workload,
+# not only the advisor's call list. Priority order; data up to `asof` only (no lookahead).
+# ---------------------------------------------------------------------------
+BOOK_TIERS = {
+    "overdrawn": ("Already overdrawn this year", "Recovery plan: fixed instalments + alert at their own danger level"),
+    "act": ("Act now: riskiest 10% by trough", "Advisor contact, matched to the cause (call, auto-save, alert, loan review)"),
+    "watch": ("Watch: next 20%", "Automatic personal alert only, no call"),
+    "stable": ("Stable", "Nothing: standard service"),
+    "new": ("Too new to score (under 12 months)", "Standard alerts until a year of history exists"),
+}
+WATCH_SHARE = 0.30   # act = riskiest 10%, watch = the next 20% (pct rank 0.10-0.30)
+
+
+def book_tiers(d: dict, asof: str | None = None) -> pd.Series:
+    """One tier per account (keys of BOOK_TIERS), most urgent first, from data up to `asof`."""
+    t = ltr_table(d, asof=asof)
+    m = d["monthly"] if asof is None else d["monthly"][d["monthly"].month <= asof]
+    overdrawn = m.sort_values(["account_id", "month"]).groupby("account_id").tail(12).groupby("account_id").days_below_zero.sum() > 0
+    r = t.ltr_pct_rank
+    tier = np.select([overdrawn.reindex(t.index).fillna(False).to_numpy(), ~t.scorable.to_numpy(),
+                      (r <= 0.10).to_numpy(), (r <= WATCH_SHARE).to_numpy()],
+                     ["overdrawn", "new", "act", "watch"], default="stable")
+    return pd.Series(tier, index=t.index, name="tier")
 
 
 def watchlist(d: dict) -> pd.DataFrame:

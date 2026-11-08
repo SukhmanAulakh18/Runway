@@ -11,6 +11,7 @@ import dataclasses
 import logging
 import math
 import warnings
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -189,6 +190,38 @@ def watchlist(asof: Optional[str] = ASOF, early_only: bool = True, limit: int = 
         out["reveal"] = {"top_hit": int(top.overdraft_next_12m.fillna(False).sum()),
                          "base_rate": float(w.overdraft_next_12m.fillna(False).mean())}
     return clean(out)
+
+
+@lru_cache(maxsize=8)
+def _book(asof: Optional[str]) -> dict:
+    d, _, EV, _ = load_all()
+    tiers = E.book_tiers(d, asof)
+    dd = d if asof is None else {"monthly": d["monthly"][d["monthly"].month <= asof], "loans": d["loans"]}
+    act = [int(a) for a in tiers[tiers == "act"].index]
+    causes = pd.Series([g["primary"]["short"] for g in (E.diagnose(a, dd) for a in act) if g]).value_counts().to_dict()
+    # tested rates from the latest cohort whose outcome year was already over at `asof` (no lookahead)
+    month = asof or "2025-12"
+    done_year = int(month[:4]) if month[5:] == "12" else int(month[:4]) - 1
+    cohorts = (EV or {}).get("book", {})
+    usable = [k for k, v in cohorts.items() if v["outcome_year"] <= done_year]
+    tested = cohorts[max(usable)] if usable else None
+    rows = [{"tier": k, "label": lab, "action": act_txt, "customers": int((tiers == k).sum()),
+             "tested_rate": tested["tiers"][k]["rate"] if tested else None,
+             "tested_share_of_overdrafts": tested["tiers"][k]["share_of_overdrafts"] if tested else None}
+            for k, (lab, act_txt) in E.BOOK_TIERS.items()]
+    n = int(len(tiers))
+    focus = [r for r in rows if r["tier"] in ("overdrawn", "act")]
+    summary = {"focus_customers": sum(r["customers"] for r in focus), "focus_customer_share": sum(r["customers"] for r in focus) / n,
+               "focus_overdraft_share": sum(r["tested_share_of_overdrafts"] or 0 for r in focus) if tested else None,
+               "stable_customer_share": next(r["customers"] for r in rows if r["tier"] == "stable") / n}
+    return {"asof": asof, "customers": n, "tiers": rows, "act_causes": causes, "summary": summary,
+            "tested_on": f"Dec {max(usable)[:4]} → {tested['outcome_year']}" if tested else None}
+
+
+@app.get("/api/book")
+def book(asof: Optional[str] = ASOF):
+    """The whole book: every customer in one tier with its action, and each tier's tested overdraft rate."""
+    return clean(_book(asof))
 
 
 @app.post("/api/portfolio")

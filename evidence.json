@@ -1726,5 +1726,133 @@
       "result": "Held in 2025, not in 2024.",
       "decision": "Reported, not used."
     }
-  ]
+  ],
+  "book": {
+    "2022-12": {
+      "outcome_year": 2023,
+      "overdrafts": 60,
+      "accounts": 2237,
+      "tiers": {
+        "overdrawn": {
+          "customers_scored": 54,
+          "with_full_next_year": 54,
+          "overdrew": 19,
+          "rate": 0.35185185185185186,
+          "share_of_overdrafts": 0.31666666666666665
+        },
+        "act": {
+          "customers_scored": 120,
+          "with_full_next_year": 120,
+          "overdrew": 11,
+          "rate": 0.09166666666666666,
+          "share_of_overdrafts": 0.18333333333333332
+        },
+        "watch": {
+          "customers_scored": 322,
+          "with_full_next_year": 322,
+          "overdrew": 7,
+          "rate": 0.021739130434782608,
+          "share_of_overdrafts": 0.11666666666666667
+        },
+        "stable": {
+          "customers_scored": 1147,
+          "with_full_next_year": 1146,
+          "overdrew": 5,
+          "rate": 0.004363001745200698,
+          "share_of_overdrafts": 0.08333333333333333
+        },
+        "new": {
+          "customers_scored": 596,
+          "with_full_next_year": 595,
+          "overdrew": 18,
+          "rate": 0.030252100840336135,
+          "share_of_overdrafts": 0.3
+        }
+      }
+    },
+    "2023-12": {
+      "outcome_year": 2024,
+      "overdrafts": 101,
+      "accounts": 3594,
+      "tiers": {
+        "overdrawn": {
+          "customers_scored": 67,
+          "with_full_next_year": 67,
+          "overdrew": 32,
+          "rate": 0.47761194029850745,
+          "share_of_overdrafts": 0.31683168316831684
+        },
+        "act": {
+          "customers_scored": 179,
+          "with_full_next_year": 179,
+          "overdrew": 20,
+          "rate": 0.11173184357541899,
+          "share_of_overdrafts": 0.19801980198019803
+        },
+        "watch": {
+          "customers_scored": 462,
+          "with_full_next_year": 462,
+          "overdrew": 11,
+          "rate": 0.023809523809523808,
+          "share_of_overdrafts": 0.10891089108910891
+        },
+        "stable": {
+          "customers_scored": 1640,
+          "with_full_next_year": 1634,
+          "overdrew": 6,
+          "rate": 0.0036719706242350062,
+          "share_of_overdrafts": 0.0594059405940594
+        },
+        "new": {
+          "customers_scored": 1254,
+          "with_full_next_year": 1252,
+          "overdrew": 32,
+          "rate": 0.025559105431309903,
+          "share_of_overdrafts": 0.31683168316831684
+        }
+      }
+    },
+    "2024-12": {
+      "outcome_year": 2025,
+      "overdrafts": 158,
+      "accounts": 4424,
+      "tiers": {
+        "overdrawn": {
+          "customers_scored": 102,
+          "with_full_next_year": 100,
+          "overdrew": 60,
+          "rate": 0.6,
+          "share_of_overdrafts": 0.379746835443038
+        },
+        "act": {
+          "customers_scored": 278,
+          "with_full_next_year": 275,
+          "overdrew": 35,
+          "rate": 0.12727272727272726,
+          "share_of_overdrafts": 0.22151898734177214
+        },
+        "watch": {
+          "customers_scored": 724,
+          "with_full_next_year": 714,
+          "overdrew": 19,
+          "rate": 0.02661064425770308,
+          "share_of_overdrafts": 0.12025316455696203
+        },
+        "stable": {
+          "customers_scored": 2564,
+          "with_full_next_year": 2520,
+          "overdrew": 10,
+          "rate": 0.003968253968253968,
+          "share_of_overdrafts": 0.06329113924050633
+        },
+        "new": {
+          "customers_scored": 832,
+          "with_full_next_year": 815,
+          "overdrew": 34,
+          "rate": 0.04171779141104295,
+          "share_of_overdrafts": 0.21518987341772153
+        }
+      }
+    }
+  }
 }

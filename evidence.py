@@ -90,6 +90,7 @@ def main(n_boot=1000, seed=0):
     ev["repeat_overdraft"] = {str(y): E.repeat_rates(d["monthly"], y) for y in (2024, 2025)}
     ev["diagnoses"] = diagnoses(d)
     ev["multiple_testing_extended"] = multiple_testing_extended(ev)
+    ev["book"] = book(d)
     ev["lessons"] = lessons(ev)   # last: reads diagnoses and the extended multiple-testing family
     return ev
 
@@ -472,6 +473,26 @@ def fairness(d):
                         all(r["catch_gap_p"] >= 0.05 for r in out) else "Check: a gap persists; see by_year."),
             "note": "Gender and age are not model inputs. 60+ customers are rarely flagged because most are steady pensioners "
                     "and their overdraft rate is near zero. Small samples (14-29 overdrafts per group): keep monitoring."}
+
+
+def book(d):
+    """The whole book: every customer in one tier (engine.book_tiers) at Dec of year N, outcome = any overdraft in N+1.
+    Three cohorts so every Time Machine view can show rates from a year that is already over (no lookahead)."""
+    m = d["monthly"]; out = {}
+    for asof in ("2022-12", "2023-12", "2024-12"):
+        t = E.book_tiers(d, asof); y = str(int(asof[:4]) + 1)
+        nxt = m[m.month.str[:4] == y]; full = nxt.groupby("account_id").size() == 12
+        od = nxt.groupby("account_id").days_below_zero.sum() > 0
+        keep = full[full].index.intersection(t.index)
+        df = pd.DataFrame({"tier": t.reindex(keep), "od": od.reindex(keep)})
+        total = int(df.od.sum())
+        rows = {}
+        for k in E.BOOK_TIERS:
+            g = df[df.tier == k]
+            rows[k] = {"customers_scored": int((t == k).sum()), "with_full_next_year": int(len(g)), "overdrew": int(g.od.sum()),
+                       "rate": float(g.od.mean()) if len(g) else None, "share_of_overdrafts": float(g.od.sum() / total) if total else None}
+        out[asof] = {"outcome_year": int(y), "overdrafts": total, "accounts": int(len(df)), "tiers": rows}
+    return out
 
 
 def lessons(ev):

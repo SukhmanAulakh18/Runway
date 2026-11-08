@@ -112,3 +112,12 @@ def test_watchlist_is_a_call_list():
     row = next(r for r in w["rows"] if r["account_id"] == 93172)
     assert row["cause"] == "Money in is falling" and row["action"] == "Call this week"
     assert sum(w["calls"].values()) == len(w["rows"])
+
+
+def test_book_covers_every_customer_without_lookahead():
+    b = client.get("/api/book", params={"asof": "2024-12"}).json()
+    assert sum(t["customers"] for t in b["tiers"]) == b["customers"]
+    assert b["tested_on"] == "Dec 2023 → 2024"                 # Dec 2024 view: rates from a year already over
+    tiers = {t["tier"]: t for t in b["tiers"]}
+    assert tiers["stable"]["tested_rate"] < 0.01 < tiers["act"]["tested_rate"] < tiers["overdrawn"]["tested_rate"]
+    assert client.get("/api/book").json()["tested_on"] == "Dec 2024 → 2025"

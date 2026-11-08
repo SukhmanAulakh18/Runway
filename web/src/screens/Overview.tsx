@@ -48,6 +48,8 @@ export default function Overview({ nav }: { nav: Nav }) {
         </section>
       )}
 
+      <BookCard nav={nav} />
+
       <section className="grid g-7-5">
         <div className="card">
           <div className="card-head">
@@ -131,5 +133,45 @@ export default function Overview({ nav }: { nav: Nav }) {
         </div>
       </section>
     </main>
+  );
+}
+
+const TIER_CLASS: Record<string, string> = { overdrawn: "t-bad", act: "t-act", watch: "t-watch", stable: "t-stable", new: "t-new" };
+
+/** The whole book: every customer in one tier, with its action and the tier's tested overdraft rate. */
+function BookCard({ nav }: { nav: Nav }) {
+  const q = useQuery({ queryKey: ["book", nav.asof], queryFn: () => api.book(nav.asof) });
+  if (q.isPending) return <Loading h={160} />;
+  if (q.isError) return <Failed error={q.error} />;
+  const b = q.data, s = b.summary;
+  return (
+    <section className="card" aria-label="The whole book">
+      <div className="card-head"><div>
+        <h2>The whole book: {b.customers.toLocaleString("en-CA")} customers, one action each</h2>
+        <p className="sub">
+          {s.focus_overdraft_share != null
+            ? <>{pct(s.focus_customer_share)} of customers (already overdrawn + riskiest 10%) produced <b>{pct(s.focus_overdraft_share)}</b> of next year's overdrafts. {pct(s.stable_customer_share)} are stable and need nothing.</>
+            : <>{pct(s.focus_customer_share)} of customers need an advisor; {pct(s.stable_customer_share)} are stable.</>}
+          {b.tested_on && <> Rates tested on {b.tested_on}, a year already over at this date.</>}
+        </p></div></div>
+      <div className="bookbar" role="img" aria-label={b.tiers.map((t) => `${t.label}: ${t.customers}`).join("; ")}>
+        {b.tiers.filter((t) => t.customers > 0).map((t) => (
+          <span key={t.tier} className={TIER_CLASS[t.tier]} style={{ flexGrow: t.customers }} title={`${t.label}: ${t.customers.toLocaleString("en-CA")}`} />
+        ))}
+      </div>
+      <table className="tbl" style={{ marginTop: 10 }}>
+        <thead><tr><th>Tier</th><th className="num">Customers</th><th className="num">Overdrew next year</th><th className="num">Share of all overdrafts</th><th>Action</th></tr></thead>
+        <tbody>{b.tiers.map((t) => (
+          <tr key={t.tier}>
+            <td><span className={`dot ${TIER_CLASS[t.tier]}`} aria-hidden="true" /> <b>{t.label}</b></td>
+            <td className="num">{t.customers.toLocaleString("en-CA")}</td>
+            <td className="num">{pct(t.tested_rate, 1)}</td>
+            <td className="num">{pct(t.tested_share_of_overdrafts)}</td>
+            <td>{t.action}{t.tier === "act" && Object.keys(b.act_causes).length > 0 &&
+              <span className="muted"> ({Object.entries(b.act_causes).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(", ")})</span>}</td>
+          </tr>))}
+        </tbody></table>
+      <p className="sub" style={{ marginTop: 8 }}>Too-new accounts can't be scored by the trough yet (it needs 12 months), and they still produce a real share of overdrafts: a gap we report rather than hide.</p>
+    </section>
   );
 }

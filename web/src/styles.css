@@ -265,3 +265,13 @@ details.fold > summary .sub::after { content: " ▾"; color: var(--ours-ink); fo
 details.fold[open] > summary .sub::after { content: " ▴"; }
 details.fold[open] > summary { margin-bottom: 12px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- whole book ---------- */
+.bookbar { display: flex; height: 16px; border-radius: 8px; overflow: hidden; gap: 2px; margin-top: 4px; }
+.bookbar span { display: block; min-width: 4px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: middle; }
+.t-bad { background: var(--bad); }
+.t-act { background: var(--ours-fill); }
+.t-watch { background: #f6a46b; }
+.t-stable { background: #c9cfd9; }
+.t-new { background: repeating-linear-gradient(45deg, #c9cfd9 0 4px, #e9ecf1 4px 8px); }

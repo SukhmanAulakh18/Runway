@@ -137,6 +137,18 @@ export default function Stress({ nav }: { nav: Nav }) {
                 {sim.insufficient_history && <p className="chip amber">Only {sim.history_months} months of history: treat this as rough.</p>}
                 <FanChart sim={sim} eiEnds={s.scenario.job_loss ? s.scenario.ei_months : null} />
                 <Legend items={[{ label: "Typical future", kind: "ours" }, { label: "Middle 80% of futures", kind: "soft" }, { label: "Overdraft line", kind: "bad" }]} />
+                {sim.ee && sim.pfe95 && (
+                  <details className="judge" style={{ marginTop: 12 }}>
+                    <summary>For risk teams: the bank's exposure profile under this shock</summary>
+                    <p className="sub" style={{ margin: "6px 0" }}>How far below $0 the in-month low goes across the same futures: expected exposure (average over all futures)
+                      and potential future exposure (95th percentile), the same exposure-profile idea used in counterparty credit risk.
+                      From the raw simulation, before calibration: compare shocks with it, don't read it as a loss forecast.</p>
+                    <table className="tbl"><thead><tr><th>Month</th><th className="num">Expected exposure</th><th className="num">95% exposure</th></tr></thead>
+                      <tbody>{[3, 6, 12, 24].filter((mo) => mo <= sim.months.length).map((mo) => (
+                        <tr key={mo}><td>{mo}</td><td className="num">{money(sim.ee![mo - 1])}</td><td className="num">{money(sim.pfe95![mo - 1])}</td></tr>))}
+                      </tbody></table>
+                  </details>
+                )}
               </div>
               <div className="card">
                 <h2>Why the two runways differ</h2>
