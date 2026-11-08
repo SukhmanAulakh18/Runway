@@ -21,12 +21,23 @@ export default function Plan({ nav }: { nav: Nav }) {
     <main className="page fade" style={{ opacity: q.isPlaceholderData ? 0.6 : 1 }}>
       <div>
         <p className="eyebrow">04 · Make a plan · customer {nav.acct}{nav.asof ? ` · as of ${monthName(nav.asof)}` : ""}</p>
-        <h1 className="title">Cover the dip first. <em>Then plan for the shock.</em></h1>
+        <h1 className="title">Fix the cause first. <em>Then plan for the shock.</em></h1>
       </div>
+
+      {p.diagnosis && p.diagnosis.primary.code !== "dip" && (
+        <section className="card nba">
+          <div className="nba-first">
+            <span className="badge ours">Do this first</span>
+            <h3>{p.diagnosis.primary.title}</h3>
+            <p className="why">{p.diagnosis.primary.why}</p>
+            <p className="act"><b>Action:</b> {p.diagnosis.primary.action}</p>
+          </div>
+        </section>
+      )}
 
       <section className="grid g-7-5">
         <div className="card hero">
-          <p className="eyebrow" style={{ color: "#ffe7d6" }}>Goal plan · do this now</p>
+          <p className="eyebrow" style={{ color: "#ffe7d6" }}>{p.diagnosis && p.diagnosis.primary.code !== "dip" ? "Then: cover the dip" : "Goal plan · do this now"}</p>
           <div className="grid g3" style={{ marginTop: 12 }}>
             <Kpi label="Cushion: overdraft protection or auto-transfer" value={money(cu.buffer)} note="Sized to their own typical in-month dip" />
             <Kpi label="Alert them" value="Before it's needed" size="md" note={`When the balance falls below ${money(cu.alert_level)}: their danger level, not a generic $100`} />
@@ -51,7 +62,7 @@ export default function Plan({ nav }: { nav: Nav }) {
             ? `Smallest cuts that keep them out of overdraft: ${o.protected_months} months instead of ${o.base_months}`
             : o.base_months >= o.horizon ? `No cuts needed: safe for all ${o.horizon} months in a ${o.outcome}` : `Cuts alone can't protect month ${o.base_months + 1}: they need a bridge first`}</h2>
           <p className="sub" style={{ marginBottom: 8 }}>
-            Linear program over the {o.outcome} simulated path{shocked ? " under your shock" : ""}. Bills and insurance are never cut; at most {money(o.max_monthly_cut)}/month.
+            Linear program over the simulated path for {o.outcome}{shocked ? ", under your shock" : ""}. Bills and insurance are never cut; at most {money(o.max_monthly_cut)}/month.
             {o.protected_months > o.base_months && <> Average cut {money(o.avg_monthly_cut)}/month.</>}
             {o.share_of_futures_protected != null && <> Keeps {pct(o.share_of_futures_protected)} of whole simulated futures safe.</>}
           </p>

@@ -150,6 +150,8 @@ class Realistic:
     buffer: float           # same as the answer key: mean avg_daily_balance, last 6 rows
     dip: float              # typical gap between average and lowest balance within a month
     window_months: int
+    loan_adjust: float = 0.0  # loan payment owed from now on minus the window's average (a new loan's payment isn't in history yet)
+    spending_history: float = 0.0  # mean money_out actually seen in the window (spending minus loan_adjust), for plain sentences
 
 
 def _acct(acct: int, d: dict) -> pd.DataFrame:
@@ -159,23 +161,38 @@ def _acct(acct: int, d: dict) -> pd.DataFrame:
     return a
 
 
+def loan_payment_due(acct: int, d: dict, month: str) -> float:
+    """Monthly loan payment owed after `month` (YYYY-MM): the loan started on or before it and runs past it.
+    Uses only the start date and term, known when the loan was granted, so it is safe in the Time Machine."""
+    L = d["loans"][d["loans"].account_id == acct]
+    if L.empty:
+        return 0.0
+    l = L.iloc[0]
+    end_of_month = pd.Period(month).end_time
+    return float(l.monthly_payment) if (l.loan_start <= end_of_month and l.loan_end > end_of_month) else 0.0
+
+
 def realistic_profile(acct: int, d: dict, window: int = WINDOW) -> Realistic:
     a = _acct(acct, d)
     w = a.tail(window)
     income = float(w.money_in.mean())
     protected = float((w.pension_in + w.interest_in).mean())
-    essential = float((w.household_bills + w.insurance + w.loan_payments + w.bank_fees).mean())
-    spending = float(w.money_out.mean())
+    # Forward-looking loan payment: a loan granted in the last months is barely in the 12-month average (93172: $0 in
+    # history, $4,638/month owed from Jan 2025); one that just ended no longer costs anything.
+    loan_now = loan_payment_due(acct, d, a.month.iloc[-1])
+    loan_adjust = loan_now - float(w.loan_payments.mean())
+    essential = float((w.household_bills + w.insurance + w.loan_payments + w.bank_fees).mean()) + loan_adjust
+    spending = float(w.money_out.mean()) + loan_adjust
     return Realistic(
         account_id=acct, income=income, protected_income=protected,
         earned_income=max(income - protected, 0.0), spending=spending,
         essential=essential, flexible=max(spending - essential, 0.0),
         transfers_out_other=float(w.transfers_out_other.mean()),
-        loan_payments=float(w.loan_payments.mean()),
+        loan_payments=loan_now,
         household_bills=float(w.household_bills.mean()),
         buffer=float(a.tail(6).avg_daily_balance.mean()),
         dip=float((w.avg_daily_balance - w.min_balance).median()),
-        window_months=len(w),
+        window_months=len(w), loan_adjust=loan_adjust, spending_history=float(w.money_out.mean()),
     )
 
 
@@ -294,7 +311,7 @@ def _sim_paths(acct: int, d: dict, sc: Scenario, months: int, n_paths: int, hist
             income = np.where(t >= sc.return_to_work_month, inc_t, income)
     else:
         income = prot_t + (1 - sc.income_cut) * earned_t
-    spend = out_t + sc.bills_increase_pct * hb_t + sc.spending_increase
+    spend = out_t + sc.bills_increase_pct * hb_t + sc.spending_increase + r.loan_adjust   # loan payment owed from now on
     # Start from today's balance (latest month-end), not the 6-month average B: out of time this lifts AUC 0.863 -> 0.877
     # and Brier 0.0152 -> 0.0145 after calibration (evidence.json -> sim_calibration). The standard formula keeps B.
     start = float(h.month_end_balance.iloc[-1]) - sc.one_off_cost - sc.one_off_months_of_spending * r.spending
@@ -407,7 +424,7 @@ def simulate(acct: int, d: dict, sc: Scenario, months: int = 24, n_paths: int = 
 # 2025 vs 1.6% who did), because replayed months wander like a random walk while real customers correct course.
 # Its ranking is good (AUC 0.88), so a 2-parameter logistic (Platt) map turns it into a probability.
 # Fitted on 2023-12 -> 2024 by evidence.sim_calibration(); validated on 2024-12 -> 2025 (see evidence.json).
-SIM_CAL_A, SIM_CAL_B = -3.3243, 0.4567
+SIM_CAL_A, SIM_CAL_B = -3.3602, 0.4574
 
 
 def calibrate_break(p_raw: float) -> float:
@@ -488,6 +505,84 @@ def load_standing_orders(data_dir: Path = DATA) -> pd.DataFrame | None:
     """standing_orders.csv: an undated end-of-2025 snapshot. Use for today's view only, never in backtests (lookahead)."""
     f = data_dir / "standing_orders.csv"
     return pd.read_csv(f) if f.exists() else None
+
+
+# ---------------------------------------------------------------------------
+# Diagnosis -> next best action. The trough says WHO; these say WHY and WHAT TO DO.
+# Tested out of time (evidence.json -> diagnoses): adding these signals to the trough did not catch more first
+# overdrafts at a 10% flag rate (33-34 of 55 either way), so they are not a new score. Inside the flagged 10% they do
+# separate risk: "money in fell" overdrew 13.5% (2024) and 20.3% (2025) vs 9-10% for all flagged, so they order the calls.
+# Rejected: "bills leave before the main deposit" was PROTECTIVE (0.4-1.0% vs 1.6%), so no "move the bill date" action.
+# ---------------------------------------------------------------------------
+INCOME_DROP = 0.75        # money in, last 3 months vs the 9 before, at or below this ratio
+NEW_LOAN_BURDEN = 0.30    # new loan (last 12 months) payment as a share of typical money in
+SWING_THRESHOLD = 0.47    # sd of monthly net flow / average balance; top 10% in 2023 (0.472) and 2024 (0.469)
+
+
+def diagnosis_signals(acct: int, d: dict) -> dict | None:
+    """The numbers behind each diagnosis, from the last 12 months only (None if under 12 months of history)."""
+    a = _acct(acct, d)
+    if len(a) < 12:
+        return None
+    w = a.tail(12); last3, prev9 = w.tail(3), w.head(9)
+    month = a.month.iloc[-1]
+    L = d["loans"][d["loans"].account_id == acct]
+    new_loan = None
+    if len(L) and L.iloc[0].loan_start.strftime("%Y-%m") > (pd.Period(month) - 12).strftime("%Y-%m") and loan_payment_due(acct, d, month) > 0:
+        l = L.iloc[0]
+        new_loan = {"payment": float(l.monthly_payment), "amount": float(l.amount), "duration_months": int(l.duration_months),
+                    "start": l.loan_start.strftime("%Y-%m-%d"), "share_of_money_in": float(l.monthly_payment / max(w.money_in.median(), 1.0))}
+    net = (w.money_in - w.money_out)
+    return {"money_in_last3": float(last3.money_in.mean()), "money_in_prev9": float(prev9.money_in.mean()),
+            "money_in_ratio": float(last3.money_in.mean() / prev9.money_in.mean()) if prev9.money_in.mean() > 0 else None,
+            "new_loan": new_loan,
+            "swing": float(net.std() / max(abs(w.avg_daily_balance.mean()), 1.0)), "net_sd": float(net.std()),
+            "good_month_surplus": float(net[net > 0].median()) if (net > 0).any() else 0.0,
+            "days_below_zero_12m": int(w.days_below_zero.sum())}
+
+
+def diagnose(acct: int, d: dict, cushion_res: dict | None = None) -> dict | None:
+    """Every diagnosis that applies, most urgent first, each with the action a bank can take, sized from own numbers."""
+    s = diagnosis_signals(acct, d)
+    if s is None:
+        return None
+    c = cushion_res or cushion(acct, d)
+    out = []
+    if s["days_below_zero_12m"] > 0:
+        out.append({"code": "repeat", "title": "Already overdrawn this year",
+                    "why": f"Below $0 on {s['days_below_zero_12m']} days in the last 12 months.",
+                    "action": "Overdraft recovery plan: turn what they owe into fixed monthly instalments and set the alert at "
+                              f"${c['alert_level']:,.0f}, so it fires before the next dip.",
+                    "numbers": {"days_below_zero_12m": s["days_below_zero_12m"], "alert_level": c["alert_level"]}})
+    if s["money_in_ratio"] is not None and s["money_in_ratio"] <= INCOME_DROP:
+        drop = 1 - s["money_in_ratio"]
+        out.append({"code": "income_drop", "title": "Money in is falling",
+                    "why": f"Money in fell {drop:.0%}: ${s['money_in_last3']:,.0f} a month over the last 3 months vs "
+                           f"${s['money_in_prev9']:,.0f} before.",
+                    "action": "Call first, this week: ask about job or income changes, explain EI, and offer a payment "
+                              "holiday on any loan before the first overdraft.",
+                    "numbers": {"drop": drop, "money_in_last3": s["money_in_last3"], "money_in_prev9": s["money_in_prev9"]}})
+    nl = s["new_loan"]
+    if nl and nl["share_of_money_in"] >= NEW_LOAN_BURDEN:
+        longer = nl["amount"] / (nl["duration_months"] + 12)      # loans.csv: amount = months x payment, so no interest term
+        out.append({"code": "new_loan", "title": "New loan is a heavy load",
+                    "why": f"A loan from {nl['start']} costs ${nl['payment']:,.0f} a month, {nl['share_of_money_in']:.0%} of typical money in.",
+                    "action": f"Loan review: move the payment date to just after their deposits, or extend the term by 12 months "
+                              f"(${nl['payment']:,.0f} -> ${longer:,.0f} a month).",
+                    "numbers": {"payment": nl["payment"], "share_of_money_in": nl["share_of_money_in"], "payment_if_extended": longer}})
+    if s["swing"] >= SWING_THRESHOLD:
+        save = 0.5 * s["good_month_surplus"]
+        out.append({"code": "swing", "title": "Cash flow swings hard",
+                    "why": f"Month to month, money in minus out swings by about ${s['net_sd']:,.0f}, large next to their balance.",
+                    "action": f"Auto-save in good months: move half of a good month's surplus (about ${save:,.0f}) into the "
+                              f"${c['buffer']:,.0f} cushion until it is full.",
+                    "numbers": {"net_sd": s["net_sd"], "auto_save": save, "buffer": c["buffer"]}})
+    out.append({"code": "dip", "title": "Dips close to $0 inside the month",
+                "why": f"The balance typically falls ${c['buffer']:,.0f} below its average within a month.",
+                "action": f"Cushion: overdraft protection or an auto-transfer of ${c['buffer']:,.0f}, and an alert when the balance "
+                          f"drops below ${c['alert_level']:,.0f}." + (f" Move ${c['top_up_now']:,.0f} to chequing now." if c["top_up_now"] > 0 else ""),
+                "numbers": {"buffer": c["buffer"], "alert_level": c["alert_level"], "top_up_now": c["top_up_now"]}})
+    return {"primary": out[0], "all": out, "signals": s}
 
 
 def committed_outflows(acct: int, orders: pd.DataFrame | None) -> dict | None:
@@ -757,12 +852,21 @@ def loan_risk(acct: int, d: dict) -> dict | None:
             "ever_overdrawn": bool((a.days_below_zero > 0).any())}
 
 
+def loan_adjust_vec(d: dict, last_month: pd.Series, window_mean_payment: pd.Series) -> pd.Series:
+    """Vectorised realistic_profile().loan_adjust: payment owed after each account's last month minus its window average."""
+    L = d["loans"].set_index("account_id").reindex(last_month.index)
+    end = pd.PeriodIndex(last_month, freq="M").end_time
+    running = (L.loan_start <= end) & (L.loan_end > end)
+    return L.monthly_payment.where(running, 0.0).fillna(0.0) - window_mean_payment
+
+
 def realistic_runway_vec(d: dict, sc: Scenario, window: int = WINDOW) -> pd.Series:
     """Realistic runway (EI capped and ending, pension kept, dip-aware) for every account under one scenario."""
     m = d["monthly"].sort_values(["account_id", "month"])
     w = m.groupby("account_id").tail(window)
     g = w.groupby("account_id")
     inc, out, hb = g.money_in.mean(), g.money_out.mean(), g.household_bills.mean()
+    out = out + loan_adjust_vec(d, g.month.max(), g.loan_payments.mean())   # same forward loan payment as realistic_profile
     prot = g.pension_in.mean() + g.interest_in.mean()
     earned = (inc - prot).clip(lower=0)
     dip = (w.avg_daily_balance - w.min_balance).groupby(w.account_id).median()

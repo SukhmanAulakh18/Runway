@@ -312,12 +312,16 @@ def write_plan(facts: dict) -> tuple[str, str]:
 
 
 # ---------------------------------------------------------------- advisor brief + customer message
-def customer_facts(acct, p, r, lt, risk, cushion, key_res, real_res, flags, committed=None, asof=None) -> dict:
+def customer_facts(acct, p, r, lt, risk, cushion, key_res, real_res, flags, committed=None, asof=None, diagnosis=None) -> dict:
     """The only numbers the brief / message may use, picked and rounded from engine outputs (no new maths)."""
     scored = bool(lt and lt.get("scorable"))
     return {
         "account": acct, "as_of": asof or "2025-12",
-        "money_in_per_month": round(r.income), "money_out_per_month": round(r.spending), "average_balance": round(p.buffer),
+        "money_in_per_month": round(r.income), "money_out_per_month": round(getattr(r, "spending_history", 0) or r.spending),
+        "average_balance": round(p.buffer),
+        "new_loan_payment_per_month": round(r.loan_payments) if getattr(r, "loan_adjust", 0) >= 1 else None,
+        "first_action": ({"title": diagnosis["primary"]["title"], "action": diagnosis["primary"]["action"], "why": diagnosis["primary"]["why"],
+                          "is_cushion": diagnosis["primary"]["code"] == "dip"} if diagnosis else None),
         "lowest_balance_6_months": round(lt["min_balance"]) if lt else None,
         "lowest_as_pct_of_average": round(lt["ltr"] * 100, 1) if lt else None,
         "riskiest_pct_of_customers": round(lt["pct_rank"] * 100, 1) if scored else None,
@@ -335,8 +339,10 @@ _BRIEF_PROMPT = """You brief a bank advisor before they contact a customer. Writ
 2) the risk and why: their balance dips close to $0 even though the average looks fine (use lowest_balance_6_months,
    riskiest_pct_of_customers and overdraft_risk_pct if present; overdraft_risk_pct is "a X% chance of a first overdraft in
    the next 12 months");
-3) the one action to offer: a cushion (overdraft protection or an automatic transfer) of cushion.amount, plus moving
-   cushion.move_now now if it is above 0.
+3) what to do first: if first_action is present, say first_action.action (because of first_action.why); if first_action is
+   not the cushion, then also offer the cushion (overdraft protection or an automatic transfer) of cushion.amount. If there is
+   no first_action, offer the cushion, plus moving cushion.move_now now if it is above 0. If new_loan_payment_per_month is
+   present, mention that a new loan now costs that much a month.
 Use ONLY numbers that appear in the facts. Dollars with $ and commas. Never mention field names. No headings or bullets.
 FACTS (JSON):
 {facts}"""
@@ -367,9 +373,15 @@ def template_brief(f: dict) -> str:
         s.append(f"But the balance dipped to ${f['lowest_balance_6_months']:,}, {f['lowest_as_pct_of_average']}% of the average"
                  + (f", putting them in the riskiest {f['riskiest_pct_of_customers']}% of customers" if f.get("riskiest_pct_of_customers") is not None else "")
                  + (f", with a {f['overdraft_risk_pct']}% chance of a first overdraft in the next 12 months." if f.get("overdraft_risk_pct") is not None else "."))
-    cu = f["cushion"]
-    s.append(f"Offer a cushion of ${cu['amount']:,} (overdraft protection or an automatic transfer)"
-             + (f" and suggest moving ${cu['move_now']:,} into chequing now." if cu["move_now"] else "."))
+    if f.get("new_loan_payment_per_month"):
+        s.append(f"A new loan now costs ${f['new_loan_payment_per_month']:,} a month.")
+    fa, cu = f.get("first_action"), f["cushion"]
+    if fa and not fa["is_cushion"]:
+        s.append(f"First, {fa['title'].lower()}: {fa['why']} {fa['action']}")
+        s.append(f"Then offer a cushion of ${cu['amount']:,} (overdraft protection or an automatic transfer).")
+    else:
+        s.append(f"Offer a cushion of ${cu['amount']:,} (overdraft protection or an automatic transfer)"
+                 + (f" and suggest moving ${cu['move_now']:,} into chequing now." if cu["move_now"] else "."))
     return " ".join(s)
 
 

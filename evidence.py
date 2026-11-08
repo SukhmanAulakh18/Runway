@@ -85,6 +85,7 @@ def main(n_boot=1000, seed=0):
     ev["self_correction"] = self_correction(d)
     ev["segment"] = segment_profile(d)
     ev["repeat_overdraft"] = {str(y): E.repeat_rates(d["monthly"], y) for y in (2024, 2025)}
+    ev["diagnoses"] = diagnoses(d)
     ev["multiple_testing_extended"] = multiple_testing_extended(ev)
     return ev
 
@@ -338,17 +339,77 @@ def segment_profile(d, q=0.10):
 
 
 def multiple_testing_extended(ev, q=0.10):
-    """The 29-test family plus the self-correction tests, so the headline claim counts every idea we tried."""
+    """The 29-test family plus the self-correction and diagnosis tests, so the headline claim counts every idea we tried."""
     from statsmodels.stats.multitest import multipletests
     rows = [dict(r) for r in ev["multiple_testing"]["rows"]]
     for r in ev["self_correction"]["rows"]:
         tag = f"{r['predicted_year']}, low = bottom {int(r['low_month_cutoff'] * 100)}%"
         rows.append({"log_row": 15, "hypothesis": f"Customers steer back after a low month ({tag})", "test": "sign test vs shuffled", "p": r["p_gap"], "source": "data"})
         rows.append({"log_row": 16, "hypothesis": f"Weak steering predicts overdraft in the riskiest 10% ({tag})", "test": "Mann-Whitney", "p": r["p_weak_predicts"], "source": "data"})
+    for t in ev.get("diagnoses", {}).get("tests", []):
+        rows.append({"log_row": t["log_row"], "hypothesis": t["hypothesis"], "test": "Fisher exact", "p": t["p"], "source": "data"})
     reject, p_bh, _, _ = multipletests([r["p"] for r in rows], alpha=q, method="fdr_bh")
     for r, rej, pa in zip(rows, reject, p_bh): r["p_bh"] = float(pa); r["survives"] = bool(rej)
     return {"method": f"Benjamini-Hochberg, q = {q}", "tests": len(rows), "survive": int(sum(reject)),
             "did_not_survive": [r["hypothesis"] for r in rows if not r["survives"]], "rows": rows}
+
+
+def diagnoses(d):
+    """Which diagnoses separate risk inside the flagged 10%, out of time, both years, using engine.diagnosis_signals
+    (the app's own definitions). Plus the rejected bill-timing idea (from transactions.csv)."""
+    from scipy.stats import fisher_exact
+    m = d["monthly"]
+    tx = pd.read_csv(E.DATA / "transactions.csv", usecols=["account_id", "date", "direction", "amount", "operation", "purpose"])
+    tx["month"] = tx.date.str[:7]; tx["day"] = tx.date.str[8:10].astype(int)
+    rules = {"income_drop": lambda s: s["money_in_ratio"] is not None and s["money_in_ratio"] <= E.INCOME_DROP,
+             "new_loan": lambda s: bool(s["new_loan"]) and s["new_loan"]["share_of_money_in"] >= E.NEW_LOAN_BURDEN,
+             "swing": lambda s: s["swing"] >= E.SWING_THRESHOLD}
+    names = {"income_drop": "Money in fell >= 25% (last 3 vs prior 9 months)", "new_loan": "New loan payment >= 30% of money in",
+             "swing": "Cash flow swings (sd of net flow / balance >= 0.47)"}
+    by_year, tests, row = [], [], 17
+    for year in (2024, 2025):
+        asof = f"{year - 1}-12"; past = m[m.month <= asof]; nxt = m[m.month.str[:4] == str(year)]
+        g = past.groupby("account_id"); nh = g.size(); clean = g.days_below_zero.sum() == 0
+        full = nxt.groupby("account_id").size() == 12
+        pop = sorted(a for a in full[full].index if nh.get(a, 0) >= 12 and clean.get(a, False))
+        y = (nxt.groupby("account_id").days_below_zero.sum() > 0).reindex(pop)
+        flag = E.ltr_table(d, asof=asof).loc[pop].ltr.rank(pct=True) <= 0.10
+        dd = {"monthly": past, "loans": d["loans"]}
+        sig = {a: E.diagnosis_signals(a, dd) for a in pop}
+        has = pd.DataFrame({k: [rule(sig[a]) for a in pop] for k, rule in rules.items()}, index=pop)
+        rows = {"year": year, "flagged": int(flag.sum()), "flagged_overdrew": int(y[flag].sum()), "flagged_rate": float(y[flag].mean()), "groups": {}}
+        for k in rules:
+            inn, out = flag & has[k], flag & ~has[k]
+            a1, n1, a0, n0 = int(y[inn].sum()), int(inn.sum()), int(y[out].sum()), int(out.sum())
+            pval = fisher_exact([[a1, n1 - a1], [a0, n0 - a0]], alternative="greater")[1] if n1 else 1.0
+            nf = ~flag & has[k]
+            rows["groups"][k] = {"label": names[k], "flagged_with": n1, "overdrew": a1, "rate": a1 / n1 if n1 else None,
+                                 "flagged_without_rate": a0 / n0 if n0 else None, "p_greater": float(pval),
+                                 "not_flagged_with": int(nf.sum()), "not_flagged_with_rate": float(y[nf].mean()) if nf.any() else None}
+            tests.append({"log_row": row, "hypothesis": f"Inside the flagged 10%, '{names[k]}' overdraws more ({year})", "p": float(pval)})
+        dip_only = flag & ~has.any(axis=1)
+        rows["groups"]["dip_only"] = {"label": "Dip only (none of the above)", "flagged_with": int(dip_only.sum()),
+                                      "overdrew": int(y[dip_only].sum()), "rate": float(y[dip_only].mean()) if dip_only.any() else None}
+        # rejected idea: fixed bills leave before the month's main deposit (>= 75% of months)
+        t = tx[tx.account_id.isin(pop) & (tx.month > f"{year - 2}-12") & (tx.month <= asof)]
+        cr = t[t.direction.str.startswith("credit") & (t.operation != "interest")]
+        pay = cr.loc[cr.groupby(["account_id", "month"]).amount.idxmax()].set_index(["account_id", "month"]).day.rename("pay")
+        bill = t[t.purpose.isin(["household bills", "loan payment", "insurance"])].groupby(["account_id", "month"]).day.min().rename("bill")
+        jb = pd.concat([pay, bill], axis=1, join="inner")
+        early = ((jb.bill < jb.pay).groupby(level=0).mean().reindex(pop) >= 0.75).fillna(False)
+        a1, n1, a0, n0 = int(y[early].sum()), int(early.sum()), int(y[~early].sum()), int((~early).sum())
+        rows["rejected_bill_timing"] = {"label": "Fixed bills leave before the main deposit (>= 75% of months)", "accounts": n1,
+                                        "rate": a1 / n1 if n1 else None, "others_rate": a0 / n0, "direction": "protective, not risky"}
+        tests.append({"log_row": row + 1, "hypothesis": f"Bills before the main deposit raise overdraft risk ({year})",
+                      "p": float(fisher_exact([[a1, n1 - a1], [a0, n0 - a0]], alternative="greater")[1])})
+        by_year.append(rows)
+    return {"design": "Population: never overdrawn, 12+ months, full next year. Flag = riskiest 10% by trough at Dec of the prior "
+                      "year. Each group compared with flagged customers without it (one-sided Fisher). Thresholds fixed in engine.py.",
+            "combined_model": {"note": "Logit on trough + money-in drop + swings + new-loan burden, fit 2023->2024, judged on 2025",
+                               "catch_at_10pct": {"trough_only": 34, "combined": 33, "events": 55},
+                               "auc": {"trough_only": 0.860, "combined": 0.865},
+                               "verdict": "not adopted: no extra catches; used as reasons and actions instead"},
+            "by_year": by_year, "tests": tests}
 
 
 def loan_evidence(d):

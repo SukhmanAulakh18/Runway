@@ -3,7 +3,7 @@ import {
 } from "recharts";
 import { kmoney, money, monthName, pct, type Month, type Sim } from "./api";
 
-const C = { ours: "#f26a1b", oursSoft: "#ffc9a3", std: "#64748b", bad: "#dc2626", ink: "#0f172a", ink3: "#8a94a6", line: "#e6e8ee" };
+const C = { ours: "#f26a1b", oursSoft: "#ffc9a3", std: "#64748b", bad: "#dc2626", ink: "#0f172a", ink3: "#5f6b7d", line: "#e6e8ee" };
 const axis = { stroke: C.ink3, fontSize: 11.5, tickLine: false, axisLine: false } as const;
 const grid = <CartesianGrid stroke={C.line} vertical={false} />;
 

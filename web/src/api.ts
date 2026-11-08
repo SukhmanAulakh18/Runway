@@ -16,14 +16,16 @@ export interface Trough { ltr: number; min_balance: number; avg_balance: number;
   neg_days_recent: number; scorable: boolean; n_months: number }
 export interface Cushion { buffer: number; alert_level: number; top_up_now: number; last_balance: number; as_of: string;
   dip_day: number | null; dip_day_share: number | null; dip_day_reliable: boolean }
+export interface Dx { code: "repeat" | "income_drop" | "new_loan" | "swing" | "dip"; title: string; why: string; action: string }
+export interface Diagnosis { primary: Dx; all: Dx[] }
 export interface Month { month: string; money_in: number; money_out: number; avg_daily_balance: number; min_balance: number;
   month_end_balance: number; days_below_zero: number }
 export interface Customer {
   account_id: number; asof: string | null; owner_age: number | null; flags: string[];
   profile: { income: number; spending: number; buffer: number; household_bills: number; fixed_costs: number; loan_payment: number; months_of_data: number };
-  standard_runway: RunwayRes; realistic: { income: number; spending: number; dip: number; window_months: number; protected_income: number };
+  standard_runway: RunwayRes; realistic: { income: number; spending: number; spending_history: number; loan_adjust: number; loan_payments: number; dip: number; window_months: number; protected_income: number };
   realistic_runway: RunwayRes; trough: Trough | null; risk: { p_12m: number; validated_population: boolean };
-  cushion: Cushion; last_activity: string; history: Month[];
+  cushion: Cushion; diagnosis: Diagnosis | null; last_activity: string; history: Month[];
   committed: { total: number; orders: number; by_purpose: Record<string, number> } | null;  // standing orders, today only
   repeat: { days_below_zero_12m: number; tier: string; rate: number; similar_accounts: number; tested_on: string; never_overdrawn_rate: number } | null;
   loan: { amount: number; monthly_payment: number; status_meaning: string; defaulted: boolean; overdrawn_before_loan: boolean; loan_start: string } | null;
@@ -36,7 +38,7 @@ export interface Verdict { answer: "yes" | "no" | "paper" | "fragile"; headline:
 export interface ShockRes { scenario: Scenario; standard: RunwayRes; realistic: RunwayRes; why_different: string[]; simulation: Sim; verdict: Verdict;
   judge_check: { I: number; S: number; B: number; H: number } }
 export interface PlanRes {
-  cushion: Cushion;
+  cushion: Cushion; diagnosis: Diagnosis | null;
   goal: { have: number; milestones: { name: string; target: number; need: number; done: boolean; months_steady: number | null; months_stretch: number | null }[];
     stretch_saving: number };
   backup: { base_runway: number; levers: { action: string; how: string; monthly_saving: number; runway: number; gain: number | null }[] };
@@ -81,7 +83,10 @@ export const api = {
 // ---- formatting only (no arithmetic on money beyond display rounding) ----
 export const money = (n: number | null | undefined) =>
   n == null ? "–" : `${n < 0 ? "−" : ""}$${Math.abs(Math.round(n)).toLocaleString("en-CA")}`;
-export const kmoney = (n: number) => (Math.abs(n) >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : Math.abs(n) >= 1e3 ? `$${Math.round(n / 1e3)}K` : money(n));
+export const kmoney = (n: number) => {
+  const s = n < 0 ? "−" : "", a = Math.abs(n);   // sign before the $: "−$90K", not "$-90K"
+  return a >= 1e6 ? `${s}$${(a / 1e6).toFixed(1)}M` : a >= 1e3 ? `${s}$${Math.round(a / 1e3)}K` : money(n);
+};
 export const pct = (n: number | null | undefined, d = 0) => (n == null ? "–" : `${(n * 100).toFixed(d)}%`);
 export const monthName = (ym: string) => new Date(`${ym}-15`).toLocaleDateString("en-CA", { month: "short", year: "numeric" });
 export const ASOF_LABEL: Record<string, string> = { "": "Today (Dec 2025)", "2024-12": "Dec 2024", "2023-12": "Dec 2023" };

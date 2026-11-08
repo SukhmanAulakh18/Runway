@@ -25,7 +25,8 @@ def test_time_machine_pitch_moment():
     c = client.get("/api/customer/93172", params={"asof": "2024-12"}).json()
     assert c["standard_runway"]["label"] == "no shortfall (120+)"
     assert c["trough"]["bottom_10"] and c["risk"]["validated_population"]
-    assert c["risk"]["p_12m"] == pytest.approx(0.040, abs=0.002)
+    assert c["risk"]["p_12m"] == pytest.approx(0.138, abs=0.002)   # was 0.040 before its new $4,638/month loan was counted (Nov 8)
+    assert c["realistic_runway"]["label"] == "2.4 months"              # was 26.7 months: the new loan payment is now owed
     assert c["history"][-1]["month"] == "2024-12"                       # no lookahead
     assert c["what_happened_next"][0]["days_below_zero"] == 13          # January 2025 reveal
 

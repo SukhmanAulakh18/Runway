@@ -191,3 +191,15 @@ def test_gemini_brief_rejected_when_number_invented(monkeypatch):
     monkeypatch.setattr(ai, "_client", _FakeGemini("They need a cushion of $9,999."))
     text, source = ai.advisor_brief(f)
     assert source == "template" and "$300" in text
+
+
+def test_brief_leads_with_the_matched_action_and_verifies():
+    from fastapi.testclient import TestClient
+    import api
+    c = TestClient(api.app)
+    b = c.post("/api/ai/brief/93172?asof=2024-12", json={}).json()
+    assert "Money in is falling" in b["text"] or "money in is falling" in b["text"]
+    assert "A new loan now costs $4,638 a month." in b["text"]
+    f = api._facts(93172, "2024-12")
+    assert f["first_action"]["title"] == "Money in is falling" and not f["first_action"]["is_cushion"]
+    assert ai.verify_numbers(b["text"], f)          # every number in the brief is an engine number

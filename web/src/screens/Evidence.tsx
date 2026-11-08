@@ -68,10 +68,33 @@ export default function Evidence() {
           <p className="sub" style={{ marginBottom: 8 }}>{e.segment.riskiest_10_n} flagged vs {e.segment.everyone_else_n} others (Dec 2024 data). Medians for amounts, shares for yes/no. Multiple-testing corrected.</p>
           <table className="tbl"><thead><tr><th>Trait</th><th className="num">Riskiest 10%</th><th className="num">Everyone else</th><th>Different?</th></tr></thead>
             <tbody>{(e.segment.rows as { trait: string; kind: string; riskiest_10: number; everyone_else: number; differs: boolean }[]).map((r) => {
-              const f = (v: number) => r.kind === "bin" || r.trait.includes("share") ? pct(v, 1) : r.trait.includes("age") ? v.toFixed(1) : money(v);
+              // explicit per-trait formats ("average" contains "age", "urban share" is already a percent)
+              const f = (v: number) => r.kind === "bin" || r.trait === "share of money in that is cash" ? pct(v, 1)
+                : r.trait === "owner age" ? `${v.toFixed(0)} yrs` : r.trait === "district urban share" ? `${v.toFixed(1)}%` : money(v);
               return <tr key={r.trait}><td>{r.trait}</td><td className="num">{f(r.riskiest_10)}</td><td className="num">{f(r.everyone_else)}</td>
                 <td>{r.differs ? <span className="chip ours">Yes</span> : <span className="chip">No difference</span>}</td></tr>;
             })}</tbody></table>
+        </section>
+      )}
+
+      {e.diagnoses && (
+        <section className="card">
+          <h2>Why they're at risk: which reasons hold up inside the riskiest 10%</h2>
+          <p className="sub">Each reason picks an action. Overdraft rate the next year for flagged customers with the reason vs flagged customers without it.
+            Combining these reasons with the trough did not catch more overdrafts ({e.diagnoses.combined_model.catch_at_10pct.combined} vs {e.diagnoses.combined_model.catch_at_10pct.trough_only} of {e.diagnoses.combined_model.catch_at_10pct.events}), so they choose the action, they don't replace the score.</p>
+          <table className="tbl"><thead><tr><th>Reason → action</th><th className="num">2024</th><th className="num">2025</th></tr></thead>
+            <tbody>{(["income_drop", "swing", "new_loan", "dip_only"] as const).map((k) => {
+              const [a, b] = e.diagnoses.by_year.map((y: { groups: Record<string, { label: string; rate: number | null; flagged_without_rate?: number | null; flagged_with: number; p_greater?: number }> }) => y.groups[k]);
+              const cell = (g: typeof a) => g.rate == null ? "–" : `${pct(g.rate)}${g.flagged_without_rate != null ? ` vs ${pct(g.flagged_without_rate)}` : ""} (n=${g.flagged_with})${g.p_greater != null && g.p_greater < 0.05 ? " ✓" : ""}`;
+              const act: Record<string, string> = { income_drop: "Call first: income check, EI, payment holiday", swing: "Auto-save good months into the cushion",
+                new_loan: "Loan review: payment date or longer term", dip_only: "Cushion + personal alert" };
+              return <tr key={k}><td><b>{a.label}</b><br /><span className="muted">{act[k]}</span></td><td className="num">{cell(a)}</td><td className="num">{cell(b)}</td></tr>;
+            })}
+            <tr><td><b>{e.diagnoses.by_year[1].rejected_bill_timing.label}</b><br /><span className="muted">Rejected: it is protective, so no "move the bill date" action</span></td>
+              {e.diagnoses.by_year.map((y: { year: number; rejected_bill_timing: { rate: number; others_rate: number; accounts: number } }) =>
+                <td key={y.year} className="num">{pct(y.rejected_bill_timing.rate, 1)} vs {pct(y.rejected_bill_timing.others_rate, 1)} (n={y.rejected_bill_timing.accounts})</td>)}</tr>
+            </tbody></table>
+          <p className="sub" style={{ marginTop: 8 }}>✓ = significant on its own (one-sided Fisher, p &lt; 0.05). All of these tests are in the multiple-testing count above.</p>
         </section>
       )}
 

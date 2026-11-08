@@ -98,7 +98,7 @@ Corrections to the critique:
 ## Pitch (60 seconds, in this order)
 
 1. "Tangerine's riskiest customers aren't broke. Their balance falls by the same amount every month, and one month it falls through zero."
-2. Demo mode: 93172, Dec 2024. "Averaged $18.5K; the standard formula says no shortfall. But it dipped to $238. We ranked her in the riskiest 2%, a 4% chance of a first overdraft in 12 months, 2.5× the average customer. In January she was overdrawn for 13 days."
+2. Demo mode: 93172, Dec 2024. "Averaged $18.5K; the standard formula says no shortfall. But it dipped to $238. We ranked her in the riskiest 2%. That same month the bank lent her $167K at $4,638 a month: counted, her runway is 2.4 months and her chance of a first overdraft is 14%. Her money in had fallen 27%, so the advisor calls first. In January she was overdrawn for 13 days."
 3. "Flag 10% of customers and we catch 62% of next year's first overdrafts, three years running. It survives controls for balance size and correction for the 29 ideas we tested."
 4. "The fix is cheap: overdraft protection sized to each customer's own dip covers 79% of those overdrafts. Of $2.9M in limits, only $78K is ever used. And an alert at *their* danger level warns 3 months early; a $100 alert catches 1 in 34."
 5. "Why it matters: every borrower in this data who went overdrawn defaulted. Pick any account and any twist card."
@@ -123,3 +123,16 @@ status D is partly "in debt" by definition; it's an early-warning signal, not ca
 | AI: plan facts | `ai.plan_facts()` builds the writer's facts from engine outputs, leading with the cushion; no "chance" field | Template passes its own number + wording checks on 60 accounts × 3 twists |
 | AI: wording guard | `ai.verify_wording()` rejects Gemini text that calls a simulation count a "chance" | Fake-Gemini test |
 | AI: twist safety net | `ai.parse_twist_checked()`: when Gemini reads the card, lists fields where the offline rules disagree, plus plain-English chips (`describe_scenario`) | Fake-Gemini test: a mis-read "bills +50%" is flagged |
+
+## Round 4 (diagnosis → action; the loan nobody counted)
+
+| Area | Change | Evidence |
+|---|---|---|
+| Engine: forward loan payments | A loan granted inside the 12-month window now counts at its full payment | 186 accounts at Dec 2024; 93172 realistic 26.7 → 2.4 months; calibration 2025 AUC 0.877 → 0.882, Brier 0.0145 → 0.0142 |
+| Engine: diagnosis → next best action | `engine.diagnose`: recovery plan / call first / loan review / auto-save / cushion, most urgent first | Inside the flagged 10%, money-in-fell overdrew 20% vs 8% (2025, survives BH); swings 14% vs 7% (2025, survives BH); 2024 same direction, not significant |
+| Rejected | "Bills before the main deposit" (protective, not risky); a combined score (33 vs 34 of 55 caught) | `evidence.json → diagnoses` |
+| Leak fixed | Loan outcome hidden in Time Machine mode | |
+| Screens | Customer "why + what to do" card; Plan leads with the first action; Evidence reasons table; phone width, CSS clash, number formats | Screenshots at 1440 px and 390 px, no console errors |
+| AI | Brief leads with the engine's first action, then the cushion; numbers still verified | `test_brief_leads_with_the_matched_action_and_verifies` |
+| Robustness | All 4,500 accounts × 3 README twists through the API | 0 errors, 0 blank numbers |
+| Multiple testing | Diagnosis and timing tests added to the family | 37 of 45 survive |

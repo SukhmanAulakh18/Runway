@@ -88,7 +88,7 @@ def test_ei_cap_constant():
 
 def test_realistic_examples(d):
     sc = E.Scenario(job_loss=True, ei_rate=0.55, ei_months=6, bills_increase_pct=0.15)
-    assert E.realistic_runway(E.realistic_profile(20111, d), sc)["runway"] == 1.3
+    assert E.realistic_runway(E.realistic_profile(20111, d), sc)["runway"] == 1.2   # was 1.3 before forward loan payments (Nov 8)
     assert E.realistic_runway(E.realistic_profile(20133, d), sc)["runway"] == 1.4
     assert E.runway(E.profile(20133, d), sc.to_answer_key_shock())["runway"] == 4.2
 
@@ -96,7 +96,7 @@ def test_employment_share_assumption(d):
     r = E.realistic_profile(20111, d)
     full = E.realistic_runway(r, E.Scenario(job_loss=True))["runway"]
     half = E.realistic_runway(r, E.Scenario(job_loss=True, employment_share=0.5))["runway"]
-    assert (full, half) == (1.3, 3.4)
+    assert (full, half) == (1.2, 3.1)   # was (1.3, 3.4) before forward loan payments (Nov 8)
 
 # ---------------------------------------------------------------- Module 4: findings
 def test_median_mislabel(d, P):
@@ -247,7 +247,7 @@ def test_portfolio_curve(d):
     pc = E.portfolio_curve(d, E.Scenario(job_loss=True, ei_months=6))
     row = pc[pc.month == 6].iloc[0]
     assert pc.iloc[0].standard == 1.0 and pc.iloc[0].realistic == 1.0
-    assert row.standard == pytest.approx(0.649, abs=0.001) and row.realistic == pytest.approx(0.408, abs=0.001)
+    assert row.standard == pytest.approx(0.649, abs=0.001) and row.realistic == pytest.approx(0.407, abs=0.001)
 
 def test_loan_risk_93172(d):
     lr = E.loan_risk(93172, d)
@@ -370,11 +370,12 @@ def test_verdict(d, acct, sc, answer, top):
         assert next(x for x in v["drivers"] if x["direction"] == want)["driver"] == top
 
 def test_verdict_fragile_when_most_futures_fail(d):
-    """93172 + furnace: averages say 'no shortfall' with $392 usable left; the simulation says no future lasts 6 months."""
+    """93172 + furnace: averages say 'no shortfall' with $6 usable left ($392 before forward loan payments: one of the last
+    12 loan payments was skipped, so the window under-counted it); the simulation says no future lasts 6 months."""
     s = E.Scenario(one_off_months_of_spending=1.0)
     p, r = E.profile(93172, d), E.realistic_profile(93172, d)
     v = E.verdict(p, E.runway(p, s.to_answer_key_shock()), E.realistic_runway(r, s), r, s, E.simulate(93172, d, s))
-    assert v["answer"] == "fragile" and v["headline"].startswith("Fragile.") and "$392" in v["headline"]
+    assert v["answer"] == "fragile" and v["headline"].startswith("Fragile.") and "$6 " in v["headline"]
 
 def test_repeat_overdraft_rates_out_of_time(d):
     r25, r24 = E.repeat_rates(d["monthly"], 2025), E.repeat_rates(d["monthly"], 2024)
@@ -395,7 +396,9 @@ def test_evidence_self_correction_and_extended_bh(d):
     assert len(sc["rows"]) == 4 and all(r["gap"] > 0.1 and r["share_accounts_positive"] > 0.8 for r in sc["rows"])
     full = evidence.main(n_boot=200)
     ext = full["multiple_testing_extended"]
-    assert ext["tests"] == full["multiple_testing"]["tests"] + 8
+    # base family + 8 steering tests + the diagnosis tests added Nov 8 (8 of them): every idea tried is counted
+    assert len(full["diagnoses"]["tests"]) == 8
+    assert ext["tests"] == full["multiple_testing"]["tests"] + 8 + len(full["diagnoses"]["tests"])
     assert all(r["survives"] for r in ext["rows"] if r["log_row"] in (7, "E4", 15))   # trough + steering hold
     assert full["impact"]["2024-12"]["alert"]["quiet_flagged"] > 0
 
@@ -407,3 +410,38 @@ def test_evidence_segment_profile(d):
     assert s["has a loan"]["differs"] and s["has a loan"]["riskiest_10"] > 2 * s["has a loan"]["everyone_else"]
     assert s["pensioner"]["differs"] and s["pensioner"]["riskiest_10"] < 0.02
     assert not s["district average salary"]["differs"] and not s["joint account"]["differs"]   # region doesn't matter
+
+
+# ---------------------------------------------------------------- Forward loan payments (Nov 8)
+def test_new_loan_payment_counts_without_lookahead(d):
+    m = d["monthly"]
+    assert E.loan_payment_due(93172, d, "2024-12") == pytest.approx(4637.72, abs=0.01)   # granted 2024-12-06
+    assert E.loan_payment_due(93172, d, "2024-11") == 0.0                               # not granted yet: no lookahead
+    dd = {"monthly": m[m.month <= "2024-12"], "loans": d["loans"]}
+    r = E.realistic_profile(93172, dd)
+    assert r.loan_adjust == pytest.approx(4637.72, abs=1) and E.realistic_runway(r, E.Scenario())["label"] == "2.4 months"
+
+def test_finished_loan_stops_costing(d):
+    L = d["loans"]; done = L[L.loan_end < pd.Timestamp("2025-06-01")].iloc[0]
+    assert E.loan_payment_due(int(done.account_id), d, "2025-12") == 0.0
+
+
+# ---------------------------------------------------------------- Diagnosis -> next best action (Nov 8)
+def test_diagnose_orders_by_urgency_and_always_ends_with_the_dip(d):
+    m = d["monthly"]; dd = {"monthly": m[m.month <= "2024-12"], "loans": d["loans"]}
+    x = E.diagnose(93172, dd)
+    assert [g["code"] for g in x["all"]] == ["income_drop", "swing", "dip"]       # money in fell 27% before the overdraft
+    assert x["primary"]["code"] == "income_drop" and "27%" in x["primary"]["why"]
+    assert [g["code"] for g in E.diagnose(20111, d)["all"]][0] == "repeat"          # already overdrawn: recovery plan first
+    assert [g["code"] for g in E.diagnose(20176, d)["all"]] == ["dip"]             # pensioner, steady: cushion only
+    for code_list in ([g["code"] for g in E.diagnose(a, d)["all"]] for a in (20111, 20176, 93172)):
+        assert code_list[-1] == "dip"
+
+def test_diagnose_needs_a_year_of_history(d):
+    m = d["monthly"]; dd = {"monthly": m[m.month <= "2023-12"], "loans": d["loans"]}
+    young = dd["monthly"].groupby("account_id").size(); a = int(young[young < 12].index[0])
+    assert E.diagnose(a, dd) is None
+
+def test_extended_loan_payment_uses_data_fields_only(d):
+    L = d["loans"]; l = L.iloc[0]
+    assert l.amount == pytest.approx(l.duration_months * l.monthly_payment, rel=1e-6)   # so amount/(term+12) is the longer-term payment
