@@ -41,7 +41,7 @@ export default function Plan({ nav }: { nav: Nav }) {
           <p className="eyebrow" style={{ color: "#ffe7d6" }}>{p.diagnosis && p.diagnosis.primary.code !== "dip" ? "Then: cover the dip" : "Goal plan · do this now"}</p>
           <div className="grid g3" style={{ marginTop: 12 }}>
             <Kpi label="1 · Alert them (free, no risk)" value={money(cu.alert_level)} note="When the balance falls below this: their own danger level, not a generic $100" />
-            <Kpi label="2 · Auto-transfer from savings" value={money(cu.buffer)} note={`Sized to their typical in-month dip.${cu.buffer_conservative ? ` Conservative option: ${money(cu.buffer_conservative)} (a 1-in-4 bad month).` : ""} A small overdraft limit only after a call.`} />
+            <Kpi label="2 · Auto-transfer from savings" value={money(cu.buffer)} note={`Their typical in-month dip${cu.buffer_conservative ? ` (conservative: ${money(cu.buffer_conservative)})` : ""}. A limit only after a call.`} />
             <Kpi label="Move to chequing now" value={cu.top_up_now > 0 ? money(cu.top_up_now) : "Nothing"} size={cu.top_up_now > 0 ? undefined : "md"} note={`Balance ${money(cu.last_balance)} at ${monthName(cu.as_of)}`} />
           </div>
           {p.limit_cost && <p style={{ margin: "14px 0 0" }}>Cost to the customer: the alert <b>$0</b>, the auto-transfer from savings <b>$0</b>. A {money(p.limit_cost.amount)} limit used for a whole month at Tangerine's published terms ($5 a month used + 19% a year) would cost about <b>{money(p.limit_cost.total)}</b>, which is why it comes last.</p>}
@@ -55,7 +55,7 @@ export default function Plan({ nav }: { nav: Nav }) {
             <p style={{ margin: "6px 0 0" }}>The personal alert fired before <b>{im.alert.fired_before} of {im.caught}</b>, a median {im.alert.median_lead_months} months early. A $100 alert: {im.alert.generic_100_fired_before}.
               {im.alert.fired_for_quiet_share != null && <> It pinged only {pct(im.alert.fired_for_quiet_share)} of flagged customers who never went overdrawn.</>}</p>
             {bc && <details className="judge" style={{ marginTop: 10 }}>
-              <summary>Risk appetite: how big should the buffer be?</summary>
+              <summary>Risk appetite: a 1-in-4-bad-month buffer covers {bc.rows[1].covered} of {bc.rows[1].overdrafts} (vs {bc.rows[0].covered}) for {kmoney(bc.rows[1].drawn_total - bc.rows[0].drawn_total)} more drawn. Show all levels</summary>
               <p className="sub" style={{ margin: "6px 0" }}>Each flagged customer's buffer set at a percentile of their own monthly dips (2025 backtest).
                 The 75th percentile is the knee: more coverage for little extra money drawn; higher levels add limits, not coverage.</p>
               <table className="tbl"><thead><tr><th>Buffer set at</th><th className="num">Overdrafts covered</th><th className="num">Limits offered</th><th className="num">Actually drawn</th></tr></thead>
