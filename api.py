@@ -111,7 +111,7 @@ def customer(acct: int, asof: Optional[str] = ASOF):
                      "days_below_zero", "household_bills", "insurance", "loan_payments", "pension_in"]]
     out = {"account_id": acct, "asof": asof, "owner_age": c.age, "flags": c.flags,
            "profile": c.p, "standard_runway": c.key_res, "realistic": c.r, "realistic_runway": c.real_res,
-           "trough": c.lt, "loan": c.LR, "risk": c.risk, "cushion": c.cushion, "committed": c.committed, "repeat": c.repeat, "diagnosis": c.diagnosis,
+           "trough": c.lt, "loan": c.LR, "loan_check": c.loan_check, "risk": c.risk, "cushion": c.cushion, "committed": c.committed, "repeat": c.repeat, "diagnosis": c.diagnosis,
            "last_activity": c.a_rows.month.max(), "history": hist}
     if asof:
         out["what_happened_next"] = E.what_happened_next(acct, c.d_full, asof, 12)
@@ -138,7 +138,8 @@ def plan(acct: int, req: PlanReq):
     pl["cushion"] = c.cushion                        # same cushion as the customer view (includes the dip day)
     opt = E.optimize_cuts(acct, c.d, sc, max_cut_share=req.max_cut_share, pessimistic=req.pessimistic)
     return clean({"cushion": c.cushion, "diagnosis": c.diagnosis, "goal": pl["goal"], "backup": pl["backup"], "optimiser": opt,
-                  "facts": ai.plan_facts(pl, c.key_res, c.real_res, c.sim, opt, c.risk)})
+                  "facts": ai.plan_facts(pl, c.key_res, c.real_res, c.sim, opt, c.risk),
+                  "limit_cost": E.overdraft_cost(c.cushion["buffer"], 1)})   # Tangerine's terms, if the limit were used for a month
 
 
 @app.post("/api/write-plan")
@@ -175,8 +176,15 @@ def twist(req: TwistReq):
 def watchlist(asof: Optional[str] = ASOF, early_only: bool = True, limit: int = Query(50, ge=1, le=500)):
     w = wl(asof)
     w = w[w.scorable & (~w.ever_negative.fillna(False) if early_only else True)]
-    top = w.head(limit)
-    out = {"asof": asof, "n_in_view": len(w), "rows": top.rename_axis("account_id").reset_index()}
+    top = w.head(limit).rename_axis("account_id").reset_index()
+    d = load_all()[0]
+    dd = d if asof is None else {"monthly": d["monthly"][d["monthly"].month <= asof], "loans": d["loans"]}
+    dg = [E.diagnose(int(a), dd) for a in top.account_id]   # each row's own cause and action: the advisor call list
+    top["cause"] = [g["primary"]["title"] if g else None for g in dg]
+    top["action"] = [g["primary"]["short"] if g else None for g in dg]
+    top["cause_code"] = [g["primary"]["code"] if g else None for g in dg]
+    out = {"asof": asof, "n_in_view": len(w), "rows": top,
+           "calls": top.groupby("action").size().sort_values(ascending=False).to_dict()}
     if asof:
         out["reveal"] = {"top_hit": int(top.overdraft_next_12m.fillna(False).sum()),
                          "base_rate": float(w.overdraft_next_12m.fillna(False).mean())}

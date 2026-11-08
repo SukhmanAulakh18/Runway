@@ -445,3 +445,38 @@ def test_diagnose_needs_a_year_of_history(d):
 def test_extended_loan_payment_uses_data_fields_only(d):
     L = d["loans"]; l = L.iloc[0]
     assert l.amount == pytest.approx(l.duration_months * l.monthly_payment, rel=1e-6)   # so amount/(term+12) is the longer-term payment
+
+
+def test_loan_check_93172_would_have_been_held(d):
+    c = E.loan_check(93172, d)
+    assert c["hold"] and c["data_up_to"] == "2024-11" and not c["overdrawn_before"] and c["trough_rank"] < 0.10
+
+
+def test_loan_check_uses_only_data_before_the_loan(d):
+    m2 = d["monthly"].copy()
+    m2.loc[(m2.account_id == 93172) & (m2.month >= "2024-12"), ["min_balance", "avg_daily_balance", "days_below_zero"]] = [-9e9, 1.0, 31]
+    assert E.loan_check(93172, {"monthly": m2, "loans": d["loans"]}) == E.loan_check(93172, d)   # no lookahead
+
+
+@pytest.mark.slow
+def test_evidence_loan_policy(d):
+    import evidence
+    lp = evidence.loan_policy(d)
+    a, b = lp["all_defaults"], lp["finished_unpaid"]
+    assert (a["held"], a["caught"], a["events"]) == (118, 41, 76)
+    assert a["default_rate_held"] > 5 * a["default_rate_not_held"] and a["fisher_p"] < 1e-6
+    assert (b["caught"], b["events"]) == (12, 31) and b["default_rate_held"] > 2.5 * b["default_rate_not_held"] and b["fisher_p"] < 0.01
+
+
+@pytest.mark.slow
+def test_evidence_monitoring_no_breaches(d):
+    import evidence
+    ev = evidence.main(n_boot=200)
+    mo = ev["monitoring"]
+    assert mo["breaches"] == [] and mo["checks"]["missing_values"] == 0
+    assert {r["effect"] for r in ev["segment"]["rows"] if r["trait"] in ("money in per month", "has a loan", "pensioner")} == {"big"}
+
+
+def test_overdraft_cost_tangerine_terms():
+    c = E.overdraft_cost(6000, 1)
+    assert c["fee"] == 5 and c["interest"] == pytest.approx(95.0) and c["total"] == pytest.approx(100.0)   # 6000 x 19% / 12

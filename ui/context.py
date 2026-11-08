@@ -29,6 +29,7 @@ class Context:
     risk: dict | None = None     # engine.overdraft_risk: calibrated chance of a first overdraft in 12 months
     cushion: dict | None = None  # engine.cushion: buffer, personal alert level, top-up now, usual dip day
     committed: dict | None = None  # engine.committed_outflows: standing orders (today only; None when asof is set)
+    loan_check: dict | None = None  # engine.loan_check: review rule at loan approval
     repeat: dict | None = None  # engine.repeat_overdraft: overdrawn in the last 12 months -> tested repeat rate
     diagnosis: dict | None = None  # engine.diagnose: why they're at risk and the matched action, most urgent first
 
@@ -42,8 +43,11 @@ def build_context(d, people, EV, accounts, acct, asof, sc) -> Context:
     tt = trough_table(asof)
     lt = E.liquidity_trough(acct, d, table=tt) if acct in tt.index else None
     LR = E.loan_risk(acct, d)
+    if LR and asof and LR["loan_start"][:7] > asof:   # granted after the Time Machine date: the bank didn't know it yet
+        LR = None
     if LR and asof:   # the loan's outcome (repaid / in debt / defaulted) is end-of-2025 knowledge: hide it in the Time Machine
         LR = {**LR, "status": None, "status_meaning": "outcome hidden in Time Machine mode", "defaulted": None}
+    LC = E.loan_check(acct, d_full) if LR else None   # would a review rule at approval have held it? (data before the loan only)
     who = people[people.account_id == acct]
     owner = who[who.type == "owner"]
     ref = pd.Timestamp(f"{asof}-28") if asof else E.END_OF_DATA
@@ -75,7 +79,7 @@ def build_context(d, people, EV, accounts, acct, asof, sc) -> Context:
 
     return Context(d=d, EV=EV, accounts=accounts, acct=acct, asof=asof, p=p, r=r, sc=sc,
                    key_res=E.runway(p, sc.to_answer_key_shock()), real_res=E.realistic_runway(r, sc),
-                   a_rows=a_rows, lt=lt, LR=LR, sim=E.simulate(acct, d, sc), age=age, flags=flags, d_full=d_full,
+                   a_rows=a_rows, lt=lt, LR=LR, loan_check=LC, sim=E.simulate(acct, d, sc), age=age, flags=flags, d_full=d_full,
                    risk=E.overdraft_risk(acct, d), cushion=(cu := E.cushion(acct, d, dip_table=dip_days())),
                    diagnosis=E.diagnose(acct, d, cushion_res=cu),
                    committed=None if asof else E.committed_outflows(acct, standing_orders()),

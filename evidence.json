@@ -77,7 +77,7 @@
         "risk_ratio": 14.557226399331661,
         "rr_ci95": [
           8.54799837767272,
-          24.79093128923757
+          24.790931289237573
         ]
       }
     ],
@@ -199,7 +199,7 @@
     "minors": 57,
     "cash_over_80pct_share": 0.6431111111111111,
     "bad_month_ratio_p90_over_median": 1.9551863863947376,
-    "district_unemployment_corr_2022_2023": 0.981521233847894,
+    "district_unemployment_corr_2022_2023": 0.9815212338478939,
     "stale_accounts": 76
   },
   "confounders": {
@@ -209,25 +209,25 @@
     "events": 55,
     "flagged": 342,
     "unadjusted": {
-      "odds_ratio": 16.0538033395175,
+      "odds_ratio": 16.05380333951765,
       "or_ci95": [
-        9.202654834139965,
-        28.00546215292111
+        9.202654834139842,
+        28.005462152922004
       ],
-      "p_value": 1.4057421408667118e-22
+      "p_value": 1.4057421408717476e-22
     },
     "adjusted": {
-      "odds_ratio": 16.813333999653125,
+      "odds_ratio": 16.813333999653118,
       "or_ci95": [
-        9.518238675379495,
-        29.69963349575502
+        9.51823867537951,
+        29.69963349575494
       ],
-      "p_value": 2.433683924162603e-22
+      "p_value": 2.4336839241617474e-22
     },
     "controls_odds_ratios": {
-      "log_avg_balance": 0.3143540586281447,
+      "log_avg_balance": 0.31435405862814514,
       "months_of_history": 0.9706793077936734,
-      "district_unemployment_2023": 0.9997902432003155
+      "district_unemployment_2023": 0.9997902432003157
     },
     "pseudo_r2": 0.20717892365083546
   },
@@ -262,9 +262,9 @@
         "log_row": 3,
         "hypothesis": "judges' runway (EI 55%) predicts a 2025 overdraft (AUC 0.783)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 7.798156853712891e-28,
+        "p": 7.798156853712888e-28,
         "source": "findings_log",
-        "p_bh": 3.2306649822524833e-27,
+        "p_bh": 3.2306649822524822e-27,
         "survives": true
       },
       {
@@ -280,18 +280,18 @@
         "log_row": 3,
         "hypothesis": "10th pct of monthly min balance predicts a 2025 overdraft (AUC 0.874)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 2.440346707203597e-47,
+        "p": 2.4403467072035974e-47,
         "source": "findings_log",
-        "p_bh": 2.359001816963477e-46,
+        "p_bh": 2.3590018169634774e-46,
         "survives": true
       },
       {
         "log_row": 3,
         "hypothesis": "buffer / spend predicts a 2025 overdraft (AUC 0.786)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 2.1578353937656524e-28,
+        "p": 2.1578353937656515e-28,
         "source": "findings_log",
-        "p_bh": 1.0429537736533986e-27,
+        "p_bh": 1.0429537736533983e-27,
         "survives": true
       },
       {
@@ -307,27 +307,27 @@
         "log_row": 3,
         "hypothesis": "prior negative predicts a 2025 overdraft (AUC 0.758)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 2.073543390464928e-23,
+        "p": 2.0735433904649277e-23,
         "source": "findings_log",
-        "p_bh": 7.516594790435364e-23,
+        "p_bh": 7.516594790435363e-23,
         "survives": true
       },
       {
         "log_row": 3,
         "hypothesis": "low-income-month share predicts a 2025 overdraft (AUC 0.703)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 4.357671434695034e-15,
+        "p": 4.3576714346950345e-15,
         "source": "findings_log",
-        "p_bh": 9.72095935431969e-15,
+        "p_bh": 9.720959354319693e-15,
         "survives": true
       },
       {
         "log_row": 3,
         "hypothesis": "median gap predicts a 2025 overdraft (AUC 0.611)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 1.7932912683053425e-05,
+        "p": 1.793291268305342e-05,
         "source": "findings_log",
-        "p_bh": 2.6002723390427464e-05,
+        "p_bh": 2.6002723390427454e-05,
         "survives": true
       },
       {
@@ -352,9 +352,9 @@
         "log_row": 5,
         "hypothesis": "Realistic variant '+ cap + pension' beats the answer key",
         "test": "normal from logged 95% CI",
-        "p": 0.04597351839405169,
+        "p": 0.04597351839405172,
         "source": "findings_log",
-        "p_bh": 0.04761542976526782,
+        "p_bh": 0.04761542976526785,
         "survives": true
       },
       {
@@ -487,18 +487,18 @@
         "log_row": 12,
         "hypothesis": "Payment / money in predicts default",
         "test": "Mann-Whitney (AUC)",
-        "p": 0.0002502676527079892,
+        "p": 0.00025026765270798925,
         "source": "data",
-        "p_bh": 0.00032989826947871307,
+        "p_bh": 0.0003298982694787131,
         "survives": true
       },
       {
         "log_row": "E4",
         "hypothesis": "Trough flag predicts after balance, history and unemployment",
         "test": "Logit Wald",
-        "p": 2.433683924162603e-22,
+        "p": 2.4336839241617474e-22,
         "source": "data",
-        "p_bh": 7.841870422301721e-22,
+        "p_bh": 7.841870422298964e-22,
         "survives": true
       }
     ]
@@ -506,7 +506,7 @@
   "sim_calibration": {
     "design": "Platt (logistic on logit of raw simulated P(break in 12 months), no shock); fit 2023-12 -> 2024, validate 2024-12 -> 2025",
     "fit": {
-      "a": -3.3602220510170646,
+      "a": -3.360222051017064,
       "b": 0.45738456860532894,
       "accounts": 2213,
       "events": 34
@@ -633,7 +633,7 @@
         "flagged_events": 20,
         "weak_steering_overdraft_rate": 0.10810810810810811,
         "strong_steering_overdraft_rate": 0.07207207207207207,
-        "p_weak_predicts": 0.06109896030608705
+        "p_weak_predicts": 0.06109896030608703
       },
       {
         "predicted_year": 2024,
@@ -663,7 +663,7 @@
         "flagged_events": 34,
         "weak_steering_overdraft_rate": 0.1111111111111111,
         "strong_steering_overdraft_rate": 0.08771929824561403,
-        "p_weak_predicts": 0.029936993034221746
+        "p_weak_predicts": 0.02993699303422175
       },
       {
         "predicted_year": 2025,
@@ -678,13 +678,14 @@
         "flagged_events": 34,
         "weak_steering_overdraft_rate": 0.14035087719298245,
         "strong_steering_overdraft_rate": 0.05847953216374269,
-        "p_weak_predicts": 0.008469684544813004
+        "p_weak_predicts": 0.008469684544813005
       }
     ],
     "verdict": "Steering back after a low holds in both years and cutoffs. Weak steering predicting overdrafts within the riskiest 10% is significant in 2025 but not in 2024 (and reverses at the 30% cutoff): not claimed."
   },
   "segment": {
     "population": "2025 cohort: complete 2024+2025, never overdrawn before 2025; traits from data up to Dec 2024",
+    "effect_rule": "big = significant and practically large (amounts >= 25% apart; yes/no shares >= 1.5x and >= 5 points apart)",
     "riskiest_10_n": 342,
     "everyone_else_n": 3075,
     "rows": [
@@ -694,9 +695,10 @@
         "riskiest_10": 16809.327083333334,
         "everyone_else": 7321.731666666667,
         "test": "Mann-Whitney (medians shown)",
-        "p": 6.355848919537849e-73,
-        "p_bh": 6.355848919537849e-72,
-        "differs": true
+        "p": 6.355848919537848e-73,
+        "p_bh": 6.355848919537848e-72,
+        "differs": true,
+        "effect": "big"
       },
       {
         "trait": "average balance",
@@ -706,7 +708,8 @@
         "test": "Mann-Whitney (medians shown)",
         "p": 1.8161968851125086e-07,
         "p_bh": 3.6323937702250173e-07,
-        "differs": true
+        "differs": true,
+        "effect": "small"
       },
       {
         "trait": "owner age",
@@ -714,9 +717,10 @@
         "riskiest_10": 40.95140314852841,
         "everyone_else": 43.50444900752909,
         "test": "Mann-Whitney (medians shown)",
-        "p": 0.0001368890364626256,
-        "p_bh": 0.00022814839410437602,
-        "differs": true
+        "p": 0.00013688903646262563,
+        "p_bh": 0.00022814839410437604,
+        "differs": true,
+        "effect": "small"
       },
       {
         "trait": "share of money in that is cash",
@@ -724,9 +728,10 @@
         "riskiest_10": 0.9936715240812042,
         "everyone_else": 0.9847088703995687,
         "test": "Mann-Whitney (medians shown)",
-        "p": 4.8379771238364045e-60,
-        "p_bh": 2.418988561918202e-59,
-        "differs": true
+        "p": 4.837977123836403e-60,
+        "p_bh": 2.418988561918201e-59,
+        "differs": true,
+        "effect": "small"
       },
       {
         "trait": "district average salary",
@@ -736,7 +741,8 @@
         "test": "Mann-Whitney (medians shown)",
         "p": 0.5346975171081191,
         "p_bh": 0.6683718963851488,
-        "differs": false
+        "differs": false,
+        "effect": "none"
       },
       {
         "trait": "district urban share",
@@ -746,7 +752,8 @@
         "test": "Mann-Whitney (medians shown)",
         "p": 0.7426053394474257,
         "p_bh": 0.8251170438304729,
-        "differs": false
+        "differs": false,
+        "effect": "none"
       },
       {
         "trait": "has a loan",
@@ -756,7 +763,8 @@
         "test": "Fisher exact (shares shown)",
         "p": 1.103178592555255e-25,
         "p_bh": 2.757946481388137e-25,
-        "differs": true
+        "differs": true,
+        "effect": "big"
       },
       {
         "trait": "pensioner",
@@ -766,7 +774,8 @@
         "test": "Fisher exact (shares shown)",
         "p": 4.05407112432482e-29,
         "p_bh": 1.3513570414416067e-28,
-        "differs": true
+        "differs": true,
+        "effect": "big"
       },
       {
         "trait": "has a card",
@@ -776,7 +785,8 @@
         "test": "Fisher exact (shares shown)",
         "p": 0.05544271515001157,
         "p_bh": 0.07920387878573082,
-        "differs": true
+        "differs": true,
+        "effect": "small"
       },
       {
         "trait": "joint account",
@@ -786,10 +796,164 @@
         "test": "Fisher exact (shares shown)",
         "p": 0.9434549315596523,
         "p_bh": 0.9434549315596523,
-        "differs": false
+        "differs": false,
+        "effect": "none"
       }
     ],
     "note": "Descriptive, not causal. Own BH family (q = 0.10): these describe the flagged group rather than test a prediction."
+  },
+  "loan_policy": {
+    "rule": "hold for review if, on data before the loan month, the applicant was ever overdrawn or is in the riskiest 10% of all customers by trough (12+ months to score)",
+    "loans": 682,
+    "scorable_by_trough": 402,
+    "all_defaults": {
+      "held": 118,
+      "held_share": 0.17302052785923755,
+      "events": 76,
+      "caught": 41,
+      "caught_share": 0.5394736842105263,
+      "lent_to_caught_defaulters": 5616392.76,
+      "lent_to_all_defaulters": 9804120.84,
+      "good_loans_held": 77,
+      "good_loans_held_amount": 8274392.159999999,
+      "default_rate_held": 0.3474576271186441,
+      "default_rate_not_held": 0.06205673758865248,
+      "fisher_p": 4.4279072738453635e-15
+    },
+    "finished_unpaid": {
+      "held": 118,
+      "held_share": 0.17302052785923755,
+      "events": 31,
+      "caught": 12,
+      "caught_share": 0.3870967741935484,
+      "lent_to_caught_defaulters": 1169498.04,
+      "lent_to_all_defaulters": 2745094.32,
+      "good_loans_held": 106,
+      "good_loans_held_amount": 12721286.88,
+      "default_rate_held": 0.1016949152542373,
+      "default_rate_not_held": 0.03368794326241135,
+      "fisher_p": 0.003110679733348009
+    },
+    "overdrawn_before_only": {
+      "held": 27,
+      "held_share": 0.039589442815249266,
+      "events": 76,
+      "caught": 27,
+      "caught_share": 0.35526315789473684,
+      "lent_to_caught_defaulters": 3475049.76,
+      "lent_to_all_defaulters": 9804120.84,
+      "good_loans_held": 0,
+      "good_loans_held_amount": 0.0,
+      "default_rate_held": 1.0,
+      "default_rate_not_held": 0.07480916030534351,
+      "fisher_p": 1.605499182028294e-28
+    },
+    "by_year": [
+      {
+        "year": 2020,
+        "loans": 20,
+        "held": 0,
+        "defaults": 4,
+        "caught": 0
+      },
+      {
+        "year": 2021,
+        "loans": 101,
+        "held": 14,
+        "defaults": 14,
+        "caught": 6
+      },
+      {
+        "year": 2022,
+        "loans": 90,
+        "held": 19,
+        "defaults": 12,
+        "caught": 7
+      },
+      {
+        "year": 2023,
+        "loans": 117,
+        "held": 18,
+        "defaults": 16,
+        "caught": 7
+      },
+      {
+        "year": 2024,
+        "loans": 196,
+        "held": 34,
+        "defaults": 26,
+        "caught": 17
+      },
+      {
+        "year": 2025,
+        "loans": 158,
+        "held": 33,
+        "defaults": 4,
+        "caught": 4
+      }
+    ],
+    "note": "Review means talk first (smaller loan, cushion, alert), not reject. Dollars are amounts lent, not losses."
+  },
+  "monitoring": {
+    "rows": [
+      {
+        "metric": "Trough score drift (PSI, Dec 2023 vs Dec 2024)",
+        "value": 0.007249648645640592,
+        "status": "ok",
+        "threshold": "watch > 0.1, breach > 0.25 (industry convention)"
+      },
+      {
+        "metric": "Money in drift (PSI, 2023 vs 2024 months)",
+        "value": 0.004095225345390359,
+        "status": "ok",
+        "threshold": "watch > 0.1, breach > 0.25 (industry convention)"
+      },
+      {
+        "metric": "Early warning AUC, predicting 2023",
+        "value": 0.8412440398786302,
+        "status": "ok",
+        "threshold": "breach < 0.75"
+      },
+      {
+        "metric": "Early warning AUC, predicting 2024",
+        "value": 0.8440191129228194,
+        "status": "ok",
+        "threshold": "breach < 0.75"
+      },
+      {
+        "metric": "Early warning AUC, predicting 2025",
+        "value": 0.8604510302309232,
+        "status": "ok",
+        "threshold": "breach < 0.75"
+      },
+      {
+        "metric": "Risk forecast calibration, 2025 (predicted / actual)",
+        "value": 0.9989177405026819,
+        "status": "ok",
+        "threshold": "breach outside 0.67-1.5"
+      },
+      {
+        "metric": "Data quality: money in/out parts add up",
+        "value": 1.0,
+        "status": "ok",
+        "threshold": "breach < 99.9% of rows"
+      },
+      {
+        "metric": "Data quality: missing or negative values",
+        "value": 0,
+        "status": "ok",
+        "threshold": "breach > 0"
+      }
+    ],
+    "checks": {
+      "money_in_parts_add_up": 1.0,
+      "money_out_parts_add_up": 1.0,
+      "missing_values": 0,
+      "negative_flows": 0
+    },
+    "breaches": [],
+    "watch": [],
+    "note": "OSFI E-23 (effective May 1, 2027) asks for monitoring with defined breach thresholds; it sets no numbers. These thresholds are stated choices; a breach triggers re-validation."
   },
   "repeat_overdraft": {
     "2024": {
@@ -1016,9 +1180,9 @@
         "log_row": 3,
         "hypothesis": "judges' runway (EI 55%) predicts a 2025 overdraft (AUC 0.783)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 7.798156853712891e-28,
+        "p": 7.798156853712888e-28,
         "source": "findings_log",
-        "p_bh": 3.19015507651891e-27,
+        "p_bh": 3.190155076518909e-27,
         "survives": true
       },
       {
@@ -1034,18 +1198,18 @@
         "log_row": 3,
         "hypothesis": "10th pct of monthly min balance predicts a 2025 overdraft (AUC 0.874)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 2.440346707203597e-47,
+        "p": 2.4403467072035974e-47,
         "source": "findings_log",
-        "p_bh": 1.5687943117737408e-46,
+        "p_bh": 1.5687943117737412e-46,
         "survives": true
       },
       {
         "log_row": 3,
         "hypothesis": "buffer / spend predicts a 2025 overdraft (AUC 0.786)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 2.1578353937656524e-28,
+        "p": 2.1578353937656515e-28,
         "source": "findings_log",
-        "p_bh": 9.710259271945436e-28,
+        "p_bh": 9.710259271945432e-28,
         "survives": true
       },
       {
@@ -1061,27 +1225,27 @@
         "log_row": 3,
         "hypothesis": "prior negative predicts a 2025 overdraft (AUC 0.758)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 2.073543390464928e-23,
+        "p": 2.0735433904649277e-23,
         "source": "findings_log",
-        "p_bh": 7.77578771424348e-23,
+        "p_bh": 7.775787714243479e-23,
         "survives": true
       },
       {
         "log_row": 3,
         "hypothesis": "low-income-month share predicts a 2025 overdraft (AUC 0.703)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 4.357671434695034e-15,
+        "p": 4.3576714346950345e-15,
         "source": "findings_log",
-        "p_bh": 1.153501262125156e-14,
+        "p_bh": 1.1535012621251562e-14,
         "survives": true
       },
       {
         "log_row": 3,
         "hypothesis": "median gap predicts a 2025 overdraft (AUC 0.611)",
         "test": "Mann-Whitney (logged AUC)",
-        "p": 1.7932912683053425e-05,
+        "p": 1.793291268305342e-05,
         "source": "findings_log",
-        "p_bh": 3.362421128072517e-05,
+        "p_bh": 3.362421128072516e-05,
         "survives": true
       },
       {
@@ -1106,9 +1270,9 @@
         "log_row": 5,
         "hypothesis": "Realistic variant '+ cap + pension' beats the answer key",
         "test": "normal from logged 95% CI",
-        "p": 0.04597351839405169,
+        "p": 0.04597351839405172,
         "source": "findings_log",
-        "p_bh": 0.05746689799256461,
+        "p_bh": 0.057466897992564644,
         "survives": true
       },
       {
@@ -1241,18 +1405,18 @@
         "log_row": 12,
         "hypothesis": "Payment / money in predicts default",
         "test": "Mann-Whitney (AUC)",
-        "p": 0.0002502676527079892,
+        "p": 0.00025026765270798925,
         "source": "data",
-        "p_bh": 0.0004331555527638275,
+        "p_bh": 0.0004331555527638276,
         "survives": true
       },
       {
         "log_row": "E4",
         "hypothesis": "Trough flag predicts after balance, history and unemployment",
         "test": "Logit Wald",
-        "p": 2.433683924162603e-22,
+        "p": 2.4336839241617474e-22,
         "source": "data",
-        "p_bh": 8.424290506716704e-22,
+        "p_bh": 8.4242905067137415e-22,
         "survives": true
       },
       {
@@ -1268,9 +1432,9 @@
         "log_row": 16,
         "hypothesis": "Weak steering predicts overdraft in the riskiest 10% (2024, low = bottom 20%)",
         "test": "Mann-Whitney",
-        "p": 0.06109896030608705,
+        "p": 0.06109896030608703,
         "source": "data",
-        "p_bh": 0.07430954631821399,
+        "p_bh": 0.07430954631821396,
         "survives": true
       },
       {
@@ -1304,9 +1468,9 @@
         "log_row": 16,
         "hypothesis": "Weak steering predicts overdraft in the riskiest 10% (2025, low = bottom 20%)",
         "test": "Mann-Whitney",
-        "p": 0.029936993034221746,
+        "p": 0.02993699303422175,
         "source": "data",
-        "p_bh": 0.03849041961542796,
+        "p_bh": 0.038490419615427963,
         "survives": true
       },
       {
@@ -1322,9 +1486,9 @@
         "log_row": 16,
         "hypothesis": "Weak steering predicts overdraft in the riskiest 10% (2025, low = bottom 30%)",
         "test": "Mann-Whitney",
-        "p": 0.008469684544813004,
+        "p": 0.008469684544813005,
         "source": "data",
-        "p_bh": 0.011549569833835914,
+        "p_bh": 0.011549569833835918,
         "survives": true
       },
       {

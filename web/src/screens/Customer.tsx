@@ -106,6 +106,20 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
         </div>
       </div>
 
+      {(() => {   // the 10-second story for any account: four beats, every number from the API
+        const nl = c.diagnosis?.signals?.new_loan, pr = c.diagnosis?.primary;
+        const beats: [string, React.ReactNode][] = [
+          ["Looks fine", <><b>{money(c.profile.buffer)}</b> on average. Standard runway: {c.standard_runway.label}.</>],
+          ["The low point", t?.scorable ? <>Dipped to <b>{money(t.min_balance)}</b>: riskier than {pct(1 - (t.pct_rank ?? 0))} of customers.</> : <>Lowest balance {t ? money(t.min_balance) : "–"} (too new to rank).</>],
+          ["What changed", nl ? <>New loan: <b>{money(nl.payment)}</b> a month. Realistic runway: <b>{c.realistic_runway.label}</b>.</>
+            : c.risk.validated_population ? <><b>{pct(c.risk.p_12m, 1)}</b> chance of a first overdraft in 12 months. Realistic runway: {c.realistic_runway.label}.</>
+            : c.repeat ? <>Already overdrawn: <b>{pct(c.repeat.rate)}</b> like them are overdrawn again within a year.</> : <>Realistic runway: <b>{c.realistic_runway.label}</b>.</>],
+          ["Do this", pr ? <><b>{pr.short ?? pr.title}</b>: {pr.title.toLowerCase()}.</> : <>Alert + auto-transfer of <b>{money(c.cushion.buffer)}</b>.</>],
+        ];
+        return <section className="story" aria-label="The story in four steps">{beats.map(([h, b], i) => (
+          <div key={h} className={`card ${i === 3 ? "ours" : ""}`}><p className="eyebrow">{i + 1} · {h}</p><p style={{ margin: "6px 0 0" }}>{b}</p></div>))}</section>;
+      })()}
+
       <p className="summary">
         Over the last {r.window_months} months they brought in about <b>{money(r.income)}</b> a month and sent out <b>{money(r.spending_history)}</b>,
         {" "}with <b>{money(c.profile.buffer)}</b> on average in the account.
@@ -182,6 +196,13 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
               <h3>Loan</h3>
               <p style={{ margin: "6px 0 0" }}>{money(c.loan.amount)} from {c.loan.loan_start}, {money(c.loan.monthly_payment)}/month. <b>{c.loan.status_meaning}</b>.
                 {c.loan.overdrawn_before_loan && <span className="chip warn" style={{ marginLeft: 6 }}>Granted while already overdrawn</span>}</p>
+              {c.loan_check && (
+                <p className={`callout ${c.loan_check.hold ? "bad" : ""}`} style={{ marginTop: 10 }}>
+                  {c.loan_check.hold
+                    ? <>A review rule at approval, using only data up to {monthName(c.loan_check.data_up_to)}, <b>would have held this loan</b>: {c.loan_check.reasons.join("; ")}.</>
+                    : <>A review rule at approval would have passed this loan (data up to {monthName(c.loan_check.data_up_to)}).</>}
+                </p>
+              )}
             </div>
           )}
         </div>

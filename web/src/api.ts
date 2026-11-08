@@ -16,8 +16,8 @@ export interface Trough { ltr: number; min_balance: number; avg_balance: number;
   neg_days_recent: number; scorable: boolean; n_months: number }
 export interface Cushion { buffer: number; alert_level: number; top_up_now: number; last_balance: number; as_of: string;
   dip_day: number | null; dip_day_share: number | null; dip_day_reliable: boolean }
-export interface Dx { code: "repeat" | "income_drop" | "new_loan" | "swing" | "dip"; title: string; why: string; action: string }
-export interface Diagnosis { primary: Dx; all: Dx[] }
+export interface Dx { code: "repeat" | "income_drop" | "new_loan" | "swing" | "dip"; title: string; why: string; action: string; short?: string }
+export interface Diagnosis { primary: Dx; all: Dx[]; signals?: { new_loan: { payment: number; start: string; amount: number } | null } }
 export interface Month { month: string; money_in: number; money_out: number; avg_daily_balance: number; min_balance: number;
   month_end_balance: number; days_below_zero: number }
 export interface Customer {
@@ -29,6 +29,7 @@ export interface Customer {
   committed: { total: number; orders: number; by_purpose: Record<string, number> } | null;  // standing orders, today only
   repeat: { days_below_zero_12m: number; tier: string; rate: number; similar_accounts: number; tested_on: string; never_overdrawn_rate: number } | null;
   loan: { amount: number; monthly_payment: number; status_meaning: string; defaulted: boolean; overdrawn_before_loan: boolean; loan_start: string } | null;
+  loan_check: { hold: boolean; reasons: string[]; data_up_to: string; amount: number } | null;  // review rule at approval
   what_happened_next?: { month: string; days_below_zero: number; min_balance: number }[];
 }
 export interface Sim { months: number[]; p10: number[]; p50: number[]; p90: number[]; dip: number; start: number;
@@ -45,10 +46,12 @@ export interface PlanRes {
   optimiser: { base_months: number; protected_months: number; horizon: number; cuts: number[]; avg_monthly_cut: number;
     max_monthly_cut: number; path: number[]; protected_path: number[]; dip: number; outcome: string; share_of_futures_protected?: number | null };
   facts: Record<string, unknown>;
+  limit_cost?: { fee: number; interest: number; total: number; amount: number };
 }
 export interface WatchRow { account_id: number; ltr: number; ltr_pct_rank: number | null; min_balance: number; avg_balance: number;
-  realistic_runway_ei: number; answer_key_runway_ei: number; reasons: string; overdraft_next_12m?: boolean | null }
-export interface Watch { asof: string | null; n_in_view: number; rows: WatchRow[]; reveal?: { top_hit: number; base_rate: number } }
+  realistic_runway_ei: number; answer_key_runway_ei: number; reasons: string; overdraft_next_12m?: boolean | null;
+  cause?: string | null; action?: string | null; cause_code?: string | null }
+export interface Watch { asof: string | null; n_in_view: number; rows: WatchRow[]; reveal?: { top_hit: number; base_rate: number }; calls?: Record<string, number> }
 export interface Twist { settings: Scenario; source: string; disagree: string[]; chips: string[] }
 // evidence.json is large; screens read the fields they need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
