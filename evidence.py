@@ -86,6 +86,8 @@ def main(n_boot=1000, seed=0):
     ev["segment"] = segment_profile(d)
     ev["loan_policy"] = loan_policy(d)
     ev["fairness"] = fairness(d)
+    ev["survival"] = survival(d)
+    ev["challenger"] = challenger(d)
     ev["monitoring"] = monitoring(d, ev)
     ev["repeat_overdraft"] = {str(y): E.repeat_rates(d["monthly"], y) for y in (2024, 2025)}
     ev["diagnoses"] = diagnoses(d)
@@ -557,6 +559,99 @@ def lessons(ev):
         {"group": "One year only", "idea": "Weak 'steering back' predicts who in the riskiest 10% overdraws",
          "result": "Held in 2025, not in 2024.", "decision": "Reported, not used."},
     ]
+
+
+def survival(d):
+    """WHEN a first overdraft comes. Two cohorts (scored Dec 2022 and Dec 2023, each followed 24 months):
+    Kaplan-Meier by trough group, log-rank test, and a discrete-time hazard model (logit on person-months; the data are
+    monthly, so most event times are tied and a Cox model is unstable). Controls standardised."""
+    import statsmodels.api as sm
+    from statsmodels.duration.survfunc import survdiff
+    out = []
+    for score in ("2022-12", "2023-12"):
+        D = E.survival_cohort(d, score)
+        stat, p = survdiff(D.time, D.event, D.group)
+        t = D.time.astype(int).to_numpy(); e = D.event.to_numpy()
+        rows = np.repeat(np.arange(len(D)), t); k = np.concatenate([np.arange(1, n + 1) for n in t])
+        y = np.zeros(len(rows)); y[(np.cumsum(t) - 1)[e == 1]] = 1
+        Z = D[["log_balance", "history"]]; Z = (Z - Z.mean()) / Z.std()
+        X = pd.DataFrame({"flag": (D["group"] == "riskiest 10%").astype(float).to_numpy()[rows],
+                          "log_balance": Z["log_balance"].to_numpy()[rows], "history": Z["history"].to_numpy()[rows],
+                          "first_6_months": (k <= 6).astype(float)})
+        r = sm.Logit(y, sm.add_constant(X)).fit(disp=0)
+        ci = np.exp(r.conf_int())
+        out.append({"scored": score, "followed": f"{int(score[:4]) + 1}-{int(score[:4]) + 2}", "customers": int(len(D)),
+                    "first_overdrafts": int(D.event.sum()), "curves": E.survival_curves(D),
+                    "logrank_chi2": float(stat), "logrank_p": float(p),
+                    "hazard_ratio_flag": float(np.exp(r.params["flag"])), "hazard_ratio_flag_ci95": [float(ci.loc["flag", 0]), float(ci.loc["flag", 1])],
+                    "hazard_ratio_first_6_months": float(np.exp(r.params["first_6_months"])), "first_6_months_p": float(r.pvalues["first_6_months"]),
+                    "flag_p": float(r.pvalues["flag"])})
+    return {"design": "Never-overdrawn, 12+ months of history, scored at December; first month with a day below $0 within 24 months; "
+                      "censored when data stop. Kaplan-Meier by trough group; discrete-time hazard (logit on person-months) adjusted "
+                      "for balance size and account age.", "cohorts": out}
+
+
+def _features(d, year):
+    """Everything known at December of year-1 for the trough backtest population (no outcome information)."""
+    m = d["monthly"]
+    nv, pre, y, ltr, low = _ltr_backtest(m, year)
+    P = pre[pre.account_id.isin(nv)].sort_values(["account_id", "month"])
+    w12 = P.groupby("account_id").tail(12); w6 = P.groupby("account_id").tail(6)
+    g12, g6 = w12.groupby("account_id"), w6.groupby("account_id")
+    net = (w12.money_in - w12.money_out).groupby(w12.account_id)
+    last3 = P.groupby("account_id").tail(3).groupby("account_id").money_in.mean()
+    prev9 = w12.groupby("account_id").head(9).groupby("account_id").money_in.mean()
+    L = d["loans"]; start = pd.Timestamp(f"{year - 1}-12-31")
+    cl = pd.read_csv(E.DATA / "clients.csv", parse_dates=["birth_date"]); dp = pd.read_csv(E.DATA / "dispositions.csv")
+    own = dp[dp.type == "owner"].merge(cl, on="client_id").set_index("account_id")
+    X = pd.DataFrame({
+        "trough": ltr, "lowest_balance": g6.min_balance.min(), "average_balance": g6.avg_daily_balance.mean(),
+        "money_in": g12.money_in.mean(), "money_out": g12.money_out.mean(),
+        "swing": net.std() / g6.avg_daily_balance.mean().abs().clip(lower=1), "money_in_trend": last3 / prev9.clip(lower=1),
+        "months_history": P.groupby("account_id").size(),
+        "has_loan": pd.Series(L[L.loan_start <= start].set_index("account_id").amount.notna()).reindex(nv).fillna(False).astype(float),
+        "pension_share": g12.pension_in.sum() / g12.money_in.sum().clip(lower=1), "cash_share": g12.cash_deposits.sum() / g12.money_in.sum().clip(lower=1),
+        "owner_age": (start - own.birth_date).dt.days / 365.25,
+    }).reindex(nv)
+    return X.astype(float), y.reindex(nv).astype(int)
+
+
+def challenger(d, seed=0):
+    """Champion vs challenger, out of time: gradient boosting on 12 features (fit on 2023->2024, judged on 2024->2025)
+    against the one-number trough. Same population and outcome as the headline backtest."""
+    from sklearn.ensemble import HistGradientBoostingClassifier
+    from sklearn.inspection import permutation_importance
+    Xtr, ytr = _features(d, 2024); Xte, yte = _features(d, 2025)
+    gb = HistGradientBoostingClassifier(max_depth=3, learning_rate=0.05, max_iter=300, l2_regularization=1.0,
+                                        class_weight="balanced", random_state=seed).fit(Xtr, ytr)
+    p_gb = gb.predict_proba(Xte)[:, 1]
+    def caught(score):   # first overdrafts in the top 10% by score
+        top = pd.Series(score, index=Xte.index).rank(pct=True, ascending=False) <= 0.10
+        return int(yte[top.values].sum())
+    trough_score = -Xte.trough.to_numpy()
+    rng = np.random.default_rng(seed); diffs = []
+    for _ in range(1000):
+        i = rng.integers(0, len(yte), len(yte))
+        if yte.values[i].sum() > 0:
+            diffs.append(roc_auc_score(yte.values[i], p_gb[i]) - roc_auc_score(yte.values[i], trough_score[i]))
+    from scipy.stats import binomtest
+    y = yte.to_numpy()
+    topg = pd.Series(p_gb).rank(pct=True, ascending=False).to_numpy() <= 0.10
+    topt = pd.Series(trough_score).rank(pct=True, ascending=False).to_numpy() <= 0.10
+    only_gb, only_tr = int(((y == 1) & topg & ~topt).sum()), int(((y == 1) & topt & ~topg).sum())
+    mcnemar_p = float(binomtest(only_gb, only_gb + only_tr).pvalue) if only_gb + only_tr else 1.0
+    imp = permutation_importance(gb, Xte, yte, scoring="roc_auc", n_repeats=10, random_state=seed)
+    top = sorted(zip(Xte.columns, imp.importances_mean), key=lambda x: -x[1])[:5]
+    return {"design": "fit on features at Dec 2023 -> overdrafts in 2024; judged on Dec 2024 -> 2025; never-overdrawn customers",
+            "features": list(Xte.columns), "test_accounts": int(len(yte)), "test_events": int(yte.sum()),
+            "auc": {"trough (champion)": float(roc_auc_score(yte, trough_score)), "gradient boosting (challenger)": float(roc_auc_score(yte, p_gb))},
+            "caught_top10": {"trough (champion)": caught(trough_score), "gradient boosting (challenger)": caught(p_gb)},
+            "auc_diff_ci95": [float(x) for x in np.percentile(diffs, [2.5, 97.5])], "auc_diff_p_boot": _p_boot(diffs),
+            "caught_by_both": int(((y == 1) & topg & topt).sum()), "caught_only_challenger": only_gb, "caught_only_champion": only_tr,
+            "mcnemar_p": mcnemar_p,
+            "top_features": [{"feature": f, "auc_drop": float(v)} for f, v in top],
+            "decision": "Keep the trough as champion: statistically tied, explainable, one SQL query, easy to monitor. "
+                        "Re-test the challenger in the pilot on Tangerine data; it graduates if it keeps winning."}
 
 
 def multiple_testing_extended(ev, q=0.10):

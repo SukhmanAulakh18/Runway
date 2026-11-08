@@ -45,6 +45,8 @@ All out of time: features up to December, outcome the next year.
 | Forecast calibration (2025) | Predicted 1.61% vs 1.61% observed; AUC 0.88; Brier 0.0142 beats the base rate 0.0158 |
 | Product backtest (2025) | Flag 10% → 34 of 55 first overdrafts; dip-sized buffer covers 27 of 34; alert fires before 23 of 34, median 3 months early, pinging 22% of flagged customers who never needed it |
 | Loan review rule (all 682 loans) | Holds 17%; catches 41 of 76 defaults; held loans default 34.7% vs 6.2% (clean outcome: 10.2% vs 3.4%, p = 0.003) |
+| Time to first overdraft (survival) | Never-overdrawn customers scored Dec 2022 and Dec 2023, followed 24 months: hazard ratio for the flag 11.2 (95% CI 5.2–23.9) and 12.4 (7.2–21.2); 2–4× higher in the first 6 months; log-rank p < 1e-9 |
+| Champion vs challenger (2025) | Gradient boosting on 12 features: 39 vs 34 of 55 caught, AUC 0.865 vs 0.860; not significant (McNemar p = 0.18, bootstrap AUC p = 0.84); its top feature is the trough. Trough kept |
 | Simulation audit | Deterministic; stable across seeds; monotonic in shock size; 0 errors over 4,500 accounts × 3 README twists |
 
 Independence: validation here was done by the same team with automated, reproducible tests. Before production, an
@@ -89,7 +91,7 @@ A breach triggers re-validation and a review of the risk rating. CI checks every
 - Hard 6-second limit, then rules or template; tests use fakes, so they never call the live model.
 - Customer messages carry no risk percentages; credit is offered only after a call.
 
-- **Measured, not assumed.** `scripts/eval_ai.py` scores the twist-card reader on tuned and held-out cards (an invented shock counts as an error) and writes `docs/AI_EVAL.md`. Offline rules: 8/16 on the first held-out set; generalised on it, then 15/16 (94%) on a fresh held-out set frozen beforehand.
+- **Measured, not assumed.** `scripts/eval_ai.py` scores the twist-card reader on tuned and held-out cards (an invented shock counts as an error) and writes `docs/AI_EVAL.md`. Offline rules: 8/16 on the first held-out set; generalised on it, then 15/16 (94%) on a fresh held-out set frozen beforehand. Gemini on the same held-out set: 14/16 (88%), median 1.3 s.
 
 ## 8. Decommissioning (E-23 D.2)
 Retire on repeated monitoring breaches or a change in data or use. Keep the last version and its `evidence.json` as a

@@ -460,6 +460,65 @@ def repeat_overdraft(acct: int, d: dict, rates: dict) -> dict | None:
             "tested_on": f"{rates['year'] - 1} -> {rates['year']}", "never_overdrawn_rate": rates["never_overdrawn_rate"]}
 
 
+# ---------------------------------------------------------------------------
+# Survival: WHEN does a first overdraft come? Kaplan-Meier by trough group over 24 months, never-overdrawn customers
+# scored at December. A cohort's 24-month follow-up must end by the view date (no lookahead): today uses the cohort
+# scored Dec 2023 (followed 2024-2025); the Dec 2024 view uses Dec 2022 (followed 2023-2024). evidence.json -> survival.
+# ---------------------------------------------------------------------------
+SURV_GROUPS = [(0.10, "riskiest 10%"), (0.30, "next 20%"), (1.01, "everyone else")]
+SURV_HORIZON = 24
+
+
+def survival_cohort(d: dict, score_month: str, horizon: int = SURV_HORIZON) -> pd.DataFrame:
+    """One row per never-overdrawn, scorable customer at `score_month`: months to first overdraft (or censoring), group."""
+    m = d["monthly"]; past = m[m.month <= score_month]
+    g = past.groupby("account_id"); nh = g.size(); clean = g.days_below_zero.sum() == 0
+    t = ltr_table(d, asof=score_month)
+    pop = [a for a in t.index if nh.get(a, 0) >= LTR_MIN_HISTORY and clean.get(a, False)]
+    start = pd.Period(score_month) + 1
+    fut = m[(m.month > score_month) & m.account_id.isin(pop)][["account_id", "month", "days_below_zero"]].copy()
+    fut["k"] = (pd.PeriodIndex(fut.month, freq="M") - start).map(lambda x: x.n) + 1
+    fut = fut[fut.k <= horizon]
+    ev = fut[fut.days_below_zero > 0].groupby("account_id").k.min()
+    last = fut.groupby("account_id").k.max()
+    rank = t.loc[pop].ltr.rank(pct=True)
+    group = [next(name for cut, name in SURV_GROUPS if r <= cut) for r in rank]
+    avg = past[past.account_id.isin(pop)].groupby("account_id").tail(6).groupby("account_id").avg_daily_balance.mean()
+    D = pd.DataFrame({"time": ev.reindex(pop).fillna(last.reindex(pop)).fillna(0).astype(float),
+                      "event": ev.reindex(pop).notna().astype(int).values, "group": group, "rank": rank.values,
+                      "log_balance": np.log(avg.reindex(pop).clip(lower=1)).values, "history": nh.reindex(pop).astype(float).values}, index=pop)
+    return D[D.time > 0]
+
+
+def survival_curves(D: pd.DataFrame, horizon: int = SURV_HORIZON) -> dict:
+    """Kaplan-Meier share overdrawn by month 0..horizon for each trough group (censoring handled)."""
+    from statsmodels.duration.survfunc import SurvfuncRight
+    out = {}
+    for _, name in SURV_GROUPS:
+        g = D[D.group == name]
+        sf = SurvfuncRight(g.time, g.event)
+        surv = pd.Series(sf.surv_prob, index=sf.surv_times)
+        curve = [float(1 - (surv[surv.index <= k].iloc[-1] if (surv.index <= k).any() else 1.0)) for k in range(horizon + 1)]
+        out[name] = {"customers": int(len(g)), "first_overdrafts": int(g.event.sum()), "overdrawn_by_month": curve}
+    return out
+
+
+def survival_score_month(asof: str | None) -> str:
+    """Latest December cohort whose 24-month follow-up is complete by the view date."""
+    year = int(asof[:4]) if asof else int(END_OF_DATA.year)
+    return f"{year - 2}-12"
+
+
+def when_overdraft(pct_rank: float | None, curves: dict, score_month: str) -> dict | None:
+    """'Among customers like this, X% had a first overdraft within 6 / 12 / 24 months' (their trough group's curve)."""
+    if pct_rank is None:
+        return None
+    name = next(n for cut, n in SURV_GROUPS if pct_rank <= cut)
+    c = curves[name]["overdrawn_by_month"]
+    return {"group": name, "within_6": c[6], "within_12": c[12], "within_24": c[24], "customers": curves[name]["customers"],
+            "cohort": f"scored {score_month}, followed {int(score_month[:4]) + 1}-{int(score_month[:4]) + 2}"}
+
+
 def overdraft_risk(acct: int, d: dict) -> dict:
     """Calibrated chance of a first overdraft in the next 12 months if nothing changes (no shock).
 

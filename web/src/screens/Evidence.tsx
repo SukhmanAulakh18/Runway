@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, money, pct } from "../api";
-import { Legend, PairBars } from "../charts";
+import { Legend, PairBars, SurvivalChart } from "../charts";
 import { Failed, Kpi, Loading } from "./ui";
 
 export default function Evidence() {
@@ -130,6 +130,47 @@ export default function Evidence() {
           <p className="sub" style={{ marginTop: 8 }}>✓ = significant on its own (one-sided Fisher, p &lt; 0.05). All of these tests are in the multiple-testing count above.</p>
         </section>
       )}
+
+      {e.survival && (() => {
+        const cs = e.survival.cohorts as { scored: string; followed: string; customers: number; first_overdrafts: number; curves: Record<string, { customers: number; overdrawn_by_month: number[] }>; hazard_ratio_flag: number; hazard_ratio_flag_ci95: number[]; hazard_ratio_first_6_months: number; logrank_p: number }[];
+        const last = cs[cs.length - 1], r = last.curves["riskiest 10%"].overdrawn_by_month;
+        return (
+          <section className="grid g-7-5" style={{ alignItems: "start" }}>
+            <div className="card">
+              <h2>Once flagged, the riskiest 10% overdraw early: {pct(r[6], 1)} within 6 months, {pct(r[24], 1)} within 2 years</h2>
+              <p className="sub" style={{ marginBottom: 8 }}>Survival analysis (Kaplan–Meier): share who've had a first overdraft, by months since scoring. Scored {last.scored}, followed {last.followed}; customers who leave are handled correctly (censored).</p>
+              <SurvivalChart curves={last.curves} />
+              <Legend items={[{ label: "Riskiest 10%", kind: "ours" }, { label: "Next 20%", kind: "ink" }, { label: "Everyone else", kind: "grey" }]} />
+            </div>
+            <div className="card">
+              <h2>When to act: in the first 6 months</h2>
+              <p className="sub">Discrete-time hazard model (monthly data, so most event times tie), adjusted for balance size and account age.</p>
+              <table className="tbl" style={{ marginTop: 8 }}><thead><tr><th>Cohort</th><th className="num">Riskiest 10% vs rest</th><th className="num">Months 1–6 vs later</th></tr></thead>
+                <tbody>{cs.map((c) => <tr key={c.scored}><td>{c.followed}</td>
+                  <td className="num">{c.hazard_ratio_flag.toFixed(1)}× ({c.hazard_ratio_flag_ci95[0].toFixed(1)}–{c.hazard_ratio_flag_ci95[1].toFixed(1)})</td>
+                  <td className="num">{c.hazard_ratio_first_6_months.toFixed(1)}×</td></tr>)}</tbody></table>
+              <p className="callout" style={{ marginTop: 10 }}>The risk is front-loaded, so the call list says "call this week", not "this quarter". Log-rank test: groups differ, p {last.logrank_p < 1e-6 ? "< 0.000001" : last.logrank_p.toFixed(4)}.</p>
+            </div>
+          </section>
+        );
+      })()}
+
+      {e.challenger && (() => {
+        const ch = e.challenger, champ = "trough (champion)", chal = "gradient boosting (challenger)";
+        return (
+          <section className="card">
+            <h2>Champion vs challenger: a 12-feature gradient-boosting model doesn't beat the one-number trough</h2>
+            <p className="sub" style={{ marginBottom: 8 }}>Both fit on 2023 → 2024 and judged on 2025 ({ch.test_accounts} customers, {ch.test_events} first overdrafts), the way a bank tests a replacement model.</p>
+            <table className="tbl"><thead><tr><th>Model</th><th className="num">AUC 2025</th><th className="num">Caught when flagging 10%</th><th>Explain to a customer?</th></tr></thead>
+              <tbody>
+                <tr><td><b>Liquidity trough</b> (champion)</td><td className="num">{ch.auc[champ].toFixed(3)}</td><td className="num">{ch.caught_top10[champ]} of {ch.test_events}</td><td>One sentence; one SQL query</td></tr>
+                <tr><td>Gradient boosting, 12 features (challenger)</td><td className="num">{ch.auc[chal].toFixed(3)}</td><td className="num">{ch.caught_top10[chal]} of {ch.test_events}</td><td>Needs feature attributions</td></tr>
+              </tbody></table>
+            <p style={{ margin: "10px 0 4px" }}>Not a significant difference: AUC p = {ch.auc_diff_p_boot.toFixed(2)}; on the overdrafts only one model caught ({ch.caught_only_challenger} vs {ch.caught_only_champion}), McNemar p = {ch.mcnemar_p.toFixed(2)}. The challenger's most important input is the trough itself.</p>
+            <p className="callout">{ch.decision}</p>
+          </section>
+        );
+      })()}
 
       {e.fairness && (
         <section className="card">

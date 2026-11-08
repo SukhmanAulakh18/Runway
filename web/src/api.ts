@@ -28,6 +28,7 @@ export interface Customer {
   cushion: Cushion; diagnosis: Diagnosis | null; last_activity: string; history: Month[];
   tier?: { key: string; label: string; action: string } | null;
   committed: { total: number; orders: number; by_purpose: Record<string, number> } | null;  // standing orders, today only
+  when: { group: string; within_6: number; within_12: number; within_24: number; customers: number; cohort: string } | null;
   repeat: { days_below_zero_12m: number; tier: string; rate: number; similar_accounts: number; tested_on: string; never_overdrawn_rate: number } | null;
   loan: { amount: number; monthly_payment: number; status_meaning: string; defaulted: boolean; overdrawn_before_loan: boolean; loan_start: string } | null;
   loan_check: { hold: boolean; reasons: string[]; data_up_to: string; amount: number } | null;  // review rule at approval

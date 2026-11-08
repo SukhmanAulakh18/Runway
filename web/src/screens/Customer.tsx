@@ -150,6 +150,13 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
 
       {c.diagnosis && <NextBestAction dx={c.diagnosis} nav={nav} tested={tested} />}
 
+      {c.when && (
+        <p className="callout" style={{ margin: 0 }}>
+          <b>When?</b> Among the {c.when.customers.toLocaleString()} customers in the same group ({c.when.group}), {pct(c.when.within_6, 1)} had a first overdraft within 6 months,
+          {" "}{pct(c.when.within_12, 1)} within 12 and {pct(c.when.within_24, 1)} within 24 ({c.when.cohort}; survival analysis).{c.when.group === "riskiest 10%" ? " Most of it comes early: act this week." : ""}
+        </p>
+      )}
+
       <Assistant key={`${c.account_id}-${c.asof}`} acct={c.account_id} asof={c.asof as Asof} />
 
       <section className="grid g-7-5" style={{ alignItems: "start" }}>

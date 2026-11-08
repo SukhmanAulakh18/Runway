@@ -51,7 +51,9 @@ Runway is an engine plus an advisor dashboard (React, FastAPI, Python; Streamlit
 6. **The cause decides the action, and one cause hides in plain sight.** Inside the flagged 10%, customers whose money
    in fell 25%+ overdrew **20% vs 8%** of other flagged customers in 2025 (same direction in 2024, too few to be sure),
    so they are called first. Adding these reasons to the score did **not** catch more (33 vs 34 of 55), so they choose
-   the action rather than replace the score. And a loan granted in the last 12 months is invisible to any runway built on
+   the action rather than replace the score. A gradient-boosting challenger on 12 features caught **39 vs 34**, a gap that is not significant
+   (McNemar p = 0.18), and its top feature was the trough itself, so the one explainable ratio stays champion. Survival
+   analysis says when to act: flagged customers have **11–12×** the hazard of a first overdraft, highest in the first 6 months. And a loan granted in the last 12 months is invisible to any runway built on
    past spending: **186** customers at Dec 2024. Our demo customer 93172 got a **$166,958** loan the same month her
    balance hit $238; counting its **$4,638/month** payment drops her realistic runway from **26.7 to 2.4 months**.
 7. **Why a lender cares:** every one of the **76** borrowers who was ever overdrawn defaulted; **27** loans

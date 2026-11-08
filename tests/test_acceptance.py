@@ -527,3 +527,25 @@ def test_new_account_swing_flag_is_new_accounts_only_and_top_10pct(d):
     assert abs(n.flag.mean() - E.NEW_SWING_SHARE) < 0.02
     t = E.book_tiers(d, "2024-12")
     assert (t[t == "new_hot"].index.isin(n[n.flag].index)).all()
+def test_survival_uses_only_completed_cohorts():
+    assert E.survival_score_month(None) == "2023-12"        # today: followed 2024-2025
+    assert E.survival_score_month("2024-12") == "2022-12"   # Dec 2024 view: followed 2023-2024 only (no lookahead)
+
+
+def test_when_overdraft_riskiest_group(d):
+    D = E.survival_cohort(d, "2023-12")
+    c = E.survival_curves(D)
+    r = c["riskiest 10%"]["overdrawn_by_month"]
+    assert r[0] == 0 and r[6] <= r[12] <= r[24] and r[24] > 5 * c["everyone else"]["overdrawn_by_month"][24]
+    w = E.when_overdraft(0.05, c, "2023-12")
+    assert w["group"] == "riskiest 10%" and w["within_12"] == pytest.approx(r[12])
+
+
+@pytest.mark.slow
+def test_evidence_survival_and_challenger(d):
+    import evidence
+    for c in evidence.survival(d)["cohorts"]:
+        assert c["hazard_ratio_flag_ci95"][0] > 3 and c["hazard_ratio_first_6_months"] > 1 and c["logrank_p"] < 1e-6
+    ch = evidence.challenger(d)
+    assert ch["top_features"][0]["feature"] == "trough"          # the challenger's most important input is the trough
+    assert ch["mcnemar_p"] > 0.05 and ch["auc_diff_p_boot"] > 0.05   # statistically tied: champion stays

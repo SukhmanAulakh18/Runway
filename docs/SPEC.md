@@ -77,6 +77,7 @@ repeat-overdraft rates shown at an as-of date come from a year already over.
 | Loan-approval rule (`loan_check`) | hold for review if, on data before the loan month, the applicant was ever overdrawn or is in the riskiest 10% by trough (`LOAN_REVIEW_TROUGH`). |
 | Optimiser (`optimize_cuts`) | one linear program (HiGHS) over 12 months, solved once: smallest cuts keeping the 10th-percentile path above the dip; bills/insurance never cut; reports `share_of_futures_protected`. **Not** MPC/receding-horizon. |
 | Book tiers (`book_tiers`) | see §1 (`WATCH_SHARE` 0.30). New accounts: `new_account_swing` = sd of monthly money in (opening month dropped), top 10% (`NEW_SWING_SHARE`) of accounts with 3–11 months (`NEW_MIN_MONTHS`). |
+| Survival (`survival_cohort`, `survival_curves`, `when_overdraft`) | time to first overdraft for never-overdrawn customers, 24 months, groups riskiest 10% / next 20% / rest; per-customer "When?" uses the cohort scored 2 years before the as-of month (`survival_score_month`: no lookahead). |
 | SQL (`sql/trough.sql`) | the trough as one window query; a test checks identical values and flags to the Python on all accounts. |
 
 ---
@@ -100,6 +101,8 @@ repeat-overdraft rates shown at an as-of date come from a year already over.
 | Repeat overdrafts | overdrawn one year → again 47% (2024), 60% (2025) vs 1.6–1.8% | out of time |
 | Who the riskiest are | money in $16,809 vs $7,322, loan 37% vs 13%, pensioners 0.3% vs 20%; district, joint account: no difference | tested, effect-size labelled |
 | Fairness | flag rate ratio women/men 1.12 (2024), 0.86 (2025): within four-fifths; catch-rate gap flips direction, p = 0.30, 0.10 | by gender and age |
+| When first overdrafts come | never-overdrawn customers scored Dec 2022 / Dec 2023, followed 24 months: riskiest 10% reach 6.3% by month 6, 12.7% by 24 (2023 cohort); hazard ratio for the flag **11.2 (5.2–23.9)** / **12.4 (7.2–21.2)**, 2–4× higher in the first 6 months; log-rank p < 1e-9 | Kaplan–Meier, discrete-time hazard logit (Cox failed on monthly ties) |
+| Champion vs challenger | gradient boosting on 12 features: **39 vs 34 of 55** caught, AUC 0.865 vs 0.860; not significant (McNemar p = 0.18, bootstrap p = 0.84); its top feature is the trough → trough kept | fit 2023→2024, judged 2024→2025 |
 | Model health | 0 breaches on 10 monitors (PSI drift, AUC floor, calibration band, data quality) | OSFI E-23 style |
 
 **Rejected, shown on screen:** trough beats plain lowest balance (tied); bills-before-deposit timing (protective, not
@@ -140,7 +143,9 @@ Gemini (`gemini-3.5-flash`) on **Vertex AI** when `GOOGLE_CLOUD_PROJECT` is set 
   (`verify_wording`); otherwise a template is used. Facts lead with the engine's first action.
 - **Measured** (`scripts/eval_ai.py` → `docs/AI_EVAL.md`): offline rules 22/22 on the cards they were tuned on,
   8/16 on the first held-out set (overfit). Generalised using that set (now the dev set), then scored **once** on a
-  fresh held-out set frozen beforehand: **15/16 (94%)**. Gemini's rows require a Vertex-configured machine.
+  fresh held-out set frozen beforehand: **15/16 (94%)**. Gemini (Nov 8, Vertex): 22/22 tuned, 15/16 dev,
+  **14/16 (88%) held-out v2**, median 1.3 s; its misses: "a third" read as 0.33, and "4 months, then back to work" read
+  as returning in month 5. Neither reader is perfect alone, which is why chips + the disagreement flag come first.
   Never tune the rules to `HELD_OUT_V2`.
 
 ---
@@ -164,14 +169,13 @@ Gemini (`gemini-3.5-flash`) on **Vertex AI** when `GOOGLE_CLOUD_PROJECT` is set 
 | `main` (`ba3756f`) | PRs #1–#14 merged |
 | **missing from main** | `1a52f5e` Pitch mode, `a0da90b` fairness/SQL/Q&A (pushed after #14 merged) → included in `p1/judge-ready` |
 | `p1/judge-ready` (bundle `judge-ready.bundle`) | the two lost commits + whole book, AI eval, exposure profile, MPC wording fix, one-population fix, this spec. **Needs pushing from the laptop + PR** |
-| Mac session, uncommitted | survival analysis (Kaplan–Meier, Cox) + champion/challenger (gradient boosting): commit **on top of `p1/judge-ready`**, then verify numbers |
+| Survival + challenger | cherry-picked on top of `p1/judge-ready`, evidence rebuilt, tests green |
 
 **Known gaps (say them first):** 1990s Czech data, not Tangerine customers; money in is mostly cash, so a job loss
 assumes all non-pension money in stops (slider); accounts under 3 months can't be scored; diagnoses hold in
 2025 only; exposure profile is uncalibrated; no causal evidence for actions (the pilot's controlled test is how).
 
-**Next steps, in order:** push `p1/judge-ready` → merge → commit the survival work on top → run
-`python scripts/eval_ai.py` on the Vertex machine → Devpost + video → rehearse Pitch mode and the live twist on
+**Next steps, in order:** merge `p1/judge-ready` → check `main` runs → Devpost + video → rehearse Pitch mode and the live twist on
 93172, 20111, 20176 with `docs/JUDGE_QA.md`.
 
 **Superseded docs:** `FRONTEND.md` and `REACT_PLAN.md` describe the plan before the React app existed; this spec and
