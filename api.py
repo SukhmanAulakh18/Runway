@@ -8,6 +8,7 @@ so the two frontends can never disagree. `asof` (Time Machine) cuts the data for
 from __future__ import annotations
 
 import dataclasses
+import json
 import logging
 import math
 import warnings
@@ -252,7 +253,8 @@ def evidence():
     EV = load_all()[2]
     if EV is None:
         raise HTTPException(404, "evidence.json missing: run python evidence.py")
-    return clean(EV)
+    ai_eval = Path(__file__).parent / "ai_eval.json"   # written by scripts/eval_ai.py (measured reader accuracy)
+    return clean({**EV, "ai_eval": json.loads(ai_eval.read_text())} if ai_eval.exists() else EV)
 
 
 if (ROOT / "web" / "dist").exists():   # production: one server for the API and the built React app

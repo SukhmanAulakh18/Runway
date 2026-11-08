@@ -1,0 +1,8 @@
+{
+ "run": "2026-11-08",
+ "backend": "Gemini on Vertex AI (gemini-3.5-flash)",
+ "held_out_cards": 16,
+ "rules_correct": 15,
+ "ai_correct": 14,
+ "ai_median_s": 1.21
+}

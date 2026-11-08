@@ -113,6 +113,14 @@ def main() -> None:
     report = "\n".join(lines) + "\n"
     print(report)
     (ROOT / "docs" / "AI_EVAL.md").write_text(report)
+    # small summary the dashboard shows next to the twist card (held-out v2: the cards never used to tune anything)
+    v2 = {r["name"].split(", ")[0]: r for r in results if r["name"].endswith("held-out v2 (never tuned on)")}
+    ai_r = next((r for k, r in v2.items() if k != "Rules"), None)
+    import json, datetime
+    (ROOT / "ai_eval.json").write_text(json.dumps({
+        "run": datetime.date.today().isoformat(), "backend": backend, "held_out_cards": len(HELD_OUT_V2),
+        "rules_correct": v2["Rules"]["correct"], "ai_correct": ai_r["correct"] if ai_r else None,
+        "ai_median_s": round(ai_r["median_s"], 2) if ai_r else None}, indent=1) + "\n")
 
 
 if __name__ == "__main__":
