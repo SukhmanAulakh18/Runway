@@ -24,8 +24,8 @@ until they go negative. In this data every borrower who was ever overdrawn defau
    only after a call. AI drafts the brief and the customer message (EN/FR); it never calculates.
 6. **Lending**: a review rule at loan approval uses the same signal.
 
-**The whole book (Dec 2024 cohort, outcome 2025)**: already overdrawn + riskiest 10% = **8.5%** of customers,
-**60%** of next year's overdrafts. The **stable** tier overdrew **0.4%**, the same in every year tested.
+**The whole book (Dec 2024 cohort, outcome 2025)**: already overdrawn + riskiest 10% + new-and-swinging = **10%** of
+customers, **68%** of next year's overdrafts. The **stable** tier overdrew **0.4%**, the same in every year tested.
 
 | Tier (`BOOK_TIERS`) | Rule (data up to the as-of month) | Action | Overdrew next year (Dec 2024 → 2025) |
 |---|---|---|---|
@@ -33,7 +33,8 @@ until they go negative. In this data every borrower who was ever overdrawn defau
 | act | trough percentile ≤ 10% | advisor contact matched to the cause | 12.7% |
 | watch | 10–30% | automatic personal alert, no call | 2.7% |
 | stable | rest | nothing | 0.4% |
-| new | under 12 months of history (can't score) | standard alerts | 4.2% (21% of overdrafts: a disclosed gap) |
+| new_hot | 3–11 months and top 10% of new accounts by swings in money in (`new_account_swing`) | welcome check-in call + personal alert | 18.6% |
+| new | under 3 months, or new but not swinging | standard alerts | 2.8% (13% of overdrafts) |
 
 ---
 
@@ -75,7 +76,7 @@ repeat-overdraft rates shown at an as-of date come from a year already over.
 | Overdraft cost (`overdraft_cost`) | Tangerine terms: $5 per month used + 19%/yr (`TANGERINE_OD_FEE`, `TANGERINE_OD_RATE`). |
 | Loan-approval rule (`loan_check`) | hold for review if, on data before the loan month, the applicant was ever overdrawn or is in the riskiest 10% by trough (`LOAN_REVIEW_TROUGH`). |
 | Optimiser (`optimize_cuts`) | one linear program (HiGHS) over 12 months, solved once: smallest cuts keeping the 10th-percentile path above the dip; bills/insurance never cut; reports `share_of_futures_protected`. **Not** MPC/receding-horizon. |
-| Book tiers (`book_tiers`) | see §1 (`WATCH_SHARE` 0.30). |
+| Book tiers (`book_tiers`) | see §1 (`WATCH_SHARE` 0.30). New accounts: `new_account_swing` = sd of monthly money in (opening month dropped), top 10% (`NEW_SWING_SHARE`) of accounts with 3–11 months (`NEW_MIN_MONTHS`). |
 | SQL (`sql/trough.sql`) | the trough as one window query; a test checks identical values and flags to the Python on all accounts. |
 
 ---
@@ -86,7 +87,7 @@ repeat-overdraft rates shown at an as-of date come from a year already over.
 |---|---|---|
 | Low point predicts first overdrafts | riskiest 10% catch **34 of 55 (62%)** in 2025; risk ratio 17.9× / 12.8× / 14.6× and AUC 0.841 / 0.844 / 0.860 for 2023 / 2024 / 2025 | out of time: features to Dec, outcome next year, never-overdrawn population |
 | Not just balance size | odds ratio **16.8 (95% CI 9.5–29.7)** after balance, account age, district unemployment | logistic regression |
-| Survives multiple testing | **37 of 45** tests (base family 28 of 29) | Benjamini–Hochberg q = 0.10 |
+| Survives multiple testing | **48 of 57** tests (base family 28 of 29) | Benjamini–Hochberg q = 0.10 |
 | Probabilities are real | raw simulation 8× too pessimistic; calibrated: **1.61% vs 1.61%**, AUC 0.882, Brier 0.0142 vs base 0.0158 | Platt, fit 2023→24, judged 2025 |
 | Customers steer back | after a low month money in beats money out +36–37 pts vs +18–19 shuffled; 87–91% of customers | permutation vs shuffled months, 2 years |
 | Cushion works as a limit | dip-sized buffer fully covers **27 of 34** caught overdrafts; **$78K drawn of $2.9M** | 2025 backtest |
@@ -95,6 +96,7 @@ repeat-overdraft rates shown at an as-of date come from a year already over.
 | Loan-approval rule | holds **118 (17%)**; catches **41 of 76** defaults; **34.7% vs 6.2%** default rate (clean outcome 10.2% vs 3.4%, p = 0.003); holds 77 good loans | before-loan data only |
 | Hidden new loans | 186 customers at Dec 2024 had a loan not yet in their spending history; 93172: realistic runway 26.7 → **2.4 months** | forward loan payments |
 | Causes pick the action | inside the flagged 10%: money in fell → 20% vs 8% overdrew (2025, survives BH), swings → 14% vs 6% (2025); 2024 not significant | Fisher, both years |
+| New accounts can be scored | the trough fails on new accounts (AUC 0.55–0.71); swings in money in, chosen on 2023 + 2024 (most caught at a 10% flag both years: 5/15, 13/28), confirmed on 2025: catches **13 of 32**, **18.6% vs 3.0%**, AUC 0.80, p < 0.001 | 4 candidates, all 12 tests in the BH family |
 | Repeat overdrafts | overdrawn one year → again 47% (2024), 60% (2025) vs 1.6–1.8% | out of time |
 | Who the riskiest are | money in $16,809 vs $7,322, loan 37% vs 13%, pensioners 0.3% vs 20%; district, joint account: no difference | tested, effect-size labelled |
 | Fairness | flag rate ratio women/men 1.12 (2024), 0.86 (2025): within four-fifths; catch-rate gap flips direction, p = 0.30, 0.10 | by gender and age |
@@ -137,8 +139,9 @@ Gemini (`gemini-3.5-flash`) on **Vertex AI** when `GOOGLE_CLOUD_PROJECT` is set 
   Every number must appear in the engine's facts (`verify_numbers`), simulation counts can't be called a "chance"
   (`verify_wording`); otherwise a template is used. Facts lead with the engine's first action.
 - **Measured** (`scripts/eval_ai.py` → `docs/AI_EVAL.md`): offline rules 22/22 on the cards they were tuned on,
-  **8/16 on held-out cards** (overfit: fallback only). Gemini's row requires a Vertex-configured machine.
-  Never tune the rules to the held-out cards.
+  8/16 on the first held-out set (overfit). Generalised using that set (now the dev set), then scored **once** on a
+  fresh held-out set frozen beforehand: **15/16 (94%)**. Gemini's rows require a Vertex-configured machine.
+  Never tune the rules to `HELD_OUT_V2`.
 
 ---
 
@@ -164,7 +167,7 @@ Gemini (`gemini-3.5-flash`) on **Vertex AI** when `GOOGLE_CLOUD_PROJECT` is set 
 | Mac session, uncommitted | survival analysis (Kaplan–Meier, Cox) + champion/challenger (gradient boosting): commit **on top of `p1/judge-ready`**, then verify numbers |
 
 **Known gaps (say them first):** 1990s Czech data, not Tangerine customers; money in is mostly cash, so a job loss
-assumes all non-pension money in stops (slider); new accounts can't be scored (21% of overdrafts); diagnoses hold in
+assumes all non-pension money in stops (slider); accounts under 3 months can't be scored; diagnoses hold in
 2025 only; exposure profile is uncalibrated; no causal evidence for actions (the pilot's controlled test is how).
 
 **Next steps, in order:** push `p1/judge-ready` → merge → commit the survival work on top → run

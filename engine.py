@@ -816,10 +816,31 @@ def realistic_vec(d: dict, window: int = WINDOW, ei_rate: float = EI_RATE) -> pd
 BOOK_TIERS = {
     "overdrawn": ("Already overdrawn this year", "Recovery plan: fixed instalments + alert at their own danger level"),
     "act": ("Act now: riskiest 10% by trough", "Advisor contact, matched to the cause (call, auto-save, alert, loan review)"),
+    "new_hot": ("New and swinging: top 10% of new accounts", "Welcome check-in call + personal alert"),
     "watch": ("Watch: next 20%", "Automatic personal alert only, no call"),
     "stable": ("Stable", "Nothing: standard service"),
-    "new": ("Too new to score (under 12 months)", "Standard alerts until a year of history exists"),
+    "new": ("Too new to score", "Standard alerts until there is enough history"),
 }
+# New accounts (3-11 months) can't be scored by the trough (it needs 12 months, and its out-of-time AUC on new accounts
+# is 0.55-0.71). Swings in money in are: chosen on 2023 and 2024 (most overdrafts caught at a 10% flag of 4 candidates, both
+# years: 5 of 15, 13 of 28), confirmed on 2025:
+# the top 10% catch 13 of 32 first overdrafts, 18.6% vs 3.0% (evidence.json -> new_accounts).
+NEW_MIN_MONTHS, NEW_SWING_SHARE = 3, 0.10
+
+
+def new_account_swing(d: dict, asof: str | None = None) -> pd.DataFrame:
+    """For accounts with 3-11 months up to `asof`: sd of monthly money in (opening month dropped), its percentile among
+    new accounts, and the flag (top 10%)."""
+    m = d["monthly"] if asof is None else d["monthly"][d["monthly"].month <= asof]
+    m = m.sort_values(["account_id", "month"])
+    n = m.groupby("account_id").size()
+    new = n[(n >= NEW_MIN_MONTHS) & (n < LTR_MIN_HISTORY)].index
+    w = m[m.account_id.isin(new)]
+    w = w[w.groupby("account_id").cumcount() > 0]                       # the opening month starts near $0
+    sd = w.groupby("account_id").money_in.std().reindex(new)
+    sd = sd.fillna(sd.median())
+    rank = sd.rank(pct=True)
+    return pd.DataFrame({"money_in_sd": sd, "pct_rank": rank, "flag": rank > 1 - NEW_SWING_SHARE})
 WATCH_SHARE = 0.30   # act = riskiest 10%, watch = the next 20% (pct rank 0.10-0.30)
 
 
@@ -829,9 +850,10 @@ def book_tiers(d: dict, asof: str | None = None) -> pd.Series:
     m = d["monthly"] if asof is None else d["monthly"][d["monthly"].month <= asof]
     overdrawn = m.sort_values(["account_id", "month"]).groupby("account_id").tail(12).groupby("account_id").days_below_zero.sum() > 0
     r = t.ltr_pct_rank
-    tier = np.select([overdrawn.reindex(t.index).fillna(False).to_numpy(), ~t.scorable.to_numpy(),
+    hot = new_account_swing(d, asof).flag.reindex(t.index).fillna(False).to_numpy(dtype=bool)
+    tier = np.select([overdrawn.reindex(t.index).fillna(False).to_numpy(), ~t.scorable.to_numpy() & hot, ~t.scorable.to_numpy(),
                       (r <= 0.10).to_numpy(), (r <= WATCH_SHARE).to_numpy()],
-                     ["overdrawn", "new", "act", "watch"], default="stable")
+                     ["overdrawn", "new_hot", "new", "act", "watch"], default="stable")
     return pd.Series(tier, index=t.index, name="tier")
 
 

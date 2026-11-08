@@ -275,3 +275,4 @@ details.fold[open] > summary { margin-bottom: 12px; }
 .t-watch { background: #f6a46b; }
 .t-stable { background: #c9cfd9; }
 .t-new { background: repeating-linear-gradient(45deg, #c9cfd9 0 4px, #e9ecf1 4px 8px); }
+.t-newhot { background: repeating-linear-gradient(45deg, var(--ours-fill) 0 4px, #f6a46b 4px 8px); }

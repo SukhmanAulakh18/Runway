@@ -41,7 +41,7 @@ All out of time: features up to December, outcome the next year.
 |---|---|
 | Riskiest 10% → first overdraft | 12.8–17.9× everyone else in 2023, 2024 and 2025; AUC 0.84–0.86 |
 | Robust to confounders | Odds ratio 16.8 (95% CI 9.5–29.7) after balance size, account age, unemployment |
-| Multiple testing | 37 of 45 ideas survive Benjamini–Hochberg (q = 0.10); failures listed in the app |
+| Multiple testing | 48 of 57 ideas survive Benjamini–Hochberg (q = 0.10); failures listed in the app |
 | Forecast calibration (2025) | Predicted 1.61% vs 1.61% observed; AUC 0.88; Brier 0.0142 beats the base rate 0.0158 |
 | Product backtest (2025) | Flag 10% → 34 of 55 first overdrafts; dip-sized buffer covers 27 of 34; alert fires before 23 of 34, median 3 months early, pinging 22% of flagged customers who never needed it |
 | Loan review rule (all 682 loans) | Holds 17%; catches 41 of 76 defaults; held loans default 34.7% vs 6.2% (clean outcome: 10.2% vs 3.4%, p = 0.003) |
@@ -89,7 +89,7 @@ A breach triggers re-validation and a review of the risk rating. CI checks every
 - Hard 6-second limit, then rules or template; tests use fakes, so they never call the live model.
 - Customer messages carry no risk percentages; credit is offered only after a call.
 
-- **Measured, not assumed.** `scripts/eval_ai.py` scores the twist-card reader on tuned and held-out cards (an invented shock counts as an error) and writes `docs/AI_EVAL.md`. Offline rules: 22/22 tuned, 8/16 held-out, so they are a fallback only.
+- **Measured, not assumed.** `scripts/eval_ai.py` scores the twist-card reader on tuned and held-out cards (an invented shock counts as an error) and writes `docs/AI_EVAL.md`. Offline rules: 8/16 on the first held-out set; generalised on it, then 15/16 (94%) on a fresh held-out set frozen beforehand.
 
 ## 8. Decommissioning (E-23 D.2)
 Retire on repeated monitoring breaches or a change in data or use. Keep the last version and its `evidence.json` as a

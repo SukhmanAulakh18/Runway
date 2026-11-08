@@ -36,6 +36,27 @@ HELD_OUT = [   # written after the rules were fixed; do not tune the rules to th
     ("Their household bills double", {"bills_increase_pct": 1.0}),
     ("Fired. EI pays 55% for 6 months, and a vet bill of $900", {**JOB, "ei_months": 6, "one_off_cost": 900.0}),
 ]
+# HELD_OUT above was scored once, its misses were then used to improve the rules (Nov 8), so it is now the dev set.
+DEV = HELD_OUT
+# Frozen BEFORE the rule changes and never used to tune: the honest held-out set from Nov 8 onward.
+HELD_OUT_V2 = [
+    ("Their wages get cut by a quarter", {"income_cut": 0.25}),
+    ("Laid off; EI at 55% for 5 months", {**JOB, "ei_months": 5}),
+    ("Property tax and utilities climb 12%", {"bills_increase_pct": 0.12}),
+    ("A $1,800 plumbing emergency", {"one_off_cost": 1800.0}),
+    ("Insurance premiums add $120 a month", {"spending_increase": 120.0}),
+    ("Lost their position, EI covers 55%, new job in month 3", {**JOB, "return_to_work_month": 3}),
+    ("Rent rises by 6 percent", {"bills_increase_pct": 0.06}),
+    ("They are terminated and EI pays 50% for eight months", {**JOB, "ei_rate": 0.50, "ei_months": 8}),
+    ("Income drops 30%", {"income_cut": 0.30}),
+    ("Laptop dies: replacement costs $1,400", {"one_off_cost": 1400.0}),
+    ("Household bills triple", {"bills_increase_pct": 2.0}),
+    ("Everything stays the same", {}),
+    ("Their salary is reduced by 10%", {"income_cut": 0.10}),
+    ("Job loss (EI 55%) plus a furnace repair worth two months of spending", {**JOB, "one_off_months_of_spending": 2.0}),
+    ("Hours reduced by a third", {"income_cut": 1 / 3}),
+    ("Unemployed for 4 months with EI at 55%, then back to work", {**JOB, "ei_months": 4, "return_to_work_month": 4}),
+]
 SHOCK_DEFAULTS = {"job_loss": False, "income_cut": 0.0, "bills_increase_pct": 0.0, "spending_increase": 0.0,
                   "one_off_cost": 0.0, "one_off_months_of_spending": 0.0, "return_to_work_month": None}
 
@@ -71,12 +92,14 @@ def main() -> None:
     backend = ai.init()
     rules = lambda t: (ai._sanitize(ai.parse_twist_offline(t)), "rules")   # noqa: E731
     live = lambda t: ai.parse_twist(t)                                         # Gemini if configured, else rules  # noqa: E731
-    results = [run("Rules, tuned cards", rules, TUNED), run("Rules, held-out cards", rules, HELD_OUT)]
+    sets = [("tuned cards", TUNED), ("dev cards (old held-out)", DEV), ("held-out v2 (never tuned on)", HELD_OUT_V2)]
+    results = [run(f"Rules, {n}", rules, c) for n, c in sets]
     if backend != "offline":
-        results += [run(f"{backend}, tuned cards", live, TUNED), run(f"{backend}, held-out cards", live, HELD_OUT)]
+        results += [run(f"{backend}, {n}", live, c) for n, c in sets]
     lines = ["# Twist-card reader evaluation", "",
              f"Backend: **{backend}**. A card is correct only if every expected field is right and no other shock is invented.",
-             "Tuned cards are the ones the rules were fixed against; held-out cards were written afterwards and never used to tune.",
+             "Tuned cards: the rules were fixed against them. Dev cards: the first held-out set (rules scored 8/16 on it), whose misses were",
+             "then used to generalise the rules. Held-out v2: frozen before that change and never used to tune; it is the honest number.",
              "", "| Reader and card set | Correct | Accuracy | Answered by | Median time | Slowest |", "|---|---|---|---|---|---|"]
     for r in results:
         src = ", ".join(f"{k} {v}" for k, v in r["sources"].items())

@@ -89,6 +89,7 @@ def main(n_boot=1000, seed=0):
     ev["monitoring"] = monitoring(d, ev)
     ev["repeat_overdraft"] = {str(y): E.repeat_rates(d["monthly"], y) for y in (2024, 2025)}
     ev["diagnoses"] = diagnoses(d)
+    ev["new_accounts"] = new_accounts(d)   # before the extended family: its 12 tests belong in it
     ev["multiple_testing_extended"] = multiple_testing_extended(ev)
     ev["book"] = book(d)
     ev["lessons"] = lessons(ev)   # last: reads diagnoses and the extended multiple-testing family
@@ -475,6 +476,41 @@ def fairness(d):
                     "and their overdraft rate is near zero. Small samples (14-29 overdrafts per group): keep monitoring."}
 
 
+def new_accounts(d):
+    """New accounts (3-11 months, never overdrawn): which signal flags next-year first overdrafts?
+    Protocol: 4 candidates, pick the one that catches most at a 10% flag in 2023 and 2024, confirm on 2025. Opening month dropped. All 12 tests are
+    added to the extended multiple-testing family."""
+    from scipy.stats import fisher_exact
+    m = d["monthly"].sort_values(["account_id", "month"])
+    cands = {"money in swing (sd)": lambda g: g.money_in.std(), "money out per month": lambda g: g.money_out.mean(),
+             "money in per month": lambda g: g.money_in.mean(), "average balance": lambda g: g.avg_daily_balance.mean()}
+    by_year, tests = [], []
+    for asof in ("2022-12", "2023-12", "2024-12"):
+        y_year = str(int(asof[:4]) + 1)
+        past = m[m.month <= asof]; nxt = m[m.month.str[:4] == y_year]
+        n = past.groupby("account_id").size(); full = nxt.groupby("account_id").size() == 12
+        clean = past.groupby("account_id").days_below_zero.sum() == 0
+        pop = [a for a in n.index if E.NEW_MIN_MONTHS <= n[a] < E.LTR_MIN_HISTORY and full.get(a, False) and clean.get(a, False)]
+        P = past[past.account_id.isin(pop)]; P = P[P.groupby("account_id").cumcount() > 0]
+        g = P.groupby("account_id")
+        y = (nxt.groupby("account_id").days_below_zero.sum() > 0).reindex(pop).astype(int)
+        row = {"predicted_year": int(y_year), "accounts": len(pop), "overdrafts": int(y.sum()), "rate": float(y.mean()), "candidates": {}}
+        for name, f in cands.items():
+            v = f(g).reindex(pop); v = v.fillna(v.median())
+            flag = v.rank(pct=True) > 1 - E.NEW_SWING_SHARE
+            a1, n1, a0, n0 = int(y[flag].sum()), int(flag.sum()), int(y[~flag].sum()), int((~flag).sum())
+            pval = float(fisher_exact([[a1, n1 - a1], [a0, n0 - a0]], alternative="greater")[1])
+            row["candidates"][name] = {"auc": float(roc_auc_score(y, v)), "flagged": n1, "caught": a1,
+                                       "flagged_rate": a1 / n1 if n1 else None, "rest_rate": a0 / n0 if n0 else None, "p": pval}
+            tests.append({"log_row": 19, "hypothesis": f"New accounts: top 10% by {name} overdraw more ({y_year})", "p": pval})
+        by_year.append(row)
+    pick = {r["predicted_year"]: max(r["candidates"], key=lambda k: (r["candidates"][k]["caught"], r["candidates"][k]["auc"])) for r in by_year}
+    return {"protocol": "4 candidates; chosen on 2023 and 2024 (most first overdrafts caught at a 10% flag in both years), confirmed on 2025; opening month dropped",
+            "chosen": "money in swing (sd)", "best_by_year": {str(k): v for k, v in pick.items()},
+            "confirmed_2025": by_year[-1]["candidates"]["money in swing (sd)"], "trough_on_new_accounts_auc": "0.55-0.71 (weak, inconsistent)",
+            "by_year": by_year, "tests": tests}
+
+
 def book(d):
     """The whole book: every customer in one tier (engine.book_tiers) at Dec of year N, outcome = any overdraft in N+1.
     Three cohorts so every Time Machine view can show rates from a year that is already over (no lookahead)."""
@@ -531,6 +567,8 @@ def multiple_testing_extended(ev, q=0.10):
         tag = f"{r['predicted_year']}, low = bottom {int(r['low_month_cutoff'] * 100)}%"
         rows.append({"log_row": 15, "hypothesis": f"Customers steer back after a low month ({tag})", "test": "sign test vs shuffled", "p": r["p_gap"], "source": "data"})
         rows.append({"log_row": 16, "hypothesis": f"Weak steering predicts overdraft in the riskiest 10% ({tag})", "test": "Mann-Whitney", "p": r["p_weak_predicts"], "source": "data"})
+    for t in ev.get("new_accounts", {}).get("tests", []):
+        rows.append({"log_row": t["log_row"], "hypothesis": t["hypothesis"], "test": "Fisher exact", "p": t["p"], "source": "data"})
     for t in ev.get("diagnoses", {}).get("tests", []):
         rows.append({"log_row": t["log_row"], "hypothesis": t["hypothesis"], "test": "Fisher exact", "p": t["p"], "source": "data"})
     reject, p_bh, _, _ = multipletests([r["p"] for r in rows], alpha=q, method="fdr_bh")

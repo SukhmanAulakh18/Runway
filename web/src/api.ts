@@ -26,6 +26,7 @@ export interface Customer {
   standard_runway: RunwayRes; realistic: { income: number; spending: number; spending_history: number; loan_adjust: number; loan_payments: number; dip: number; window_months: number; protected_income: number };
   realistic_runway: RunwayRes; trough: Trough | null; risk: { p_12m: number; validated_population: boolean };
   cushion: Cushion; diagnosis: Diagnosis | null; last_activity: string; history: Month[];
+  tier?: { key: string; label: string; action: string } | null;
   committed: { total: number; orders: number; by_purpose: Record<string, number> } | null;  // standing orders, today only
   repeat: { days_below_zero_12m: number; tier: string; rate: number; similar_accounts: number; tested_on: string; never_overdrawn_rate: number } | null;
   loan: { amount: number; monthly_payment: number; status_meaning: string; defaulted: boolean; overdrawn_before_loan: boolean; loan_start: string } | null;
@@ -52,7 +53,7 @@ export interface WatchRow { account_id: number; ltr: number; ltr_pct_rank: numbe
   realistic_runway_ei: number; answer_key_runway_ei: number; reasons: string; overdraft_next_12m?: boolean | null;
   cause?: string | null; action?: string | null; cause_code?: string | null }
 export interface Watch { asof: string | null; n_in_view: number; rows: WatchRow[]; reveal?: { top_hit: number; base_rate: number }; calls?: Record<string, number> }
-export interface BookTier { tier: "overdrawn" | "act" | "watch" | "stable" | "new"; label: string; action: string; customers: number;
+export interface BookTier { tier: "overdrawn" | "act" | "new_hot" | "watch" | "stable" | "new"; label: string; action: string; customers: number;
   tested_rate: number | null; tested_share_of_overdrafts: number | null }
 export interface Book { asof: string | null; customers: number; tiers: BookTier[]; act_causes: Record<string, number>; tested_on: string | null;
   summary: { focus_customers: number; focus_customer_share: number; stable_customer_share: number;

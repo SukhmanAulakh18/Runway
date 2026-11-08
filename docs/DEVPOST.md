@@ -35,7 +35,7 @@ Runway is an engine plus an advisor dashboard (React, FastAPI, Python; Streamlit
 1. **The low point predicts first overdrafts.** Flag the 10% with the lowest trough and you catch **34 of 55 (62%)**
    first overdrafts in 2025, tested on data the model never saw. The flagged group's risk is **12.8–17.9×** everyone
    else's, in **each of 2023, 2024 and 2025** (AUC 0.84–0.86). It survives controls for balance size, account age and
-   unemployment (**odds ratio 16.8, 95% CI 9.5–29.7**) and multiple-testing correction (**37 of 45** ideas tested survive).
+   unemployment (**odds ratio 16.8, 95% CI 9.5–29.7**) and multiple-testing correction (**48 of 57** ideas tested survive).
 2. **Customers steer back, which is why naive simulations fail.** After a month at their own low, money in beats money
    out the next month **36 percentage points more often** than after a normal month; with the same months in random
    order it is only **18 points**. **87–91% of customers** show it, in both years. A simulation that replays months randomly can't steer back: it predicted **15%** would go overdrawn

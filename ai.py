@@ -103,14 +103,24 @@ def _num(s: str) -> float:
     return float(s.replace(",", ""))
 
 
+_NUM_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+              "eleven": 11, "twelve": 12, "fifteen": 15, "twenty": 20, "twenty-five": 25, "thirty": 30, "forty": 40, "fifty": 50}
+_FRACTIONS = {"half": 0.5, "a half": 0.5, "a third": 1 / 3, "one third": 1 / 3, "a quarter": 0.25, "one quarter": 0.25}
+_INCOME = r"(?:pay|paycheque|paycheck|salary|salaries|income|wages?|hours|earnings)"
+_CUT = r"(?:cut|cuts|drops?|dropped|falls?|fell|reduced|reduces?|lowered|slashed|lose|loses|lost|down)"
+
+
 def parse_twist_offline(text: str) -> dict:
+    """Rule-based twist reader: the fallback when Gemini is off. Scored by scripts/eval_ai.py on held-out cards."""
     t = text.lower()
     out = {"job_loss": False, "ei_rate": 0.55, "ei_months": 6, "income_cut": 0.0,
            "bills_increase_pct": 0.0, "spending_increase": 0.0, "one_off_cost": 0.0,
            "one_off_months_of_spending": 0.0, "return_to_work_month": None}
     t = re.sub(r"\s*\bper ?cent\b", "%", t)   # "15 percent" -> "15%"
-    if re.search(r"laid[\s-]*of+\b|lay[\s-]*off|\blos(?:e|es|t|ing)\s+(?:(?:their|his|her|the|a)\s+)?jobs?\b|"
-                 r"jobs?\s+(?:loss|lost)|unemploy|fired|redundan|let go", t):
+    t = re.sub(r"\b(" + "|".join(sorted(_NUM_WORDS, key=len, reverse=True)) + r")\b(?=\s*(?:%|months?|weeks?))",
+               lambda m: str(_NUM_WORDS[m.group(1)]), t)   # "ten %" / "three months" -> digits ("a month" untouched)
+    if re.search(r"laid[\s-]*of+\b|lay[\s-]*off|\blos(?:e|es|t|ing)\s+(?:(?:their|his|her|the|a)\s+)?(?:jobs?|position|work)\b|"
+                 r"jobs?\s+(?:loss|lost)|unemploy|fired|redundan|let go|furlough|terminated|dismissed", t):
         out["job_loss"] = True
         m = re.search(r"\bei\b[^.%]*?(\d+(?:\.\d+)?)\s*%", t) or re.search(r"(\d+(?:\.\d+)?)\s*%[^.]*\bei\b", t)
         if m:
@@ -118,16 +128,30 @@ def parse_twist_offline(text: str) -> dict:
         m = re.search(r"for (\d+) months", t)
         if m:
             out["ei_months"] = int(m.group(1))
-        m = re.search(r"(?:new job|back to work|re-?employed)[^.]*?(?:month|after) (\d+)", t)
+        m = re.search(r"(?:new job|back (?:to|at) work|re-?employed|rehired)[^.]*?(?:month|after) (\d+)", t)
         if m:
             out["return_to_work_month"] = int(m.group(1))
-    m = re.search(r"(?:pay|salary|income|hours) (?:is |are )?(?:cut|drops?|falls?|reduced)[^.%]*?(\d+(?:\.\d+)?)\s*%", t)
-    if m and not out["job_loss"]:
-        out["income_cut"] = _num(m.group(1)) / 100
-    m = re.search(r"(?:bills?|rent|utilit\w*|household)[^.%$]*?(?:up|rise|rises|increase\w*|go up|goes up)[^.%$]*?(\d+(?:\.\d+)?)\s*%", t)
+    if not out["job_loss"]:
+        m = (re.search(_INCOME + r"[^.%$]{0,30}?" + _CUT + r"[^.%$]{0,15}?(\d+(?:\.\d+)?)\s*%", t)
+             or re.search(r"(\d+(?:\.\d+)?)\s*%\s*(?:pay|salary|wage|income|hours)?\s*(?:cut|drop|reduction)", t)
+             or re.search(_INCOME + r"\s+(?:drops?|falls?|is down)\s+(\d+(?:\.\d+)?)\s*%", t))
+        if m:
+            out["income_cut"] = _num(m.group(1)) / 100
+        else:
+            frac = "|".join(sorted(_FRACTIONS, key=len, reverse=True))
+            m = (re.search(_INCOME + r"[^.]{0,30}?" + _CUT + r"[^.]{0,10}?(?:by |in )?(" + frac + r")\b", t)
+                 or re.search(_CUT + r"\s+(" + frac + r")\s+(?:of\s+)?(?:their|his|her|the)?\s*" + _INCOME, t))
+            if m:
+                out["income_cut"] = _FRACTIONS[m.group(1)]
+    bills = r"(?:bills?|rent|utilit\w*|household|hydro|heating|property tax\w*)"
+    m = re.search(bills + r"[^.%$]*?(?:up|rise|rises|rising|increase\w*|go up|goes up|jump\w*|climb\w*|grow\w*|higher)[^.%$]*?(\d+(?:\.\d+)?)\s*%", t)
     if m:
         out["bills_increase_pct"] = _num(m.group(1)) / 100
-    # Dollar amounts: "$400 a month" is monthly, anything else is one-off.
+    elif re.search(bills + r"[^.]*?\b(?:double|doubles|doubled)\b", t):
+        out["bills_increase_pct"] = 1.0
+    elif re.search(bills + r"[^.]*?\b(?:triple|triples|tripled)\b", t):
+        out["bills_increase_pct"] = 2.0
+    # Dollar amounts: "$400 a month" is monthly, anything else is a one-off cost.
     monthly, oneoff = [], []
     for m in re.finditer(r"\$\s?([\d,]+(?:\.\d+)?)(\s*(?:a|per|/|each)\s*month|\s*monthly)?", t):
         (monthly if m.group(2) else oneoff).append(_num(m.group(1)))
@@ -138,7 +162,7 @@ def parse_twist_offline(text: str) -> dict:
     if m:
         g = m.group(1)
         out["one_off_months_of_spending"] = words.get(g, None) or _num(g)
-    elif oneoff and re.search(r"repair|furnace|roof|car|vet|dental|emergency|broke|breaks|dies|bill|cost", t):
+    elif oneoff:
         out["one_off_cost"] = sum(oneoff)
     return out
 

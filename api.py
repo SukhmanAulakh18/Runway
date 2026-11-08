@@ -114,6 +114,8 @@ def customer(acct: int, asof: Optional[str] = ASOF):
            "profile": c.p, "standard_runway": c.key_res, "realistic": c.r, "realistic_runway": c.real_res,
            "trough": c.lt, "loan": c.LR, "loan_check": c.loan_check, "risk": c.risk, "cushion": c.cushion, "committed": c.committed, "repeat": c.repeat, "diagnosis": c.diagnosis,
            "last_activity": c.a_rows.month.max(), "history": hist}
+    t = _tiers(asof)
+    out["tier"] = {"key": t.get(acct), "label": E.BOOK_TIERS[t[acct]][0], "action": E.BOOK_TIERS[t[acct]][1]} if acct in t.index else None
     if asof:
         out["what_happened_next"] = E.what_happened_next(acct, c.d_full, asof, 12)
     return clean(out)
@@ -193,9 +195,14 @@ def watchlist(asof: Optional[str] = ASOF, early_only: bool = True, limit: int = 
 
 
 @lru_cache(maxsize=8)
+def _tiers(asof: Optional[str]):
+    return E.book_tiers(load_all()[0], asof)
+
+
+@lru_cache(maxsize=8)
 def _book(asof: Optional[str]) -> dict:
     d, _, EV, _ = load_all()
-    tiers = E.book_tiers(d, asof)
+    tiers = _tiers(asof)
     dd = d if asof is None else {"monthly": d["monthly"][d["monthly"].month <= asof], "loans": d["loans"]}
     act = [int(a) for a in tiers[tiers == "act"].index]
     causes = pd.Series([g["primary"]["short"] for g in (E.diagnose(a, dd) for a in act) if g]).value_counts().to_dict()
@@ -210,14 +217,14 @@ def _book(asof: Optional[str]) -> dict:
              "tested_share_of_overdrafts": tested["tiers"][k]["share_of_overdrafts"] if tested else None}
             for k, (lab, act_txt) in E.BOOK_TIERS.items()]
     n = int(len(tiers))
-    focus = [r for r in rows if r["tier"] in ("overdrawn", "act")]
+    focus = [r for r in rows if r["tier"] in ("overdrawn", "act", "new_hot")]
     # the sentence "X% of customers produced Y% of overdrafts" must describe ONE population: the tested cohort
     tt = tested["tiers"] if tested else None
     tested_n = sum(v["with_full_next_year"] for v in tt.values()) if tt else None
     summary = {"focus_customers": sum(r["customers"] for r in focus), "focus_customer_share": sum(r["customers"] for r in focus) / n,
                "stable_customer_share": next(r["customers"] for r in rows if r["tier"] == "stable") / n,
-               "tested_focus_customer_share": (sum(tt[k]["with_full_next_year"] for k in ("overdrawn", "act")) / tested_n) if tt else None,
-               "tested_focus_overdraft_share": sum(tt[k]["share_of_overdrafts"] or 0 for k in ("overdrawn", "act")) if tt else None,
+               "tested_focus_customer_share": (sum(tt[k]["with_full_next_year"] for k in ("overdrawn", "act", "new_hot")) / tested_n) if tt else None,
+               "tested_focus_overdraft_share": sum(tt[k]["share_of_overdrafts"] or 0 for k in ("overdrawn", "act", "new_hot")) if tt else None,
                "tested_stable_rate": tt["stable"]["rate"] if tt else None}
     return {"asof": asof, "customers": n, "tiers": rows, "act_causes": causes, "summary": summary,
             "tested_on": f"Dec {max(usable)[:4]} → {tested['outcome_year']}" if tested else None}

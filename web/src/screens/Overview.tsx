@@ -136,7 +136,7 @@ export default function Overview({ nav }: { nav: Nav }) {
   );
 }
 
-const TIER_CLASS: Record<string, string> = { overdrawn: "t-bad", act: "t-act", watch: "t-watch", stable: "t-stable", new: "t-new" };
+const TIER_CLASS: Record<string, string> = { overdrawn: "t-bad", act: "t-act", new_hot: "t-newhot", watch: "t-watch", stable: "t-stable", new: "t-new" };
 
 /** The whole book: every customer in one tier, with its action and the tier's tested overdraft rate. */
 function BookCard({ nav }: { nav: Nav }) {
@@ -149,9 +149,9 @@ function BookCard({ nav }: { nav: Nav }) {
       <div className="card-head"><div>
         <h2>The whole book: {b.customers.toLocaleString("en-CA")} customers, one action each</h2>
         <p className="sub">
-          {pct(s.focus_customer_share)} of customers at this date need an advisor (already overdrawn or riskiest 10%); {pct(s.stable_customer_share)} are stable and need nothing.
+          {pct(s.focus_customer_share)} of customers at this date need an advisor (already overdrawn, riskiest 10%, or a new account that swings hard); {pct(s.stable_customer_share)} are stable and need nothing.
           {s.tested_focus_overdraft_share != null && s.tested_focus_customer_share != null && s.tested_stable_rate != null &&
-            <> Tested on {b.tested_on}: those two tiers were <b>{pct(s.tested_focus_customer_share)}</b> of customers and produced <b>{pct(s.tested_focus_overdraft_share)}</b> of the next year's overdrafts; the stable tier overdrew {pct(s.tested_stable_rate, 1)}.</>}
+            <> Tested on {b.tested_on}: those tiers were <b>{pct(s.tested_focus_customer_share)}</b> of customers and produced <b>{pct(s.tested_focus_overdraft_share)}</b> of the next year's overdrafts; the stable tier overdrew {pct(s.tested_stable_rate, 1)}.</>}
           {b.tested_on && <> Rates come from a year already over at this date.</>}
         </p></div></div>
       <div className="bookbar" role="img" aria-label={b.tiers.map((t) => `${t.label}: ${t.customers}`).join("; ")}>
@@ -171,7 +171,7 @@ function BookCard({ nav }: { nav: Nav }) {
               <span className="muted"> ({Object.entries(b.act_causes).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(", ")})</span>}</td>
           </tr>))}
         </tbody></table>
-      <p className="sub" style={{ marginTop: 8 }}>Too-new accounts can't be scored by the trough yet (it needs 12 months), and they still produce a real share of overdrafts: a gap we report rather than hide.</p>
+      <p className="sub" style={{ marginTop: 8 }}>New accounts can't be scored by the trough (it needs 12 months), so they get their own test: swings in money in, chosen on 2023 and 2024 and confirmed on 2025 (the top 10% of new accounts caught 13 of 32 first overdrafts, 18.6% vs 3.0%). Accounts under 3 months stay unscored.</p>
     </section>
   );
 }

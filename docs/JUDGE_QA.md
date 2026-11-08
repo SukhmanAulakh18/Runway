@@ -13,7 +13,7 @@ Rule for the table: answer in one sentence, point at the screen, stop. Never cla
 ## Bankers (Scotiabank, RBC, CIBC, Sun Life)
 | Question | Answer |
 |---|---|
-| Who uses it, and why only 50 customers on screen? | Customer-care and risk teams. The **whole book** is tiered every month (Overview, "The whole book"): at Dec 2024, already overdrawn + riskiest 10% were **8.5%** of customers and produced **60%** of 2025's overdrafts; the **57%** "stable" tier overdrew **0.4%** (the same in all three years) and needs nothing. The 50 are one advisor's call list for the week; the next 20% get an automatic alert, no call. |
+| Who uses it, and why only 50 customers on screen? | Customer-care and risk teams. The **whole book** is tiered every month (Overview, "The whole book"): at Dec 2024, already overdrawn + riskiest 10% + new accounts that swing hard were **10%** of customers and produced **68%** of 2025's overdrafts; the **57%** "stable" tier overdrew **0.4%** (the same in all three years) and needs nothing. The 50 are one advisor's call list for the week; the next 20% get an automatic alert, no call. |
 | Isn't the trough just a low balance? | Yes, that's the point: the standard runway and the average both miss it. 93172 averaged $18.5K and the formula said "no shortfall". The ratio and the plain low point are tied; both beat both runway formulas. |
 | Why offer credit to your riskiest customers? | We don't lead with it. Alert and call first, then an auto-transfer from their own savings ($0); a small limit only after a call, at Tangerine's terms (~$108 for a $6,527 limit used a whole month). Every overdrawn borrower here defaulted. |
 | What does it do for the bank? | Loan review rule: holds **17%** of loans; held loans default **34.7% vs 6.2%** (clean outcome **10.2% vs 3.4%**, p = 0.003). 93172's $167K loan would have been held. |
@@ -27,7 +27,7 @@ Rule for the table: answer in one sentence, point at the screen, stop. Never cla
 | Can the AI make up a number? | No. Every number in AI text must appear in the engine's facts (`verify_numbers`); simulation counts can't be called a "chance" (`verify_wording`). Otherwise a template is used. |
 | Prompt injection through the twist card? | Gemini returns schema-typed JSON only; values are clamped (`_sanitize`); the rule parser cross-checks and flags disagreements; the chips must be confirmed before anything runs. |
 | What if Gemini is slow or down? | Hard 6-second limit (one call once hung 92 s; fixed), then rules or template. Tests use a fake model, so they never call the live one. |
-| How accurate is the twist-card reader? | Measured (`python scripts/eval_ai.py` → `docs/AI_EVAL.md`): the offline rules get **22/22** on the cards they were tuned on but only **8/16 (50%)** on held-out wordings ("rent jumps 8%", "15% pay cut"): overfit, so they are only the fallback. Gemini is scored on the same held-out cards; a card counts only if nothing is invented. |
+| How accurate is the twist-card reader? | Measured (`python scripts/eval_ai.py` → `docs/AI_EVAL.md`): the offline rules scored **8/16** on the first held-out set (overfit); generalised on that set, they score **15/16 (94%)** on a fresh held-out set frozen beforehand and scored once. Gemini is scored on the same held-out cards; a card counts only if nothing is invented. |
 | Why not an ML model instead of a ratio? | We tried: a combined logistic model caught 33 vs the trough's 34 of 55. The simple, explainable ratio won; the extra signals choose the action instead. |
 | How do you know the simulation is right? | Audited: deterministic, stable across seeds, monotonic, 0 errors on 4,500 accounts × 3 twists. Raw it was 8× too pessimistic (customers steer back); calibrated, it predicted 1.6% vs 1.6%. |
 
@@ -49,7 +49,7 @@ Rule for the table: answer in one sentence, point at the screen, stop. Never cla
 | Question | Answer |
 |---|---|
 | Overfitting? | Features up to December, outcome the next year, three separate years; thresholds fixed before the year they're judged on. |
-| Multiple testing? | 45 tests, Benjamini–Hochberg q = 0.10: 37 survive; the failures are on screen with what we did about each. |
+| Multiple testing? | 57 tests, Benjamini–Hochberg q = 0.10: 48 survive; the failures are on screen with what we did about each. |
 | Confounders? | Odds ratio 16.8 (95% CI 9.5–29.7) after balance size, account age and district unemployment. |
 | Biggest weakness? | Money in is mostly cash, so a job loss assumes all non-pension money in stops; the slider shows it. And it's 1990s Czech data, which is why the pilot starts in shadow mode. |
 
@@ -62,3 +62,4 @@ Rule for the table: answer in one sentence, point at the screen, stop. Never cla
 | Why Platt scaling for calibration? | Two parameters, fit on 2023 → 2024, judged on 2025: predicted 1.61% vs 1.61%, Brier 0.0142 vs 0.0158 base rate. With ~55 events a year, isotonic would overfit. |
 | You list a Kalman filter: does it work? | We tested a local-level model with a maximum-likelihood signal-to-noise ratio: for about half of accounts the noise ratio sat at the grid floor (no detectable trend), so we dropped it from the product rather than show noise. |
 | Is "riskiest 10%" a probability or a rank? | Both are shown: the trough is a rank (the flag); the per-customer chance comes from the calibrated simulation (predicted 1.6% vs 1.6% actual in 2025). |
+| What about new customers? | The trough needs 12 months and fails on new accounts (AUC 0.55–0.71), so they get their own test: swings in money in, chosen on 2023 + 2024, confirmed on 2025 (top 10% catch 13 of 32 first overdrafts, 18.6% vs 3.0%). |

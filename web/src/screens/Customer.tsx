@@ -102,7 +102,9 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
           <h1 className="title" style={{ margin: 0 }}>Customer {c.account_id}</h1>
           {c.owner_age != null && <span className="badge muted">Owner {c.owner_age}</span>}
           {t?.bottom_10 && <span className="badge ours">Riskiest 10%</span>}
-          {!t?.scorable && <span className="badge muted">Too new to score</span>}
+          {!t?.scorable && (c.tier?.key === "new_hot"
+            ? <span className="badge ours" title={c.tier.action}>New and swinging: top 10% of new accounts</span>
+            : <span className="badge muted">Too new to score</span>)}
         </div>
       </div>
 

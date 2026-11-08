@@ -398,7 +398,9 @@ def test_evidence_self_correction_and_extended_bh(d):
     ext = full["multiple_testing_extended"]
     # base family + 8 steering tests + the diagnosis tests added Nov 8 (8 of them): every idea tried is counted
     assert len(full["diagnoses"]["tests"]) == 8
-    assert ext["tests"] == full["multiple_testing"]["tests"] + 8 + len(full["diagnoses"]["tests"])
+    # + the 12 new-account candidate tests (Nov 8): a test that's run must be counted
+    assert len(full["new_accounts"]["tests"]) == 12
+    assert ext["tests"] == full["multiple_testing"]["tests"] + 8 + len(full["diagnoses"]["tests"]) + len(full["new_accounts"]["tests"])
     assert all(r["survives"] for r in ext["rows"] if r["log_row"] in (7, "E4", 15))   # trough + steering hold
     assert full["impact"]["2024-12"]["alert"]["quiet_flagged"] > 0
 
@@ -516,3 +518,12 @@ def test_book_tiers_partition_and_order(d):
     lt = E.ltr_table(d, asof="2024-12")
     assert (lt.loc[t[t == "act"].index].ltr_pct_rank <= 0.10).all()
     assert not lt.loc[t[t == "new"].index].scorable.any()
+
+
+def test_new_account_swing_flag_is_new_accounts_only_and_top_10pct(d):
+    n = E.new_account_swing(d, "2024-12")
+    months = d["monthly"][d["monthly"].month <= "2024-12"].groupby("account_id").size().reindex(n.index)
+    assert months.between(E.NEW_MIN_MONTHS, E.LTR_MIN_HISTORY - 1).all()
+    assert abs(n.flag.mean() - E.NEW_SWING_SHARE) < 0.02
+    t = E.book_tiers(d, "2024-12")
+    assert (t[t == "new_hot"].index.isin(n[n.flag].index)).all()
