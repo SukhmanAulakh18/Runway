@@ -135,3 +135,30 @@ def test_customer_tier_for_new_account():
     t = api._tiers("2024-12"); a = int(t[t == "new_hot"].index[0])
     c = client.get(f"/api/customer/{a}", params={"asof": "2024-12"}).json()
     assert c["tier"]["key"] == "new_hot" and not c["trough"]["scorable"]
+
+
+# ---------------------------------------------------------------- Screens read only what the engine sends (Nov 8)
+def test_every_evidence_section_a_screen_reads_exists():
+    """Parse the React screens for e.<section> reads and check /api/evidence serves each one (a renamed section fails here)."""
+    import re
+    from pathlib import Path
+    screens = Path(api.__file__).parent / "web" / "src" / "screens"
+    ev = client.get("/api/evidence").json()
+    read = set(re.findall(r"\be\.([a-z_]+)", (screens / "Evidence.tsx").read_text()))      # e = the evidence on that screen
+    read |= {k for p in screens.glob("*.tsx") for k in re.findall(r"\bev\.data\?\.([a-z_]+)", p.read_text())}
+    assert read and not (read - set(ev)), f"screens read evidence sections the API does not send: {read - set(ev)}"
+
+
+def test_customer_finance_fields_on_screen():
+    c = client.get("/api/customer/93172", params={"asof": "2024-12"}).json()
+    assert c["trough"]["haircut"] == pytest.approx(1 - c["trough"]["ltr"])          # Customer: haircut
+    assert c["cushion"]["buffer_conservative"] >= c["cushion"]["buffer"] > 0         # Plan: conservative buffer
+    w = c["when"]                                                                     # Customer: "When?" (cohort 2022-12)
+    assert w["group"] == "riskiest 10%" and w["cohort"].startswith("scored 2022-12") and 0 < w["within_6"] <= w["within_24"]
+    assert c["tier"]["key"] == "act" and c["loan_check"]["hold"]
+
+
+def test_plan_carries_cost_and_cushion():
+    p = client.post("/api/plan/93172", params={"asof": "2024-12"}, json={"scenario": {}}).json()
+    assert p["cushion"]["alert_level"] == p["cushion"]["buffer"]                     # alert at their own dip, not $100
+    assert p["limit_cost"]["total"] > 0 and p["optimiser"]["horizon"] == 12

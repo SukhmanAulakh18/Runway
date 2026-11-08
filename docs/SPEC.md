@@ -3,7 +3,7 @@
 Read this first. It says what Runway is, how every number is defined, what has been proven, what is on screen,
 and where the work stands. Numbers come from `evidence.json` (rebuild: `python evidence.py`); definitions from
 `engine.py`. If this file and the code disagree, the code wins: fix this file.
-Last full check: Nov 8, branch `p1/judge-ready` (114 fast, 6 UI, 12 slow tests passing; 0 WCAG A/AA violations).
+Last full check: Nov 8, branch `p1/ship` (123 fast, 6 UI, 14 slow tests passing; 0 WCAG A/AA violations).
 
 ---
 
@@ -123,7 +123,7 @@ money; `api.py` calls `ui/context.build_context`, the same function Streamlit us
 | 02 Know the customer | 4-step story strip; calibrated risk; trough; both runways; "why they're at risk, and what to do"; advisor assistant (brief, EN/FR message); balance chart; what happened next; loan card (would it have been held) |
 | 03 Stress test | twist card → chips (+ AI/rules disagreement flags) → verdict + drivers → runways → simulated futures → fan chart → exposure profile (risk teams) → judge check |
 | 04 Make a plan | first action; no-risk steps first with real costs; cushion backtest; cuts; backup levers; milestones; AI plan |
-| 05 Why trust it | headline proof; model health; backtests; calibration; steering; loan rule; fairness; who the riskiest are; reasons; what didn't hold up; limits with responses |
+| 05 Why trust it | headline proof; our runway vs the judges' formula (tested); model health; backtests; calibration; steering; loan rule; fairness; who the riskiest are; reasons; what didn't hold up; limits with responses |
 
 **Pitch mode** (top bar): five guided steps; Demo account 93172 at Dec 2024.
 
@@ -167,10 +167,9 @@ Gemini (`gemini-3.5-flash`) on **Vertex AI** when `GOOGLE_CLOUD_PROJECT` is set 
 
 | Where | What |
 |---|---|
-| `main` (`ba3756f`) | PRs #1–#14 merged |
-| **missing from main** | `1a52f5e` Pitch mode, `a0da90b` fairness/SQL/Q&A (pushed after #14 merged) → included in `p1/judge-ready` |
-| `p1/judge-ready` (bundle `judge-ready.bundle`) | the two lost commits + whole book, AI eval, exposure profile, MPC wording fix, one-population fix, this spec. **Needs pushing from the laptop + PR** |
-| Survival + challenger | cherry-picked on top of `p1/judge-ready`, evidence rebuilt, tests green |
+| `main` | PRs #1–#17 merged: everything in this spec, including survival, challenger, buffer risk appetite, haircut |
+| `p1/ship` | Evidence card "Our runway vs the judges' formula" (out-of-time AUC, deficit mislabel, EI cap, EI ending, previously Streamlit-only); screen ↔ API contract tests; `scripts/smoke.py`; Docker verified (8/8 smoke checks in the container); `docs/DEPLOY.md` for Vertex; `docs/TEST_PLAN.md`; `docs/guide/Runway_Guide.docx` + `.pdf` |
+| Cloud Run | Ready (`docs/DEPLOY.md`); not deployed: needs the owner's go-ahead and the organizers' OK on putting the data behind a public link |
 
 **Known gaps (say them first):** 1990s Czech data, not Tangerine customers; money in is mostly cash, so a job loss
 assumes all non-pension money in stops (slider); accounts under 3 months can't be scored; diagnoses hold in

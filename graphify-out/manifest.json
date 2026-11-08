@@ -270,9 +270,9 @@
     "semantic_hash": ""
   },
   "docs/HANDOFF.md": {
-    "mtime": 1794147832.9034803,
-    "seen": 1794148490.2027352,
-    "ast_hash": "61581df80ea5b26bfd761da7c2152675",
+    "mtime": 1794149982.2921748,
+    "seen": 1794149983.7416902,
+    "ast_hash": "517de7d855f4c51886c7f72b636c466c",
     "semantic_hash": ""
   },
   "docs/REACT_PLAN.md": {
@@ -294,9 +294,9 @@
     "semantic_hash": ""
   },
   "tests/test_api.py": {
-    "mtime": 1794129945.930512,
-    "seen": 1794148490.202697,
-    "ast_hash": "0b7cd02b3f6976bb67017635ad86aebc",
+    "mtime": 1794149479.331959,
+    "seen": 1794149983.7409039,
+    "ast_hash": "5c98c95d094f6d96b4a7f6bcda8081d6",
     "semantic_hash": ""
   },
   "web/eslint.config.js": {
@@ -342,9 +342,9 @@
     "semantic_hash": ""
   },
   "web/src/screens/Evidence.tsx": {
-    "mtime": 1794129946.0151265,
-    "seen": 1794148490.202713,
-    "ast_hash": "4b688cbb3a7c89d5cc6d8d80625fac55",
+    "mtime": 1794149440.5186596,
+    "seen": 1794149983.741236,
+    "ast_hash": "1cbbcab61f79d6c5e4dcb198575f2254",
     "semantic_hash": ""
   },
   "web/src/screens/Overview.tsx": {
@@ -414,9 +414,9 @@
     "semantic_hash": ""
   },
   "docs/DEPLOY.md": {
-    "mtime": 1794112207.7969723,
-    "seen": 1794148490.202732,
-    "ast_hash": "2f6179e7221e3b67e542797c2946c975",
+    "mtime": 1794149532.0236661,
+    "seen": 1794149983.741643,
+    "ast_hash": "b951440f2181b1d2817caee19fa6ee2b",
     "semantic_hash": ""
   },
   "docs/DEVPOST.md": {
@@ -462,15 +462,33 @@
     "semantic_hash": ""
   },
   "docs/SPEC.md": {
-    "mtime": 1794147705.9525735,
-    "seen": 1794148490.2027378,
-    "ast_hash": "b5fc1f33d52e35971064c711d93e5caa",
+    "mtime": 1794149982.2779498,
+    "seen": 1794149983.741737,
+    "ast_hash": "41fbd4f211aadc6188fcc3bd2cb5f7da",
     "semantic_hash": ""
   },
   ".claude/launch.json": {
     "mtime": 1794107846.36519,
     "seen": 1794148490.2026749,
     "ast_hash": "0aab52ff5198909b40bf8c79e7e0fcf2",
+    "semantic_hash": ""
+  },
+  "scripts/smoke.py": {
+    "mtime": 1794149507.8752332,
+    "seen": 1794149983.740855,
+    "ast_hash": "8030799f021370ebbdbf2403e1708fe2",
+    "semantic_hash": ""
+  },
+  "docs/TEST_PLAN.md": {
+    "mtime": 1794149576.7700195,
+    "seen": 1794149983.741754,
+    "ast_hash": "fd14cb15a1ea376a8c4c07091de48ea0",
+    "semantic_hash": ""
+  },
+  "docs/guide/Runway_Guide.pdf": {
+    "mtime": 1794149948.1089358,
+    "seen": 1794149983.741806,
+    "ast_hash": "cefae6c3e8baa2646521ff38278f2f24",
     "semantic_hash": ""
   },
   "web/package-lock.json": {
