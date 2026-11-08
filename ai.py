@@ -11,10 +11,24 @@ from __future__ import annotations
 import json
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 
-MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
+# gemini-2.5-flash returns 404 for new keys (Nov 2026); 3.7/3.8-flash were overloaded (503/504) in testing,
+# 3.5/3.6-flash answered every call in 3-4 s.
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
+AI_TIMEOUT_S = 6.0   # on stage, never wait longer than this for Gemini: fall back to rules / template
 _client = None
 _backend = "offline"
+_pool = ThreadPoolExecutor(max_workers=2)
+
+
+def _generate(contents: str, config=None) -> str:
+    """One Gemini call with a hard wall-clock limit. Raises on error or timeout so callers fall back."""
+    from google.genai import types
+    config = config or types.GenerateContentConfig()
+    # default thinking made plan writing exceed the API's 10 s deadline; minimal: 2-3 s, still passes our checks
+    config.thinking_config = config.thinking_config or types.ThinkingConfig(thinking_level="MINIMAL")
+    return _pool.submit(_client.models.generate_content, model=MODEL, contents=contents, config=config).result(timeout=AI_TIMEOUT_S).text
 
 
 def init() -> str:
@@ -22,12 +36,15 @@ def init() -> str:
     global _client, _backend
     try:
         from google import genai
+        from google.genai import types
+        # 10 s is the API's minimum deadline; no retries, so a stuck call dies instead of hanging (we saw 92 s)
+        http = types.HttpOptions(timeout=10_000, retry_options=types.HttpRetryOptions(attempts=1))
         if os.environ.get("GOOGLE_CLOUD_PROJECT"):
             _client = genai.Client(vertexai=True, project=os.environ["GOOGLE_CLOUD_PROJECT"],
-                                   location=os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"))
+                                   location=os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1"), http_options=http)
             _backend = f"Gemini on Vertex AI ({MODEL})"
         elif os.environ.get("GEMINI_API_KEY"):
-            _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+            _client = genai.Client(api_key=os.environ["GEMINI_API_KEY"], http_options=http)
             _backend = f"Gemini API ({MODEL})"
     except Exception:
         _client, _backend = None, "offline"
@@ -117,11 +134,8 @@ def parse_twist(text: str) -> tuple[dict, str]:
         try:
             from google.genai import types
             prompt = _PROMPT.format(fields="\n".join(f"- {k}: {v}" for k, v in SCENARIO_FIELDS.items()), text=text)
-            resp = _client.models.generate_content(
-                model=MODEL, contents=prompt,
-                config=types.GenerateContentConfig(response_mime_type="application/json", response_schema=_TWIST_SCHEMA,
-                                                   temperature=0))
-            data = json.loads(resp.text)
+            data = json.loads(_generate(prompt, types.GenerateContentConfig(
+                response_mime_type="application/json", response_schema=_TWIST_SCHEMA, temperature=0)))
             base = parse_twist_offline("")
             base.update({k: data[k] for k in base if k in data and data[k] is not None or k == "return_to_work_month" and k in data})
             return _sanitize(base), "AI"
@@ -182,8 +196,10 @@ customer, using ONLY the numbers in the facts below. Do not invent, round differ
 numbers. Start with the cushion: the buffer to keep (overdraft protection or an automatic transfer) and the
 balance at which they get an alert. Then the shock result, the first milestone they haven't reached, and the
 single most useful backup action. "futures_lasting_6_months_of_10" is a count of simulated futures: say
-"N of 10 simulated futures", never "chance" or "%". Only overdraft_risk_pct may be called a chance.
-No headings, no bullet points.
+"N of 10 simulated futures", never "chance" or "%". Only overdraft_risk_pct may be called a chance, written as
+"a X% chance of a first overdraft in the next 12 months". Write dollar amounts with $ and commas ($6,527).
+next_milestone.months is how many months of saving `saving` it takes to reach that milestone (not months of runway).
+Never mention field names. No headings, no bullet points.
 FACTS (JSON):
 {facts}"""
 
@@ -269,9 +285,7 @@ def write_plan(facts: dict) -> tuple[str, str]:
     """Returns (text, source). AI text is used only if every number checks out."""
     if _client is not None:
         try:
-            resp = _client.models.generate_content(
-                model=MODEL, contents=_PLAN_PROMPT.format(facts=json.dumps(facts, default=str)))
-            text = resp.text.strip()
+            text = _generate(_PLAN_PROMPT.format(facts=json.dumps(facts, default=str))).strip()
             if verify_numbers(text, facts) and verify_wording(text, facts):
                 return text, "AI (numbers verified)"
         except Exception:
