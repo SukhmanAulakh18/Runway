@@ -480,3 +480,29 @@ def test_evidence_monitoring_no_breaches(d):
 def test_overdraft_cost_tangerine_terms():
     c = E.overdraft_cost(6000, 1)
     assert c["fee"] == 5 and c["interest"] == pytest.approx(95.0) and c["total"] == pytest.approx(100.0)   # 6000 x 19% / 12
+
+
+@pytest.mark.parametrize("asof", ["2024-12", "2025-12"])
+def test_sql_trough_matches_engine(d, asof):
+    """sql/trough.sql (warehouse-ready) gives the same trough and the same riskiest-10% flags as the Python engine."""
+    import sqlite3
+    from pathlib import Path
+    con = sqlite3.connect(":memory:")
+    d["monthly"][["account_id", "month", "min_balance", "avg_daily_balance"]].to_sql("monthly_summary", con, index=False)
+    sql = (Path(__file__).resolve().parent.parent / "sql" / "trough.sql").read_text()
+    q = pd.read_sql_query(sql, con, params={"asof": asof}).set_index("account_id")
+    t = E.ltr_table(d, asof=asof)
+    assert len(q) == len(t)
+    assert np.allclose(q.ltr.to_numpy(), t.ltr.reindex(q.index).to_numpy(), atol=1e-9)
+    py_flag = (t.scorable & (t.ltr_pct_rank <= 0.10)).reindex(q.index)
+    assert (q.riskiest_10.astype(bool) == py_flag).all()
+
+
+@pytest.mark.slow
+def test_evidence_fairness_and_lessons(d):
+    import evidence
+    fr = evidence.fairness(d)
+    assert fr["flag_ratio_in_band"] and fr["gap_direction_flips"] and all(r["catch_gap_p"] >= 0.05 for r in fr["by_year"])
+    ev = evidence.main(n_boot=200)
+    assert {l["group"] for l in ev["lessons"]} == {"Rejected", "Not claimed", "One year only"}
+    assert any(r["metric"].startswith("Fairness") for r in ev["monitoring"]["rows"]) and ev["monitoring"]["breaches"] == []

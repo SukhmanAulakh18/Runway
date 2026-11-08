@@ -894,6 +894,112 @@
     ],
     "note": "Review means talk first (smaller loan, cushion, alert), not reject. Dollars are amounts lent, not losses."
   },
+  "fairness": {
+    "by_year": [
+      {
+        "predicted_year": 2024,
+        "groups": {
+          "women": {
+            "customers": 1066,
+            "flag_rate": 0.10600375234521577,
+            "first_overdrafts": 14,
+            "caught": 10,
+            "catch_rate": 0.7142857142857143
+          },
+          "men": {
+            "customers": 1147,
+            "flag_rate": 0.0950305143853531,
+            "first_overdrafts": 20,
+            "caught": 10,
+            "catch_rate": 0.5
+          },
+          "under 30": {
+            "customers": 642,
+            "flag_rate": 0.102803738317757,
+            "first_overdrafts": 9,
+            "caught": 2,
+            "catch_rate": 0.2222222222222222
+          },
+          "30-44": {
+            "customers": 592,
+            "flag_rate": 0.13513513513513514,
+            "first_overdrafts": 10,
+            "caught": 9,
+            "catch_rate": 0.9
+          },
+          "45-59": {
+            "customers": 576,
+            "flag_rate": 0.1284722222222222,
+            "first_overdrafts": 13,
+            "caught": 9,
+            "catch_rate": 0.6923076923076923
+          },
+          "60+": {
+            "customers": 403,
+            "flag_rate": 0.004962779156327543,
+            "first_overdrafts": 2,
+            "caught": 0,
+            "catch_rate": 0.0
+          }
+        },
+        "flag_rate_ratio_women_to_men": 1.1154706783482797,
+        "catch_gap_p": 0.29553905842777534
+      },
+      {
+        "predicted_year": 2025,
+        "groups": {
+          "women": {
+            "customers": 1693,
+            "flag_rate": 0.09273479031305375,
+            "first_overdrafts": 26,
+            "caught": 13,
+            "catch_rate": 0.5
+          },
+          "men": {
+            "customers": 1724,
+            "flag_rate": 0.10730858468677494,
+            "first_overdrafts": 29,
+            "caught": 21,
+            "catch_rate": 0.7241379310344828
+          },
+          "under 30": {
+            "customers": 914,
+            "flag_rate": 0.10175054704595186,
+            "first_overdrafts": 14,
+            "caught": 10,
+            "catch_rate": 0.7142857142857143
+          },
+          "30-44": {
+            "customers": 915,
+            "flag_rate": 0.12568306010928962,
+            "first_overdrafts": 24,
+            "caught": 13,
+            "catch_rate": 0.5416666666666666
+          },
+          "45-59": {
+            "customers": 932,
+            "flag_rate": 0.13197424892703863,
+            "first_overdrafts": 16,
+            "caught": 11,
+            "catch_rate": 0.6875
+          },
+          "60+": {
+            "customers": 656,
+            "flag_rate": 0.01676829268292683,
+            "first_overdrafts": 1,
+            "caught": 0,
+            "catch_rate": 0.0
+          }
+        },
+        "flag_rate_ratio_women_to_men": 0.8641879918902955,
+        "catch_gap_p": 0.10370146417079301
+      }
+    ],
+    "gap_direction_flips": true,
+    "flag_ratio_in_band": true,
+    "verdict": "No consistent gender gap: flag rates stay within the four-fifths band and the catch-rate gap changes direction between years, significant in neither.",
+    "note": "Gender and age are not model inputs. 60+ customers are rarely flagged because most are steady pensioners and their overdraft rate is near zero. Small samples (14-29 overdrafts per group): keep monitoring."
+  },
   "monitoring": {
     "rows": [
       {
@@ -931,6 +1037,18 @@
         "value": 0.9989177405026819,
         "status": "ok",
         "threshold": "breach outside 0.67-1.5"
+      },
+      {
+        "metric": "Fairness: flag rate, women vs men (2025)",
+        "value": 0.8641879918902955,
+        "status": "ok",
+        "threshold": "watch outside 0.8-1.25 (four-fifths rule)"
+      },
+      {
+        "metric": "Fairness: catch-rate gap, women vs men (2025, Fisher p)",
+        "value": 0.10370146417079301,
+        "status": "ok",
+        "threshold": "watch p < 0.05, breach p < 0.01"
       },
       {
         "metric": "Data quality: money in/out parts add up",
@@ -1564,5 +1682,49 @@
         "survives": false
       }
     ]
-  }
+  },
+  "lessons": [
+    {
+      "group": "Rejected",
+      "idea": "Bills that leave before the paycheque cause overdrafts",
+      "result": "The opposite: those customers overdrew less, in both years.",
+      "decision": "Dropped. No 'move the bill date' action."
+    },
+    {
+      "group": "Rejected",
+      "idea": "One combined score (trough + every reason) catches more",
+      "result": "It caught 33 vs the trough's 34 of 55 first overdrafts.",
+      "decision": "Kept the simple trough as the score; reasons only choose the action."
+    },
+    {
+      "group": "Not claimed",
+      "idea": "The trough ratio beats the plain lowest balance",
+      "result": "Statistically tied (p = 0.39).",
+      "decision": "We claim the low point beats both runway formulas, not that the ratio beats the low point."
+    },
+    {
+      "group": "One year only",
+      "idea": "Money in falling predicts overdrafts inside the riskiest 10%",
+      "result": "Significant in 2025; same direction in 2024 but too few cases to be sure.",
+      "decision": "Used to choose the action (call first); not claimed as proven."
+    },
+    {
+      "group": "One year only",
+      "idea": "Big cash-flow swings predict overdrafts inside the riskiest 10%",
+      "result": "Significant in 2025; no difference in 2024.",
+      "decision": "Used to choose the action (auto-save good months); not claimed as proven."
+    },
+    {
+      "group": "One year only",
+      "idea": "A heavy new loan predicts overdrafts inside the riskiest 10%",
+      "result": "Same direction both years, but only 5 and 10 customers.",
+      "decision": "Kept as a loan-review prompt; not claimed."
+    },
+    {
+      "group": "One year only",
+      "idea": "Weak 'steering back' predicts who in the riskiest 10% overdraws",
+      "result": "Held in 2025, not in 2024.",
+      "decision": "Reported, not used."
+    }
+  ]
 }

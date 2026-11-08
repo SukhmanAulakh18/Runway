@@ -85,10 +85,12 @@ def main(n_boot=1000, seed=0):
     ev["self_correction"] = self_correction(d)
     ev["segment"] = segment_profile(d)
     ev["loan_policy"] = loan_policy(d)
+    ev["fairness"] = fairness(d)
     ev["monitoring"] = monitoring(d, ev)
     ev["repeat_overdraft"] = {str(y): E.repeat_rates(d["monthly"], y) for y in (2024, 2025)}
     ev["diagnoses"] = diagnoses(d)
     ev["multiple_testing_extended"] = multiple_testing_extended(ev)
+    ev["lessons"] = lessons(ev)   # last: reads diagnoses and the extended multiple-testing family
     return ev
 
 def _ltr_backtest(m, year, window=6, pct=0.10):
@@ -417,6 +419,14 @@ def monitoring(d, ev):
                      "threshold": f"breach < {AUC_FLOOR}"})
     rows.append({"metric": "Risk forecast calibration, 2025 (predicted / actual)", "value": ratio,
                  "status": status(not (CALIBRATION_BAND[0] <= ratio <= CALIBRATION_BAND[1])), "threshold": f"breach outside {CALIBRATION_BAND[0]}-{CALIBRATION_BAND[1]}"})
+    fr = ev.get("fairness")
+    if fr:
+        r25 = fr["by_year"][-1]
+        rows.append({"metric": "Fairness: flag rate, women vs men (2025)", "value": r25["flag_rate_ratio_women_to_men"],
+                     "status": status(False, not (FOUR_FIFTHS[0] <= r25["flag_rate_ratio_women_to_men"] <= FOUR_FIFTHS[1])),
+                     "threshold": f"watch outside {FOUR_FIFTHS[0]}-{FOUR_FIFTHS[1]} (four-fifths rule)"})
+        rows.append({"metric": "Fairness: catch-rate gap, women vs men (2025, Fisher p)", "value": r25["catch_gap_p"],
+                     "status": status(r25["catch_gap_p"] < 0.01, r25["catch_gap_p"] < 0.05), "threshold": "watch p < 0.05, breach p < 0.01"})
     rows.append({"metric": "Data quality: money in/out parts add up", "value": min(checks["money_in_parts_add_up"], checks["money_out_parts_add_up"]),
                  "status": status(min(checks["money_in_parts_add_up"], checks["money_out_parts_add_up"]) < 0.999), "threshold": "breach < 99.9% of rows"})
     rows.append({"metric": "Data quality: missing or negative values", "value": checks["missing_values"] + checks["negative_flows"],
@@ -425,6 +435,71 @@ def monitoring(d, ev):
             "watch": [r["metric"] for r in rows if r["status"] == "watch"],
             "note": "OSFI E-23 (effective May 1, 2027) asks for monitoring with defined breach thresholds; it sets no numbers. "
                     "These thresholds are stated choices; a breach triggers re-validation."}
+
+
+FOUR_FIFTHS = (0.8, 1.25)   # flag-rate ratio band between groups (the "four-fifths rule" convention)
+
+
+def fairness(d):
+    """Does the early warning treat groups alike? For 2024 and 2025: flag rate and catch rate (share of first overdrafts
+    flagged) by owner gender and age band. Fisher test on the catch-rate gap. Groups are never inputs to the score."""
+    from scipy.stats import fisher_exact
+    cl = pd.read_csv(E.DATA / "clients.csv", parse_dates=["birth_date"]); dp = pd.read_csv(E.DATA / "dispositions.csv")
+    own = dp[dp.type == "owner"].merge(cl, on="client_id").set_index("account_id")
+    out = []
+    for year in (2024, 2025):
+        nv, pre, y, ltr, low = _ltr_backtest(d["monthly"], year)
+        f, yy = low.reindex(nv).astype(bool).values, y.reindex(nv).astype(bool).values
+        age = ((pd.Timestamp(f"{year - 1}-12-31") - own.birth_date.reindex(nv)).dt.days / 365.25).values
+        groups = {"women": (own.gender.reindex(nv) == "F").values, "men": (own.gender.reindex(nv) == "M").values,
+                  "under 30": age < 30, "30-44": (age >= 30) & (age < 45), "45-59": (age >= 45) & (age < 60), "60+": age >= 60}
+        rows = {}
+        for g, m in groups.items():
+            ev_ = yy & m
+            rows[g] = {"customers": int(m.sum()), "flag_rate": float(f[m].mean()), "first_overdrafts": int(ev_.sum()),
+                       "caught": int((ev_ & f).sum()), "catch_rate": float((ev_ & f).sum() / max(ev_.sum(), 1))}
+        w, mn = rows["women"], rows["men"]
+        out.append({"predicted_year": year, "groups": rows,
+                    "flag_rate_ratio_women_to_men": w["flag_rate"] / max(mn["flag_rate"], 1e-9),
+                    "catch_gap_p": float(fisher_exact([[w["caught"], w["first_overdrafts"] - w["caught"]],
+                                                       [mn["caught"], mn["first_overdrafts"] - mn["caught"]]])[1])})
+    flips = (out[0]["groups"]["women"]["catch_rate"] - out[0]["groups"]["men"]["catch_rate"]) * \
+            (out[1]["groups"]["women"]["catch_rate"] - out[1]["groups"]["men"]["catch_rate"]) < 0
+    ok_ratio = all(FOUR_FIFTHS[0] <= r["flag_rate_ratio_women_to_men"] <= FOUR_FIFTHS[1] for r in out)
+    return {"by_year": out, "gap_direction_flips": bool(flips), "flag_ratio_in_band": bool(ok_ratio),
+            "verdict": ("No consistent gender gap: flag rates stay within the four-fifths band and the catch-rate gap "
+                        "changes direction between years, significant in neither." if flips and ok_ratio and
+                        all(r["catch_gap_p"] >= 0.05 for r in out) else "Check: a gap persists; see by_year."),
+            "note": "Gender and age are not model inputs. 60+ customers are rarely flagged because most are steady pensioners "
+                    "and their overdraft rate is near zero. Small samples (14-29 overdrafts per group): keep monitoring."}
+
+
+def lessons(ev):
+    """The ideas that didn't hold up, grouped in plain words with what we did about each (for the Evidence page)."""
+    mt = {r["hypothesis"]: r for r in ev["multiple_testing_extended"]["rows"]}
+    def p(prefix):
+        return [r["p"] for h, r in mt.items() if h.startswith(prefix)]
+    return [
+        {"group": "Rejected", "idea": "Bills that leave before the paycheque cause overdrafts",
+         "result": "The opposite: those customers overdrew less, in both years.", "decision": "Dropped. No 'move the bill date' action."},
+        {"group": "Rejected", "idea": "One combined score (trough + every reason) catches more",
+         "result": "It caught {combined} vs the trough's {trough_only} of {events} first overdrafts.".format(
+             **ev["diagnoses"]["combined_model"]["catch_at_10pct"]),
+         "decision": "Kept the simple trough as the score; reasons only choose the action."},
+        {"group": "Not claimed", "idea": "The trough ratio beats the plain lowest balance",
+         "result": f"Statistically tied (p = {p('Trough beats Lowest')[0]:.2f}).",
+         "decision": "We claim the low point beats both runway formulas, not that the ratio beats the low point."},
+        {"group": "One year only", "idea": "Money in falling predicts overdrafts inside the riskiest 10%",
+         "result": "Significant in 2025; same direction in 2024 but too few cases to be sure.",
+         "decision": "Used to choose the action (call first); not claimed as proven."},
+        {"group": "One year only", "idea": "Big cash-flow swings predict overdrafts inside the riskiest 10%",
+         "result": "Significant in 2025; no difference in 2024.",
+         "decision": "Used to choose the action (auto-save good months); not claimed as proven."},
+        {"group": "One year only", "idea": "A heavy new loan predicts overdrafts inside the riskiest 10%",
+         "result": "Same direction both years, but only 5 and 10 customers.", "decision": "Kept as a loan-review prompt; not claimed."},
+        {"group": "One year only", "idea": "Weak 'steering back' predicts who in the riskiest 10% overdraws",
+         "result": "Held in 2025, not in 2024.", "decision": "Reported, not used."},
+    ]
 
 
 def multiple_testing_extended(ev, q=0.10):

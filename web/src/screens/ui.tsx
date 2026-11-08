@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 export function Loading({ h = 160 }: { h?: number }) {
   return <div className="skeleton" style={{ minHeight: h }} aria-label="Loading" />;
@@ -30,4 +30,28 @@ export function Kpi({ label, value, note, size, swatch, tip }: { label: ReactNod
       {note && <small>{note}</small>}
     </div>
   );
+}
+
+
+/** Counts the number inside a label (e.g. "62%", "14.6×", "$78K") up from 0 once. Text only; no maths on money.
+ *  Skipped for people who prefer reduced motion, and for labels without a number. */
+export function CountUp({ text, ms = 900 }: { text: string; ms?: number }) {
+  const m = text.match(/-?\d[\d,]*(\.\d+)?/);
+  const [shown, setShown] = useState(text);
+  const done = useRef(false);
+  useEffect(() => {
+    if (!m || done.current || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { setShown(text); return; }
+    done.current = true;
+    const target = parseFloat(m[0].replace(/,/g, "")), dec = m[1] ? m[1].length - 1 : 0, t0 = performance.now();
+    let raf = 0;
+    const tick = (t: number) => {
+      const k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3);   // ease-out
+      const v = (target * e).toLocaleString("en-CA", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+      setShown(text.replace(m[0], v));
+      if (k < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
+  return <span aria-label={text}>{shown}</span>;
 }

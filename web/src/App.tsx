@@ -15,6 +15,14 @@ const STEPS: { id: Tab; n: string; name: string; hint: string }[] = [
   { id: "plan", n: "04", name: "Make a plan", hint: "Cushion, cuts, backup" },
   { id: "evidence", n: "05", name: "Why trust it", hint: "Backtests and limits" },
 ];
+const PITCH: { tab: Tab; title: string; cue: string; shock?: Partial<Scenario> }[] = [
+  { tab: "overview", title: "The finding", cue: "Banks watch the average; overdrafts happen at the low point. Point at the four headline numbers, then the call list: every row has its own next step." },
+  { tab: "customer", title: "One customer", cue: "Read the four steps left to right: looks fine, the low point, the new loan, call this week. The loan card says a check at approval would have held it." },
+  { tab: "stress", title: "A twist card", cue: "Job loss plus bills up 15%. Read the verdict first, then 'What moves the answer'. The judges' formula is under 'Judge check'.", shock: { job_loss: true, bills_increase_pct: 0.15 } },
+  { tab: "plan", title: "The plan", cue: "Fix the cause first. Then the no-risk steps: an alert and a transfer from savings. A limit comes last, with its real cost.", shock: { job_loss: true, bills_increase_pct: 0.15 } },
+  { tab: "evidence", title: "Why trust it", cue: "Tested on years the model never saw. Model health shows no breaches, and everything that failed is listed. Now: pick any account and any twist card." },
+];
+
 export interface Nav { acct: number; asof: Asof; scenario: Scenario; go: (t: Tab, acct?: number) => void; setScenario: (s: Scenario) => void }
 
 function readUrl() {
@@ -46,6 +54,23 @@ export default function App() {
   }, [qc]);
 
   const go = (t: Tab, a?: number) => { if (a) setAcct(a); setTab(t); window.scrollTo({ top: 0 }); };
+  const [step, setStep] = useState<number | null>(null);
+  const pitch = (i: number | null) => {
+    setStep(i);
+    if (i === null) return;
+    setAsof("2024-12"); setScenario({ ...NO_SHOCK, ...PITCH[i].shock }); go(PITCH[i].tab, 93172);
+  };
+  useEffect(() => {   // arrow keys move through the pitch; Esc leaves it
+    if (step === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.closest("input, textarea")) return;
+      if (e.key === "ArrowRight" && step < PITCH.length - 1) pitch(step + 1);
+      if (e.key === "ArrowLeft" && step > 0) pitch(step - 1);
+      if (e.key === "Escape") pitch(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
   const open = () => {
     const n = Number(draft);
     if (accounts.data?.includes(n)) go(tab === "overview" || tab === "evidence" ? "customer" : tab, n);
@@ -90,13 +115,26 @@ export default function App() {
               <button key={k} className={(asof ?? "") === k ? "on" : ""} onClick={() => setAsof((k || null) as Asof)}>{ASOF_LABEL[k]}</button>
             ))}
           </div>
-          <button className="btn ours" onClick={() => { setAsof("2024-12"); setScenario(NO_SHOCK); go("customer", 93172); }}>
-            Demo mode
+          <button className="btn ours" onClick={() => pitch(0)} aria-pressed={step !== null}>
+            {step === null ? "▶ Pitch mode" : "Pitch mode on"}
           </button>
           <span className="spacer" />
           <span className={`pill ${health.data?.ai?.toLowerCase().includes("gemini") ? "ai" : ""}`} title="AI reads twist cards and writes plans; it never calculates">
             AI: {health.data?.ai ?? "…"}
           </span>
+        {step !== null && (
+            <div className="pitchbar" role="region" aria-label="Pitch mode">
+              <div className="pitch-dots">{PITCH.map((p, i) => <button key={p.title} className={i === step ? "on" : ""} onClick={() => pitch(i)} aria-label={`Step ${i + 1}: ${p.title}`} />)}</div>
+              <div className="pitch-text"><b>{step + 1} / {PITCH.length} · {PITCH[step].title}</b><span>{PITCH[step].cue}</span></div>
+              <div className="pitch-btns">
+                <button className="btn sm" onClick={() => pitch(step - 1)} disabled={step === 0}>← Back</button>
+                {step < PITCH.length - 1
+                  ? <button className="btn ours sm" onClick={() => pitch(step + 1)}>Next →</button>
+                  : <button className="btn primary sm" onClick={() => pitch(null)}>Done</button>}
+                <button className="btn sm" onClick={() => pitch(null)} aria-label="Leave pitch mode">Esc</button>
+              </div>
+            </div>
+          )}
         </header>
 
         {tab === "overview" && <Overview nav={nav} />}
@@ -104,6 +142,7 @@ export default function App() {
         {tab === "stress" && <Stress nav={nav} />}
         {tab === "plan" && <Plan nav={nav} />}
         {tab === "evidence" && <Evidence />}
+
       </div>
     </div>
   );
