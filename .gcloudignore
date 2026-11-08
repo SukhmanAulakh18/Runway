@@ -1,0 +1,14 @@
+# What Cloud Build uploads for `gcloud run deploy --source .` (without this file gcloud uses .gitignore and drops data/).
+# Mirrors .dockerignore: never upload secrets or local environments; data/ IS uploaded (the container needs the CSVs).
+.gcloudignore
+.env
+.env.*
+.venv/
+.git/
+**/__pycache__/
+.pytest_cache/
+web/node_modules/
+web/dist/
+graphify-out/
+.claude/
+docs/guide/

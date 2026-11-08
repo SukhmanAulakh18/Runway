@@ -169,7 +169,7 @@ Gemini (`gemini-3.5-flash`) on **Vertex AI** when `GOOGLE_CLOUD_PROJECT` is set 
 |---|---|
 | `main` | PRs #1–#17 merged: everything in this spec, including survival, challenger, buffer risk appetite, haircut |
 | `p1/ship` | Evidence card "Our runway vs the judges' formula" (out-of-time AUC, deficit mislabel, EI cap, EI ending, previously Streamlit-only); screen ↔ API contract tests; `scripts/smoke.py`; Docker verified (8/8 smoke checks in the container); `docs/DEPLOY.md` for Vertex; `docs/TEST_PLAN.md`; `docs/guide/Runway_Guide.docx` + `.pdf` |
-| Cloud Run | Ready (`docs/DEPLOY.md`); not deployed: needs the owner's go-ahead and the organizers' OK on putting the data behind a public link |
+| Cloud Run | **Live:** https://runway-1085585470420.us-central1.run.app (from `main` `a2a0746`; Gemini on Vertex; smoke test 8/8). Delete after judging (`docs/DEPLOY.md` §4) |
 
 **Known gaps (say them first):** 1990s Czech data, not Tangerine customers; money in is mostly cash, so a job loss
 assumes all non-pension money in stops (slider); accounts under 3 months can't be scored; diagnoses hold in
