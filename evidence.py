@@ -82,7 +82,8 @@ def main(n_boot=1000, seed=0):
     ev["multiple_testing"] = multiple_testing(ev, d)
     ev["sim_calibration"] = sim_calibration(d)
     ev["impact"] = {asof: impact(d, asof) for asof in ("2023-12", "2024-12")}
-    json.dump(ev, open("evidence.json", "w"), indent=2)
+    ev["self_correction"] = self_correction(d)
+    ev["multiple_testing_extended"] = multiple_testing_extended(ev)
     return ev
 
 def _ltr_backtest(m, year, window=6, pct=0.10):
@@ -251,6 +252,60 @@ def multiple_testing(ev, d, q=0.10):
             "did_not_survive": [r["hypothesis"] for r in rows if not r["survives"]], "rows": rows}
 
 
+def _correction_scores(m, year, q, reps=30, seed=0):
+    """Per account (never negative before `year`, months <= year-1): P(next month's net > 0 | month-end in own bottom q)
+    minus P(next net > 0 | otherwise), real minus the same months in random order (no steering), averaged over reps."""
+    nv, pre, y, ltr, low10 = _ltr_backtest(m, year)
+    P = pre[pre.account_id.isin(nv)].sort_values(["account_id", "month"]); rng = np.random.default_rng(seed)
+    def stat(bal, net):
+        lowm = bal[:-1] <= np.quantile(bal, q); nxt = net[1:] > 0
+        return np.nan if lowm.sum() < 2 or (~lowm).sum() < 2 else nxt[lowm].mean() - nxt[~lowm].mean()
+    real, shuf = {}, {}
+    for a, g in P.groupby("account_id"):
+        net = (g.money_in - g.money_out).to_numpy(); bal = g.month_end_balance.to_numpy(); s0 = bal[0] - net[0]
+        real[a] = stat(bal, net)
+        shuf[a] = np.nanmean([stat(s0 + np.cumsum(pn), pn) for pn in (rng.permutation(net) for _ in range(reps))])
+    R = pd.DataFrame({"real": pd.Series(real), "shuffled": pd.Series(shuf)}).reindex(nv)
+    R["gap"] = R.real - R.shuffled; R["y"] = y; R["flag"] = low10
+    return R.dropna()
+
+
+def self_correction(d):
+    """Finding: customers steer back after a low month (why the raw Monte Carlo is ~8x too pessimistic).
+    Follow-up (not replicated, reported anyway): does weak steering predict who in the riskiest 10% goes overdrawn?"""
+    from scipy.stats import binomtest, mannwhitneyu
+    m = d["monthly"]; rows = []
+    for year in (2024, 2025):
+        for q in (0.2, 0.3):
+            R = _correction_scores(m, year, q); f = R[R.flag]; weak = f.gap <= f.gap.median()
+            rows.append({"predicted_year": year, "low_month_cutoff": q, "accounts": int(len(R)),
+                         "rebuild_after_low_real": float(R.real.mean()), "rebuild_after_low_shuffled": float(R.shuffled.mean()),
+                         "gap": float(R.gap.mean()), "share_accounts_positive": float((R.gap > 0).mean()),
+                         "p_gap": float(binomtest(int((R.gap > 0).sum()), len(R)).pvalue),
+                         "flagged": int(len(f)), "flagged_events": int(f.y.sum()),
+                         "weak_steering_overdraft_rate": float(f[weak].y.mean()), "strong_steering_overdraft_rate": float(f[~weak].y.mean()),
+                         "p_weak_predicts": float(mannwhitneyu(f[f.y == 1].gap, f[f.y == 0].gap, alternative="less").pvalue)})
+    return {"design": "real vs the customer's own months in random order (30 shuffles); months <= Dec of the year before; "
+                      "low month = month-end balance in the customer's own bottom 20% (or 30%)",
+            "rows": rows,
+            "verdict": "Steering back after a low holds in both years and cutoffs. Weak steering predicting overdrafts within the "
+                       "riskiest 10% is significant in 2025 but not in 2024 (and reverses at the 30% cutoff): not claimed."}
+
+
+def multiple_testing_extended(ev, q=0.10):
+    """The 29-test family plus the self-correction tests, so the headline claim counts every idea we tried."""
+    from statsmodels.stats.multitest import multipletests
+    rows = [dict(r) for r in ev["multiple_testing"]["rows"]]
+    for r in ev["self_correction"]["rows"]:
+        tag = f"{r['predicted_year']}, low = bottom {int(r['low_month_cutoff'] * 100)}%"
+        rows.append({"log_row": 15, "hypothesis": f"Customers steer back after a low month ({tag})", "test": "sign test vs shuffled", "p": r["p_gap"], "source": "data"})
+        rows.append({"log_row": 16, "hypothesis": f"Weak steering predicts overdraft in the riskiest 10% ({tag})", "test": "Mann-Whitney", "p": r["p_weak_predicts"], "source": "data"})
+    reject, p_bh, _, _ = multipletests([r["p"] for r in rows], alpha=q, method="fdr_bh")
+    for r, rej, pa in zip(rows, reject, p_bh): r["p_bh"] = float(pa); r["survives"] = bool(rej)
+    return {"method": f"Benjamini-Hochberg, q = {q}", "tests": len(rows), "survive": int(sum(reject)),
+            "did_not_survive": [r["hypothesis"] for r in rows if not r["survives"]], "rows": rows}
+
+
 def loan_evidence(d):
     """Finding 5: overdraft separates defaulted from repaid loans; pre-loan signals predict default."""
     from scipy.stats import fisher_exact
@@ -351,6 +406,9 @@ def impact(d, asof, flag_share=0.10):
         leads.append((pd.Period(first) - pd.Period(hit.month.iloc[0])).n if len(hit) else None)
         generic += int((before.month_end_balance < 100).any())
     L = pd.Series(leads, dtype=float)
+    quiet = [a for a in cu if not ev[a]]                                # flagged, never overdrawn next year
+    pinged = [int((nxt[nxt.account_id == a].month_end_balance < cu[a]["alert_level"]).sum()) for a in quiet]
+    fired_quiet = sum(k > 0 for k in pinged)
     return {"population": "12+ months of history, never overdrawn up to asof, full next year", "accounts": len(pop),
             "flagged": int(flag.sum()), "first_overdrafts": int(ev.sum()), "caught": len(caught),
             "caught_share": len(caught) / max(int(ev.sum()), 1),
@@ -361,6 +419,9 @@ def impact(d, asof, flag_share=0.10):
                        "covered_in_full": int(covered), "covered_share": covered / max(len(caught), 1)},
             "alert": {"rule": "month-end balance below the customer's own alert_level, before the first overdraft",
                       "fired_before": int(L.notna().sum()), "median_lead_months": float(L.median()) if L.notna().any() else None,
+                      "quiet_flagged": len(quiet), "fired_for_quiet": int(fired_quiet), "fired_for_quiet_share": fired_quiet / max(len(quiet), 1),
+                      "mean_pings_per_quiet_customer_year": float(np.mean(pinged)) if pinged else 0.0,
+                      "precision": int(L.notna().sum()) / max(int(L.notna().sum()) + fired_quiet, 1),
                       "generic_100_fired_before": generic}}
 
 
@@ -392,4 +453,7 @@ def formula_holes(d):
 
 
 if __name__ == "__main__":
-    print(json.dumps(main(), indent=2))
+    # Only this entry point writes evidence.json: tests call main(n_boot=200) and must not overwrite the published file.
+    ev = main()
+    json.dump(ev, open("evidence.json", "w"), indent=2)
+    print(json.dumps(ev, indent=2))

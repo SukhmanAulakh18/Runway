@@ -41,7 +41,7 @@ export default function Overview({ nav }: { nav: Nav }) {
           <div className="card ours"><Kpi label="Dip-sized buffer covers" value={pct(im.buffer.covered_share)}
             note={`${kmoney(im.buffer.drawn_total)} drawn of ${kmoney(im.buffer.limits_total)} in limits`} /></div>
           <div className="card"><Kpi label="Personal alert warns" value={`${im.alert.median_lead_months} mo early`}
-            note={`${im.alert.fired_before} of ${im.caught}. A $100 alert: ${im.alert.generic_100_fired_before} of ${im.caught}`} /></div>
+            note={`${im.alert.fired_before} of ${im.caught}; a $100 alert: ${im.alert.generic_100_fired_before}.${im.alert.fired_for_quiet_share != null ? ` Pinged ${pct(im.alert.fired_for_quiet_share)} of flagged customers who never needed it` : ""}`} /></div>
         </section>
       )}
 

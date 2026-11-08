@@ -353,3 +353,14 @@ def test_evidence_impact(d):
     assert (i["first_overdrafts"], i["caught"]) == (55, 34)
     assert i["buffer"]["covered_in_full"] == 27 and i["alert"]["fired_before"] == 23 and i["alert"]["generic_100_fired_before"] == 1
     assert i["buffer"]["drawn_total"] < 0.05 * i["buffer"]["limits_total"]
+
+@pytest.mark.slow
+def test_evidence_self_correction_and_extended_bh(d):
+    import evidence
+    sc = evidence.self_correction(d)
+    assert len(sc["rows"]) == 4 and all(r["gap"] > 0.1 and r["share_accounts_positive"] > 0.8 for r in sc["rows"])
+    full = evidence.main(n_boot=200)
+    ext = full["multiple_testing_extended"]
+    assert ext["tests"] == full["multiple_testing"]["tests"] + 8
+    assert all(r["survives"] for r in ext["rows"] if r["log_row"] in (7, "E4", 15))   # trough + steering hold
+    assert full["impact"]["2024-12"]["alert"]["quiet_flagged"] > 0
