@@ -159,7 +159,7 @@ def test_customer_finance_fields_on_screen():
 
 
 def test_plan_carries_cost_and_cushion():
-    p = client.post("/api/plan/93172", params={"asof": "2024-12"}, json={"scenario": {}}).json()
+    p = client.post("/api/plan/93172", json={"scenario": {}, "asof": "2024-12"}).json()
     assert p["cushion"]["alert_level"] == p["cushion"]["buffer"]                     # alert at their own dip, not $100
     assert p["limit_cost"]["total"] > 0 and p["optimiser"]["horizon"] == 12
 
