@@ -96,7 +96,7 @@ export default function Overview({ nav }: { nav: Nav }) {
           <div className="card">
             <h2>{at6 ? `If everyone lost their job: the standard formula says ${pct(at6.standard)} still have money at month 6. Realistically, ${pct(at6.realistic)}.`
               : "Bank view: a layoff hits everyone at once"}</h2>
-            <p className="sub" style={{ marginBottom: 10 }}>Share of all 4,500 customers above zero. Realistic = EI capped at $729/week and stopping after 6 months, pensions kept.</p>
+            <p className="sub" style={{ marginBottom: 10 }}>Share of all 4,500 customers above zero, on today's data (Dec 2025) whatever the Time Machine is set to. Realistic = EI capped at $729/week and stopping after 6 months, pensions kept.</p>
             {pc.isPending ? <Loading h={220} /> : pc.isError ? <Failed error={pc.error} /> : <PortfolioChart data={pc.data} />}
             <Legend items={[{ label: "Realistic", kind: "ours" }, { label: "Standard formula", kind: "std" }]} />
           </div>

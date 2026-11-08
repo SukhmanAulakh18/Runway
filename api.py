@@ -90,7 +90,9 @@ def ctx(acct: int, asof: Optional[str], sc: E.Scenario):
     d, people, EV, accounts = load_all()
     m = d["monthly"]
     if not ((m.account_id == acct) & (m.month <= (asof or "9999"))).any():
-        raise HTTPException(404, f"Account {acct} has no data" + (f" up to {asof}" if asof else ""))
+        opened_later = asof and (m.account_id == acct).any()
+        raise HTTPException(404, f"Account {acct} opened after {asof}: switch the Time Machine to a later date." if opened_later
+                            else f"Account {acct} isn't in the data: try 93172, 20111 or any of the 4,500 accounts.")
     return build_context(d, people, EV, accounts, acct, asof, sc)
 
 
@@ -116,6 +118,9 @@ def customer(acct: int, asof: Optional[str] = ASOF):
            "last_activity": c.a_rows.month.max(), "history": hist}
     t = _tiers(asof)
     out["tier"] = {"key": t.get(acct), "label": E.BOOK_TIERS[t[acct]][0], "action": E.BOOK_TIERS[t[acct]][1]} if acct in t.index else None
+    if out["tier"]:   # the tier's tested rate (same cohort as the whole-book card: a year already over, no lookahead)
+        bk = _book(asof); row = next(r for r in bk["tiers"] if r["tier"] == out["tier"]["key"])
+        out["tier"].update(tested_rate=row["tested_rate"], tested_on=bk["tested_on"])
     if asof:
         out["what_happened_next"] = E.what_happened_next(acct, c.d_full, asof, 12)
     return clean(out)

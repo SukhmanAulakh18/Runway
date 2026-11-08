@@ -137,11 +137,15 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
               ? <Kpi tip="Tested out of time: among customers overdrawn this much in one year, the share overdrawn again the next year."
                   label="Overdrawn again within a year" value={pct(c.repeat.rate)}
                   note={`Below $0 on ${c.repeat.days_below_zero_12m} days in the last 12 months. Of ${c.repeat.similar_accounts} customers like this (${c.repeat.tested_on}), ${pct(c.repeat.rate)} were overdrawn again, vs ${pct(c.repeat.never_overdrawn_rate, 1)} of those never overdrawn.`} />
-              : <Kpi label="First-overdraft forecast" value="n/a" size="md" note="Needs 12+ months of history" />}
+              : c.tier?.tested_rate != null
+                ? <Kpi tip="No personal forecast for this customer, so we show what their tier actually did: the share of customers in the same tier who were overdrawn the next year, from a year that is already over."
+                    label="Customers in their tier: overdrawn the next year" value={pct(c.tier.tested_rate, 1)}
+                    note={`${t?.scorable ? "No personal forecast: they were overdrawn before, and the forecast is tested on customers never overdrawn." : `No personal forecast yet: ${t?.n_months ?? "under 12"} of the 12 months of history it needs.`} Tier tested ${c.tier.tested_on}.`} />
+                : <Kpi label="First-overdraft forecast" value="Not yet" size="md" note={t?.scorable ? "They were overdrawn before; the forecast is tested on customers never overdrawn." : "Needs 12+ months of history."} />}
         </div>
         <div className="card ours">
           <Kpi tip={GLOSSARY.trough} label="Liquidity trough (lowest ÷ average, 6 mo)" value={t ? pct(t.ltr) : "–"}
-            note={t?.pct_rank != null ? `Riskier than ${pct(1 - t.pct_rank)} of customers${t.haircut != null ? ` · a ${pct(t.haircut)} haircut at the low point` : ""}` : "Needs 12+ months of history"} />
+            note={t?.pct_rank != null ? `Riskier than ${pct(1 - t.pct_rank)} of customers${t.haircut != null ? ` · a ${pct(t.haircut)} haircut at the low point` : ""}` : `Not ranked yet: ${t?.n_months ?? 0} of the 12 months needed to compare fairly`} />
         </div>
         <div className="card"><Kpi swatch="std" tip={GLOSSARY.standard} label="Standard runway (no shock)" value={c.standard_runway.label} size="md" note="Judges' formula, medians" /></div>
         <div className="card"><Kpi swatch="ours" tip={GLOSSARY.realistic} label="Realistic runway (no shock)" value={c.realistic_runway.label} size="md" note="Last 12 months, dip-aware" /></div>
