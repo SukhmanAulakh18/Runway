@@ -31,6 +31,24 @@ export default function Evidence() {
         <div className="card"><Kpi label="Ever-overdrawn borrowers who defaulted" value={`${L.overdrawn_and_defaulted} of ${L.overdrawn_borrowers}`} note={`${L.pre_loan_overdrawn} of ${L.pre_loan_overdrawn} lent to while already overdrawn defaulted (p = ${L.fisher_p.toExponential(1)})`} /></div>
       </section>
 
+      {e.monitoring && (
+        <section className="card">
+          <div className="card-head">
+            <div>
+              <h2>Model health: {e.monitoring.breaches.length === 0 ? "no breaches" : `${e.monitoring.breaches.length} breach${e.monitoring.breaches.length > 1 ? "es" : ""}, re-validate`}</h2>
+              <p className="sub">What a deployed model reports each period: input drift, accuracy and data quality against stated thresholds. {e.monitoring.note}</p>
+            </div>
+          </div>
+          <table className="tbl"><thead><tr><th>Monitor</th><th className="num">Value</th><th>Threshold</th><th>Status</th></tr></thead>
+            <tbody>{(e.monitoring.rows as { metric: string; value: number; threshold: string; status: string }[]).map((r) => (
+              <tr key={r.metric}><td>{r.metric}</td>
+                <td className="num">{r.metric.startsWith("Data quality: money") ? pct(r.value, 1) : r.metric.startsWith("Data quality") ? String(r.value) : r.value.toFixed(3)}</td>
+                <td className="muted">{r.threshold}</td>
+                <td>{r.status === "ok" ? <span className="chip good">OK</span> : r.status === "watch" ? <span className="chip amber">Watch</span> : <span className="chip warn">Breach</span>}</td></tr>))}</tbody></table>
+          <p className="sub" style={{ marginTop: 8 }}>Model documentation in the OSFI E-23 format: docs/MODEL_CARD.md. Every pull request is checked by CI.</p>
+        </section>
+      )}
+
       <section className="grid g2">
         <div className="card">
           <h2>The riskiest 10% are {Math.min(...rr).toFixed(0)}–{Math.max(...rr).toFixed(0)}× likelier to have a first overdraft, every year</h2>
@@ -51,7 +69,7 @@ export default function Evidence() {
           <div className="card">
             <h2>After a low month, {pct(Math.min(...steer.map((r) => r.share_accounts_positive)))} of customers steer back faster than chance</h2>
             <p className="sub" style={{ marginBottom: 8 }}>How much more often money in beats money out the month after a low than after a normal month (percentage points). Real months vs the same months in random order: customers aren't a random walk.</p>
-            <PairBars data={steerBars} a={{ key: "a", name: "Real customers" }} b={{ key: "b", name: "Same months, random order" }} fmt={(v) => `+${Math.round(v * 100)} pts`} />
+            <PairBars data={steerBars} a={{ key: "a", name: "Real customers" }} b={{ key: "b", name: "Same months, random order" }} fmt={(v) => (Math.round(v * 100) === 0 ? "0" : `+${Math.round(v * 100)} pts`)} />
             <Legend items={[{ label: "Real customers", kind: "ours" }, { label: "Same months, random order", kind: "soft" }]} />
           </div>
           <div className="card">
@@ -62,17 +80,32 @@ export default function Evidence() {
         </section>
       )}
 
+      {e.loan_policy && (() => {
+        const lp = e.loan_policy, rows = [["All defaults (finished unpaid + running in debt)", lp.all_defaults], ["Finished unpaid only (the clean outcome)", lp.finished_unpaid]] as const;
+        return (
+          <section className="card">
+            <h2>A credit check that uses the finding: held loans default {(lp.all_defaults.default_rate_held / lp.all_defaults.default_rate_not_held).toFixed(1)}× as often</h2>
+            <p className="sub" style={{ marginBottom: 8 }}>{lp.rule}. {lp.loans} loans; {lp.scorable_by_trough} had 12+ months to score. {lp.note}</p>
+            <table className="tbl"><thead><tr><th>Outcome</th><th className="num">Held for review</th><th className="num">Defaults caught</th><th className="num">Default rate: held vs not</th><th className="num">Good loans held</th><th className="num">p</th></tr></thead>
+              <tbody>{rows.map(([name, r]) => (
+                <tr key={name}><td>{name}</td><td className="num">{r.held} ({pct(r.held_share)})</td><td className="num">{r.caught} of {r.events}</td>
+                  <td className="num">{pct(r.default_rate_held)} vs {pct(r.default_rate_not_held, 1)}</td><td className="num">{r.good_loans_held}</td>
+                  <td className="num">{r.fisher_p < 0.001 ? "< 0.001" : r.fisher_p.toFixed(3)}</td></tr>))}</tbody></table>
+          </section>
+        );
+      })()}
+
       {e.segment && (
         <section className="card">
           <h2>Who the riskiest 10% are: every trait we checked, including the ones that don't matter</h2>
           <p className="sub" style={{ marginBottom: 8 }}>{e.segment.riskiest_10_n} flagged vs {e.segment.everyone_else_n} others (Dec 2024 data). Medians for amounts, shares for yes/no. Multiple-testing corrected.</p>
-          <table className="tbl"><thead><tr><th>Trait</th><th className="num">Riskiest 10%</th><th className="num">Everyone else</th><th>Different?</th></tr></thead>
-            <tbody>{(e.segment.rows as { trait: string; kind: string; riskiest_10: number; everyone_else: number; differs: boolean }[]).map((r) => {
+          <table className="tbl"><thead><tr><th>Trait</th><th className="num">Riskiest 10%</th><th className="num">Everyone else</th><th>Difference</th></tr></thead>
+            <tbody>{(e.segment.rows as { trait: string; kind: string; riskiest_10: number; everyone_else: number; differs: boolean; effect?: string }[]).map((r) => {
               // explicit per-trait formats ("average" contains "age", "urban share" is already a percent)
               const f = (v: number) => r.kind === "bin" || r.trait === "share of money in that is cash" ? pct(v, 1)
                 : r.trait === "owner age" ? `${v.toFixed(0)} yrs` : r.trait === "district urban share" ? `${v.toFixed(1)}%` : money(v);
               return <tr key={r.trait}><td>{r.trait}</td><td className="num">{f(r.riskiest_10)}</td><td className="num">{f(r.everyone_else)}</td>
-                <td>{r.differs ? <span className="chip ours">Yes</span> : <span className="chip">No difference</span>}</td></tr>;
+                <td>{r.effect === "big" ? <span className="chip ours">Big difference</span> : r.effect === "small" ? <span className="chip">Small (real but minor)</span> : <span className="chip">No difference</span>}</td></tr>;
             })}</tbody></table>
         </section>
       )}

@@ -94,3 +94,21 @@ def test_repeat_uses_no_future_rates():
     acct = int(m[(m.month.between("2024-01", "2024-12")) & (m.days_below_zero > 0)].account_id.iloc[0])
     past = client.get(f"/api/customer/{acct}", params={"asof": "2024-12"}).json()["repeat"]
     assert past is not None and past["tested_on"] == "2023 -> 2024"
+
+
+def test_future_loans_hidden_in_time_machine():
+    """A loan granted in 2025 must not appear in the Dec 2024 view (it was unknown to the bank then)."""
+    assert client.get("/api/customer/55447", params={"asof": "2024-12"}).json()["loan"] is None   # loan starts 2025-04-02
+    assert client.get("/api/customer/55447").json()["loan"]["amount"] > 0
+
+
+def test_loan_check_on_customer():
+    lc = client.get("/api/customer/93172", params={"asof": "2024-12"}).json()["loan_check"]
+    assert lc["hold"] and lc["data_up_to"] == "2024-11"
+
+
+def test_watchlist_is_a_call_list():
+    w = client.get("/api/watchlist", params={"asof": "2024-12"}).json()
+    row = next(r for r in w["rows"] if r["account_id"] == 93172)
+    assert row["cause"] == "Money in is falling" and row["action"] == "Call this week"
+    assert sum(w["calls"].values()) == len(w["rows"])

@@ -12,6 +12,7 @@ export default function Overview({ nav }: { nav: Nav }) {
   const im = ev.data?.impact?.["2024-12"];
   const y25 = ev.data?.trough?.by_year?.find((r: { predicted_year: number }) => r.predicted_year === 2025);
   const at6 = pc.data?.find((p) => p.month === 6);
+  const lp = ev.data?.loan_policy;
   type Trait = { trait: string; riskiest_10: number; everyone_else: number };
   const seg = ev.data?.segment ? Object.fromEntries((ev.data.segment.rows as Trait[]).map((r) => [r.trait, r])) as Record<string, Trait> : null;
 
@@ -51,8 +52,9 @@ export default function Overview({ nav }: { nav: Nav }) {
         <div className="card">
           <div className="card-head">
             <div>
-              <h2>Watchlist{nav.asof ? `, as the bank saw it in ${monthName(nav.asof)}` : ""}</h2>
-              <p className="sub">Never overdrawn yet, ranked by how close their balance gets to $0. Click a row to open the customer.</p>
+              <h2>Advisor call list{nav.asof ? `, as the bank saw it in ${monthName(nav.asof)}` : ""}</h2>
+              <p className="sub">Never overdrawn yet, ranked by how close their balance gets to $0. Each row has its own cause and next step. Click to open.</p>
+              {wl.data?.calls && <div className="chips" style={{ marginTop: 8 }}>{Object.entries(wl.data.calls).map(([a, n]) => <span key={a} className="chip ours"><b>{n}</b>&nbsp;· {a}</span>)}</div>}
             </div>
             {wl.data?.reveal && <span className="badge bad">{wl.data.reveal.top_hit} of {wl.data.rows.length} overdrawn next year</span>}
           </div>
@@ -68,7 +70,7 @@ export default function Overview({ nav }: { nav: Nav }) {
               <table className="tbl">
                 <thead><tr>
                   <th>Account</th><th>Lowest vs average (6 mo)</th><th className="num" title="Percentile rank: 1.6% = in the riskiest 1.6% of customers">Top %</th>
-                  <th className="num">Lowest</th><th>Why</th>{nav.asof && <th>Next 12 months</th>}
+                  <th className="num">Lowest</th><th>Cause → next step</th>{nav.asof && <th>Next 12 months</th>}
                 </tr></thead>
                 <tbody>
                   {wl.data.rows.map((r) => (
@@ -78,7 +80,7 @@ export default function Overview({ nav }: { nav: Nav }) {
                         <span style={{ width: 40 }}>{pct(r.ltr)}</span></div></td>
                       <td className="num">{r.ltr_pct_rank != null ? pct(r.ltr_pct_rank, 1) : "–"}</td>
                       <td className="num">{money(r.min_balance)}</td>
-                      <td><div className="chips">{r.reasons.split("; ").filter(Boolean).slice(0, 1).map((x) => <span key={x} className="chip" title={r.reasons}>{x}</span>)}</div></td>
+                      <td>{r.cause ? <span title={r.reasons}>{r.cause} → <b>{r.action}</b></span> : <span className="muted">{r.reasons.split("; ")[0]}</span>}</td>
                       {nav.asof && <td>{r.overdraft_next_12m ? <span className="badge bad">Overdrawn</span> : <span className="muted">Stayed above $0</span>}</td>}
                     </tr>
                   ))}
@@ -97,7 +99,15 @@ export default function Overview({ nav }: { nav: Nav }) {
             <Legend items={[{ label: "Realistic", kind: "ours" }, { label: "Standard formula", kind: "std" }]} />
           </div>
           <div className="card">
-            <h2>Why it matters to a lender</h2>
+            <h2>{lp ? `Check the trough before lending: held loans defaulted ${pct(lp.all_defaults.default_rate_held)} vs ${pct(lp.all_defaults.default_rate_not_held, 1)}` : "Why it matters to a lender"}</h2>
+            {lp && (
+              <p style={{ margin: "8px 0 0" }}>
+                A review rule at loan approval (already overdrawn, or riskiest 10% by trough; data before the loan only, nothing fit on
+                loan outcomes) holds <b>{pct(lp.all_defaults.held_share)}</b> of loans and catches <b>{lp.all_defaults.caught} of {lp.all_defaults.events}</b> defaults.
+                Counting only loans that finished unpaid: {lp.finished_unpaid.caught} of {lp.finished_unpaid.events}, {pct(lp.finished_unpaid.default_rate_held)} vs {pct(lp.finished_unpaid.default_rate_not_held, 1)}.
+                It also holds {lp.all_defaults.good_loans_held} good loans: review means talk first, not reject.
+              </p>
+            )}
             {ev.data && (
               <p style={{ margin: "8px 0 0" }}>
                 <b>{ev.data.loans.overdrawn_and_defaulted} of {ev.data.loans.overdrawn_borrowers}</b> borrowers who were ever overdrawn defaulted;

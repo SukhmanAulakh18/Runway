@@ -84,6 +84,8 @@ def main(n_boot=1000, seed=0):
     ev["impact"] = {asof: impact(d, asof) for asof in ("2023-12", "2024-12")}
     ev["self_correction"] = self_correction(d)
     ev["segment"] = segment_profile(d)
+    ev["loan_policy"] = loan_policy(d)
+    ev["monitoring"] = monitoring(d, ev)
     ev["repeat_overdraft"] = {str(y): E.repeat_rates(d["monthly"], y) for y in (2024, 2025)}
     ev["diagnoses"] = diagnoses(d)
     ev["multiple_testing_extended"] = multiple_testing_extended(ev)
@@ -332,10 +334,97 @@ def segment_profile(d, q=0.10):
                          "test": "Fisher exact (shares shown)",
                          "p": float(fisher_exact([[a.sum(), (~a).sum()], [b.sum(), (~b).sum()]])[1])})
     reject, p_bh, _, _ = multipletests([r["p"] for r in rows], alpha=q, method="fdr_bh")
-    for r, rej, pa in zip(rows, reject, p_bh): r["p_bh"] = float(pa); r["differs"] = bool(rej)
+    for r, rej, pa in zip(rows, reject, p_bh):
+        r["p_bh"] = float(pa); r["differs"] = bool(rej)
+        a, b = r["riskiest_10"], r["everyone_else"]
+        ratio = max(a, b) / max(min(a, b), 1e-9)
+        large = ratio >= 1.25 if r["kind"] == "num" else (ratio >= 1.5 and abs(a - b) >= 0.05)
+        r["effect"] = "big" if (rej and large) else ("small" if rej else "none")   # significant != meaningful at n = 3,417
     return {"population": "2025 cohort: complete 2024+2025, never overdrawn before 2025; traits from data up to Dec 2024",
+            "effect_rule": "big = significant and practically large (amounts >= 25% apart; yes/no shares >= 1.5x and >= 5 points apart)",
             "riskiest_10_n": int(flag.sum()), "everyone_else_n": int((~flag).sum()), "rows": rows,
             "note": "Descriptive, not causal. Own BH family (q = 0.10): these describe the flagged group rather than test a prediction."}
+
+
+def loan_policy(d):
+    """Backtest of a review rule at loan approval (engine.loan_check) over every loan. Nothing is fit on loan outcomes.
+    Reported for all defaults (B + D) and for the clean outcome (B: finished, not repaid), since D is partly overdraft-defined.
+    Dollar figures are money LENT to customers who later defaulted, not losses (recoveries aren't in the data)."""
+    from scipy.stats import fisher_exact
+    L = d["loans"].copy()
+    L["prev"] = (L.loan_start.dt.to_period("M") - 1).astype(str)
+    tables = {p: E.ltr_table(d, asof=p) for p in sorted(L.prev.unique())}
+    chk = [E.loan_check(int(a), d, tables[p]) for a, p in zip(L.account_id, L.prev)]
+    L["hold"] = [c["hold"] for c in chk]; L["scorable"] = [c["scorable"] for c in chk]
+    L["over"] = [c["overdrawn_before"] for c in chk]
+    def summary(y, flag):
+        a, b = int((flag & (y == 1)).sum()), int(flag.sum()); c, n0 = int((~flag & (y == 1)).sum()), int((~flag).sum())
+        return {"held": b, "held_share": b / len(L), "events": int(y.sum()), "caught": a, "caught_share": a / max(int(y.sum()), 1),
+                "lent_to_caught_defaulters": float(L.amount[flag & (y == 1)].sum()), "lent_to_all_defaulters": float(L.amount[y == 1].sum()),
+                "good_loans_held": int((flag & (y == 0)).sum()), "good_loans_held_amount": float(L.amount[flag & (y == 0)].sum()),
+                "default_rate_held": a / max(b, 1), "default_rate_not_held": c / max(n0, 1),
+                "fisher_p": float(fisher_exact([[a, b - a], [c, n0 - c]])[1])}
+    y_all, y_b = L.defaulted.astype(int), (L.status == "B").astype(int)
+    return {"rule": "hold for review if, on data before the loan month, the applicant was ever overdrawn or is in the riskiest "
+                    "10% of all customers by trough (12+ months to score)",
+            "loans": int(len(L)), "scorable_by_trough": int(L.scorable.sum()),
+            "all_defaults": summary(y_all, L.hold), "finished_unpaid": summary(y_b, L.hold),
+            "overdrawn_before_only": summary(y_all, L.over),
+            "by_year": [{"year": int(yr), "loans": int(len(g)), "held": int(g.hold.sum()), "defaults": int(g.defaulted.sum()),
+                         "caught": int((g.hold & (g.defaulted == 1)).sum())} for yr, g in L.groupby(L.loan_start.dt.year)],
+            "note": "Review means talk first (smaller loan, cushion, alert), not reject. Dollars are amounts lent, not losses."}
+
+
+# Breach thresholds for ongoing monitoring (OSFI E-23, Principle 3.6, asks institutions to define them; it sets no numbers).
+# PSI bands are the common industry convention; AUC and calibration floors are this team's choices, stated up front.
+PSI_WATCH, PSI_BREACH = 0.10, 0.25
+AUC_FLOOR = 0.75
+CALIBRATION_BAND = (0.67, 1.5)     # predicted / observed overdraft rate
+
+
+def _psi(expected, actual, bins=10):
+    """Population Stability Index of a score: decile bins from the expected (earlier) distribution."""
+    edges = np.unique(np.quantile(expected, np.linspace(0, 1, bins + 1)))
+    edges[0], edges[-1] = -np.inf, np.inf
+    e = np.histogram(expected, edges)[0] / len(expected); a = np.histogram(actual, edges)[0] / len(actual)
+    e, a = np.clip(e, 1e-6, None), np.clip(a, 1e-6, None)
+    return float(np.sum((a - e) * np.log(a / e)))
+
+
+def monitoring(d, ev):
+    """Model health, as a deployed model would report it each period: input drift, performance vs breach thresholds,
+    data quality. Any breach = review trigger (E-23 3.6)."""
+    m = d["monthly"]
+    t23, t24 = E.ltr_table(d, asof="2023-12"), E.ltr_table(d, asof="2024-12")
+    psi = _psi(t23[t23.scorable].ltr.clip(-1, 1).to_numpy(), t24[t24.scorable].ltr.clip(-1, 1).to_numpy())
+    psi_money_in = _psi(m[m.month.between("2023-01", "2023-12")].money_in.to_numpy(), m[m.month.between("2024-01", "2024-12")].money_in.to_numpy())
+    cal = ev["sim_calibration"]["validate"]; ratio = cal["calibrated_mean"] / max(cal["observed_rate"], 1e-9)
+    parts_in = m[["cash_deposits", "transfers_in", "pension_in", "interest_in"]].sum(axis=1)
+    parts_out = m[["household_bills", "insurance", "loan_payments", "bank_fees", "cash_withdrawals_genuine", "card_withdrawals", "transfers_out_other"]].sum(axis=1)
+    checks = {
+        "money_in_parts_add_up": float(((parts_in - m.money_in).abs() <= 1).mean()),
+        "money_out_parts_add_up": float(((parts_out - m.money_out).abs() <= 1).mean()),
+        "missing_values": int(m.isna().sum().sum()),
+        "negative_flows": int((m[["money_in", "money_out"]] < 0).sum().sum()),
+    }
+    def status(breach, watch=False): return "breach" if breach else ("watch" if watch else "ok")
+    rows = [{"metric": "Trough score drift (PSI, Dec 2023 vs Dec 2024)", "value": psi, "status": status(psi > PSI_BREACH, psi > PSI_WATCH),
+             "threshold": f"watch > {PSI_WATCH}, breach > {PSI_BREACH} (industry convention)"},
+            {"metric": "Money in drift (PSI, 2023 vs 2024 months)", "value": psi_money_in, "status": status(psi_money_in > PSI_BREACH, psi_money_in > PSI_WATCH),
+             "threshold": f"watch > {PSI_WATCH}, breach > {PSI_BREACH} (industry convention)"}]
+    for r in ev["trough"]["by_year"]:
+        rows.append({"metric": f"Early warning AUC, predicting {r['predicted_year']}", "value": r["auc"], "status": status(r["auc"] < AUC_FLOOR),
+                     "threshold": f"breach < {AUC_FLOOR}"})
+    rows.append({"metric": "Risk forecast calibration, 2025 (predicted / actual)", "value": ratio,
+                 "status": status(not (CALIBRATION_BAND[0] <= ratio <= CALIBRATION_BAND[1])), "threshold": f"breach outside {CALIBRATION_BAND[0]}-{CALIBRATION_BAND[1]}"})
+    rows.append({"metric": "Data quality: money in/out parts add up", "value": min(checks["money_in_parts_add_up"], checks["money_out_parts_add_up"]),
+                 "status": status(min(checks["money_in_parts_add_up"], checks["money_out_parts_add_up"]) < 0.999), "threshold": "breach < 99.9% of rows"})
+    rows.append({"metric": "Data quality: missing or negative values", "value": checks["missing_values"] + checks["negative_flows"],
+                 "status": status(checks["missing_values"] + checks["negative_flows"] > 0), "threshold": "breach > 0"})
+    return {"rows": rows, "checks": checks, "breaches": [r["metric"] for r in rows if r["status"] == "breach"],
+            "watch": [r["metric"] for r in rows if r["status"] == "watch"],
+            "note": "OSFI E-23 (effective May 1, 2027) asks for monitoring with defined breach thresholds; it sets no numbers. "
+                    "These thresholds are stated choices; a breach triggers re-validation."}
 
 
 def multiple_testing_extended(ev, q=0.10):

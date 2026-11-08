@@ -22,7 +22,7 @@ Runway is an engine plus an advisor dashboard (React, FastAPI, Python; Streamlit
    sized from their own numbers: already overdrawn → a recovery plan; **money in falling → call first** (income check, EI,
    payment holiday); a heavy new loan → a loan review (payment date or a longer term); big swings → auto-save good months;
    and always a **cushion sized to their own dip** (overdraft protection or an auto-transfer) with a personal alert.
-4. **Make a plan:** that first action, the cushion, the smallest monthly cuts that avoid overdraft (a linear program), and
+4. **Make a plan (no-risk steps first):** that first action, then an alert at the customer's own danger level and an automatic transfer from savings (a small overdraft limit only after a call, because every overdrawn borrower here defaulted), the smallest monthly cuts that avoid overdraft (a linear program), and
    backup actions ranked by months gained.
 5. **A verdict for every twist:** "Yes / No / Only on paper / Fragile", the biggest reason in months (each realistic
    choice flipped back to the standard assumption), and the simulated range of when money runs out. "Fragile" catches
@@ -55,7 +55,12 @@ Runway is an engine plus an advisor dashboard (React, FastAPI, Python; Streamlit
    past spending: **186** customers at Dec 2024. Our demo customer 93172 got a **$166,958** loan the same month her
    balance hit $238; counting its **$4,638/month** payment drops her realistic runway from **26.7 to 2.4 months**.
 7. **Why a lender cares:** every one of the **76** borrowers who was ever overdrawn defaulted; **27** loans
-   ($3.48M) went to customers already overdrawn, and all 27 defaulted.
+   ($3.48M) went to customers already overdrawn, and all 27 defaulted. **A credit check that uses the finding:** hold a
+   loan for review if, on data before the loan month, the applicant was already overdrawn or is in the riskiest 10% by
+   trough (nothing fit on loan outcomes). It holds **17%** of the 682 loans and catches **41 of 76** defaults; held loans
+   defaulted **34.7% vs 6.2%**. On the clean outcome (finished unpaid) it is **12 of 31, 10.2% vs 3.4%** (p = 0.003). It
+   also holds 77 good loans, so "review" means talk first, not reject. 93172's $167K loan would have been held (riskiest
+   1.7% on November 2024 data). Dollar figures are amounts lent, not losses: recoveries aren't in the data.
 8. **Where the standard formula misleads:** it pays EI forever (39% "last a year" vs 22% if EI stops at 6 months),
    cuts pensions in a layoff (740 pensioners), ignores the EI cap (57% of customers), and its medians call 1,181
    customers deficit-spenders when 97.5% of them actually end up with more money.

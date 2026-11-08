@@ -39,10 +39,11 @@ export default function Plan({ nav }: { nav: Nav }) {
         <div className="card hero">
           <p className="eyebrow" style={{ color: "#ffe7d6" }}>{p.diagnosis && p.diagnosis.primary.code !== "dip" ? "Then: cover the dip" : "Goal plan · do this now"}</p>
           <div className="grid g3" style={{ marginTop: 12 }}>
-            <Kpi label="Cushion: overdraft protection or auto-transfer" value={money(cu.buffer)} note="Sized to their own typical in-month dip" />
-            <Kpi label="Alert them" value="Before it's needed" size="md" note={`When the balance falls below ${money(cu.alert_level)}: their danger level, not a generic $100`} />
+            <Kpi label="1 · Alert them (free, no risk)" value={money(cu.alert_level)} note="When the balance falls below this: their own danger level, not a generic $100" />
+            <Kpi label="2 · Auto-transfer from savings" value={money(cu.buffer)} note="Sized to their typical in-month dip. A small overdraft limit only after a call." />
             <Kpi label="Move to chequing now" value={cu.top_up_now > 0 ? money(cu.top_up_now) : "Nothing"} size={cu.top_up_now > 0 ? undefined : "md"} note={`Balance ${money(cu.last_balance)} at ${monthName(cu.as_of)}`} />
           </div>
+          {p.limit_cost && <p style={{ margin: "14px 0 0" }}>Cost to the customer: the alert <b>$0</b>, the auto-transfer from savings <b>$0</b>. A {money(p.limit_cost.amount)} limit used for a whole month at Tangerine's published terms ($5 a month used + 19% a year) would cost about <b>{money(p.limit_cost.total)}</b>, which is why it comes last.</p>}
           {cu.dip_day_reliable && cu.dip_day && <p style={{ margin: "14px 0 0" }}>Their balance usually bottoms out around <b>day {cu.dip_day}</b> of the month ({pct(cu.dip_day_share)} of months): time the alert for then.</p>}
         </div>
         <div className="card">

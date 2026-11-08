@@ -1,0 +1,40 @@
+# Checks every pull request and every push to main.
+# The bank data is never committed, so data tests skip here (with a reason) and run locally before every merge:
+#   pytest -q && pytest -q -m ui && pytest -q -m slow
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Compile every module
+        run: python -m compileall -q engine.py evidence.py ai.py api.py app.py ui
+      - name: Tests (data-free ones run; data tests skip with a reason)
+        run: pytest -q -rs
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Type-check and build the dashboard
+        run: npm run build

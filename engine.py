@@ -579,10 +579,29 @@ def diagnose(acct: int, d: dict, cushion_res: dict | None = None) -> dict | None
                     "numbers": {"net_sd": s["net_sd"], "auto_save": save, "buffer": c["buffer"]}})
     out.append({"code": "dip", "title": "Dips close to $0 inside the month",
                 "why": f"The balance typically falls ${c['buffer']:,.0f} below its average within a month.",
-                "action": f"Cushion: overdraft protection or an auto-transfer of ${c['buffer']:,.0f}, and an alert when the balance "
-                          f"drops below ${c['alert_level']:,.0f}." + (f" Move ${c['top_up_now']:,.0f} to chequing now." if c["top_up_now"] > 0 else ""),
+                "action": f"No-risk steps first: an alert when the balance drops below ${c['alert_level']:,.0f}, then an automatic "
+                          f"transfer of ${c['buffer']:,.0f} from savings. A small overdraft limit only after a call."
+                          + (f" Move ${c['top_up_now']:,.0f} to chequing now." if c["top_up_now"] > 0 else ""),
                 "numbers": {"buffer": c["buffer"], "alert_level": c["alert_level"], "top_up_now": c["top_up_now"]}})
+    for g in out:   # a few words for the advisor call list
+        g["short"] = SHORT_ACTION[g["code"]]
     return {"primary": out[0], "all": out, "signals": s}
+
+
+SHORT_ACTION = {"repeat": "Recovery plan", "income_drop": "Call this week", "new_loan": "Loan review",
+                "swing": "Auto-save good months", "dip": "Alert + auto-transfer"}
+
+# Tangerine's published overdraft protection terms (tangerine.ca fee schedule and FAQ, checked Nov 2026):
+# $5 per use, charged at most once a month, plus 19% a year on the overdrawn balance. Customers must apply for it.
+TANGERINE_OD_FEE, TANGERINE_OD_RATE = 5.0, 0.19
+NSF_FEE_CAP = 10.0   # federal cap on a non-sufficient-funds fee, personal accounts, since March 12, 2026
+
+
+def overdraft_cost(amount: float, months: float = 1.0) -> dict:
+    """What it would cost the customer to use a limit of `amount` fully for `months`, at Tangerine's terms."""
+    fee = TANGERINE_OD_FEE * np.ceil(months)
+    interest = amount * TANGERINE_OD_RATE * months / 12
+    return {"fee": float(fee), "interest": float(interest), "total": float(fee + interest), "months": months, "amount": float(amount)}
 
 
 def committed_outflows(acct: int, orders: pd.DataFrame | None) -> dict | None:
@@ -830,6 +849,29 @@ def what_happened_next(acct: int, d: dict, asof: str, months: int = 12) -> pd.Da
 # 27 loans went to accounts already overdrawn: all 27 defaulted (Fisher p = 1.6e-28) vs 49/655 others.
 # Among 588 borrowers never overdrawn before the loan, the pre-loan trough predicts default (AUC 0.775).
 # ---------------------------------------------------------------------------
+LOAN_REVIEW_TROUGH = 0.10   # same "riskiest 10%" cutoff as the watchlist: nothing is fit on loan outcomes
+
+
+def loan_check(acct: int, d: dict, table: pd.DataFrame | None = None) -> dict | None:
+    """Would a review rule at loan approval have held this customer's loan? Uses only months before the loan month:
+    hold if ever overdrawn, or in the riskiest 10% of all customers by liquidity trough (12+ months to score).
+    Backtest over all 682 loans: evidence.json -> loan_policy."""
+    L = d["loans"][d["loans"].account_id == acct]
+    if L.empty:
+        return None
+    l = L.iloc[0]
+    prev = (l.loan_start.to_period("M") - 1).strftime("%Y-%m")
+    t = ltr_table(d, asof=prev) if table is None else table
+    pre = d["monthly"][(d["monthly"].account_id == acct) & (d["monthly"].month <= prev)]
+    over = bool((pre.days_below_zero > 0).any())
+    scorable = bool(acct in t.index and t.loc[acct].scorable)
+    rank = float(t.loc[acct].ltr_pct_rank) if scorable else None
+    top = bool(scorable and rank <= LOAN_REVIEW_TROUGH)
+    reasons = (["already overdrawn before the loan"] if over else []) + ([f"in the riskiest {rank:.1%} of customers by trough"] if top else [])
+    return {"loan_start": l.loan_start.strftime("%Y-%m-%d"), "amount": float(l.amount), "data_up_to": prev,
+            "hold": over or top, "reasons": reasons, "overdrawn_before": over, "trough_rank": rank, "scorable": scorable}
+
+
 def loan_risk(acct: int, d: dict) -> dict | None:
     """Credit view for one account: the loan, and what the account looked like before it was granted."""
     L = d["loans"]

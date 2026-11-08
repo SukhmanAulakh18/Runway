@@ -208,8 +208,8 @@ def _sanitize(s: dict) -> dict:
 # ---------------------------------------------------------------- plan writer
 _PLAN_PROMPT = """Write a short, warm plan (4-6 sentences, plain English, second person "you") for a bank
 customer, using ONLY the numbers in the facts below. Do not invent, round differently or calculate new
-numbers. Start with the cushion: the buffer to keep (overdraft protection or an automatic transfer) and the
-balance at which they get an alert. Then the shock result, the first milestone they haven't reached, and the
+numbers. Start with the no-risk steps: an alert when the balance drops below the alert level, then an automatic
+transfer from savings of the buffer amount; a small overdraft limit is offered only after a conversation. Then the shock result, the first milestone they haven't reached, and the
 single most useful backup action. "futures_lasting_6_months_of_10" is a count of simulated futures: say
 "N of 10 simulated futures", never "chance" or "%". Only overdraft_risk_pct may be called a chance, written as
 "a X% chance of a first overdraft in the next 12 months". Write dollar amounts with $ and commas ($6,527).
@@ -277,8 +277,8 @@ def template_plan(f: dict) -> str:
     s = []
     cu = f.get("cushion")
     if cu:
-        s.append(f"To stay out of overdraft, keep a buffer of ${cu['buffer']:,.0f}: overdraft protection or an automatic "
-                 f"transfer for that amount, with an alert when your balance drops below ${cu['alert_level']:,.0f}.")
+        s.append(f"To stay out of overdraft, set an alert for when your balance drops below ${cu['alert_level']:,.0f}, and keep "
+                 f"${cu['buffer']:,.0f} within reach: an automatic transfer from savings first, or a small overdraft limit after a conversation.")
         if cu.get("top_up_now"):
             s.append(f"Move ${cu['top_up_now']:,.0f} into chequing now to be covered this month.")
         if cu.get("dip_day"):
@@ -340,24 +340,25 @@ _BRIEF_PROMPT = """You brief a bank advisor before they contact a customer. Writ
    riskiest_pct_of_customers and overdraft_risk_pct if present; overdraft_risk_pct is "a X% chance of a first overdraft in
    the next 12 months");
 3) what to do first: if first_action is present, say first_action.action (because of first_action.why); if first_action is
-   not the cushion, then also offer the cushion (overdraft protection or an automatic transfer) of cushion.amount. If there is
+   not the cushion, then also set an alert and offer an automatic transfer from savings of cushion.amount (a small overdraft limit only after the call). If there is
    no first_action, offer the cushion, plus moving cushion.move_now now if it is above 0. If new_loan_payment_per_month is
-   present, mention that a new loan now costs that much a month.
+   present, say it in its own sentence ("A new loan now costs $X a month.") and do not link it to the cushion with
+   "since" or "because".
 Use ONLY numbers that appear in the facts. Dollars with $ and commas. Never mention field names. No headings or bullets.
 FACTS (JSON):
 {facts}"""
 
 _MESSAGE_PROMPT = {
     "en": """Write a short, warm message (3 sentences, second person "you") that a bank advisor could send to this customer.
-Say their balance has been dipping close to $0 during the month (lowest_balance_6_months), offer to set up a cushion of
-cushion.amount (overdraft protection or an automatic transfer) and an alert before the balance gets that low, and invite them
+Say their balance has been dipping close to $0 during the month (lowest_balance_6_months), offer to set up an alert before
+the balance gets that low and an automatic transfer from their savings of cushion.amount, and invite them
 to reply. Do not mention risk, chance, percentages, simulations or runways. Use ONLY numbers in the facts, dollars with $ and
 commas. Never mention field names. No subject line, no signature.
 FACTS (JSON):
 {facts}""",
     "fr": """Rédige un message court et chaleureux (3 phrases, vouvoiement) qu'un conseiller bancaire pourrait envoyer à ce client.
-Dis que son solde descend près de 0 $ pendant le mois (lowest_balance_6_months), propose de mettre en place un coussin de
-cushion.amount (protection de découvert ou virement automatique) et une alerte avant que le solde descende aussi bas, et
+Dis que son solde descend près de 0 $ pendant le mois (lowest_balance_6_months), propose de mettre en place une alerte
+avant que le solde descende aussi bas et un virement automatique de cushion.amount depuis son épargne, et
 invite-le à répondre. Ne parle pas de risque, de probabilité, de pourcentages, de simulations ni de « runway ».
 Utilise UNIQUEMENT les nombres des faits; écris les montants sans séparateur de milliers, ainsi : 6527 $.
 Ne mentionne jamais les noms des champs. Pas d'objet, pas de signature.
@@ -378,9 +379,9 @@ def template_brief(f: dict) -> str:
     fa, cu = f.get("first_action"), f["cushion"]
     if fa and not fa["is_cushion"]:
         s.append(f"First, {fa['title'].lower()}: {fa['why']} {fa['action']}")
-        s.append(f"Then offer a cushion of ${cu['amount']:,} (overdraft protection or an automatic transfer).")
+        s.append(f"Then set an alert and offer an automatic transfer of ${cu['amount']:,} from savings (a small overdraft limit only after the call).")
     else:
-        s.append(f"Offer a cushion of ${cu['amount']:,} (overdraft protection or an automatic transfer)"
+        s.append(f"Set an alert and offer an automatic transfer of ${cu['amount']:,} from savings (a small overdraft limit only after a call)"
                  + (f" and suggest moving ${cu['move_now']:,} into chequing now." if cu["move_now"] else "."))
     return " ".join(s)
 
@@ -390,14 +391,14 @@ def template_message(f: dict, lang: str = "en") -> str:
     if lang == "fr":
         s = [f"Bonjour, nous avons remarqué que votre solde descend parfois jusqu'à {low} $ en cours de mois." if low is not None
              else "Bonjour, nous avons regardé l'évolution de votre solde en cours de mois."]
-        s.append(f"Nous pouvons mettre en place un coussin de {cu['amount']} $ (protection de découvert ou virement automatique) "
-                 "et une alerte avant que votre solde ne descende aussi bas.")
+        s.append(f"Nous pouvons mettre en place une alerte avant que votre solde ne descende aussi bas, et un virement "
+                 f"automatique de {cu['amount']} $ depuis votre épargne.")
         s.append("Répondez simplement à ce message si cela vous intéresse.")
     else:
         s = [f"Hi, we noticed your balance sometimes dips as low as ${low:,} during the month." if low is not None
              else "Hi, we've been looking at how your balance moves during the month."]
-        s.append(f"We can set up a cushion of ${cu['amount']:,} (overdraft protection or an automatic transfer) "
-                 "and an alert before your balance gets that low.")
+        s.append(f"We can set up an alert before your balance gets that low, and an automatic transfer of "
+                 f"${cu['amount']:,} from your savings.")
         s.append("Just reply to this message if you'd like us to set it up.")
     return " ".join(s)
 
