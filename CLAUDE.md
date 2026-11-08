@@ -1,10 +1,10 @@
 # CLAUDE.md: Runway (Sheridan Datathon 2026, Tangerine track)
 
-Runway is a Streamlit app that, for any bank `account_id`, shows the customer's money picture, applies a shock (job loss with EI, higher bills, a one-off repair) and produces a plan. Its headline finding is the Liquidity Trough Ratio, an early warning for first overdrafts, which in this data also separate repaid from defaulted loans. Read `docs/ARCHITECTURE.md` for how it works and `docs/TASKS.md` for who owns which file.
+Runway is a React dashboard (`web/`) over a FastAPI layer (`api.py`), with a Streamlit backup (`app.py`), that, for any bank `account_id`, shows the customer's money picture, applies a shock (job loss with EI, higher bills, a one-off repair) and produces a plan. Its headline finding is the Liquidity Trough Ratio, an early warning for first overdrafts, which in this data also separate repaid from defaulted loans. Read `docs/ARCHITECTURE.md` for how it works and `docs/TASKS.md` for who owns which file.
 
 ## Start here
 
-Before any task, read `docs/HANDOFF.md` (verified numbers, decisions, open bugs with owners) and `docs/CTO_REVIEW.md` (what's strong, what's wrong, what to do next). Frontend work: `docs/FRONTEND.md` and `docs/REACT_PLAN.md`. There is no API in the repo yet; it gets added later, with no maths in it either.
+Before any task, read `docs/SPEC.md` (the single source of truth: problem, definitions, proven results, screens, status), then `docs/HANDOFF.md` (verified numbers, decisions, open bugs with owners) and `docs/CTO_REVIEW.md` (what's strong, what's wrong, what to do next). The API (`api.py`) has no maths: it calls `ui/context.build_context`, the same function Streamlit uses. `docs/FRONTEND.md` and `docs/REACT_PLAN.md` are the pre-build plan (superseded by SPEC.md and the code).
 
 ## Two Claude Code sessions on this repo
 

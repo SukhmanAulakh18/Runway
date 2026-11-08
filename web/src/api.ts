@@ -26,13 +26,15 @@ export interface Customer {
   standard_runway: RunwayRes; realistic: { income: number; spending: number; spending_history: number; loan_adjust: number; loan_payments: number; dip: number; window_months: number; protected_income: number };
   realistic_runway: RunwayRes; trough: Trough | null; risk: { p_12m: number; validated_population: boolean };
   cushion: Cushion; diagnosis: Diagnosis | null; last_activity: string; history: Month[];
+  tier?: { key: string; label: string; action: string } | null;
   committed: { total: number; orders: number; by_purpose: Record<string, number> } | null;  // standing orders, today only
+  when: { group: string; within_6: number; within_12: number; within_24: number; customers: number; cohort: string } | null;
   repeat: { days_below_zero_12m: number; tier: string; rate: number; similar_accounts: number; tested_on: string; never_overdrawn_rate: number } | null;
   loan: { amount: number; monthly_payment: number; status_meaning: string; defaulted: boolean; overdrawn_before_loan: boolean; loan_start: string } | null;
   loan_check: { hold: boolean; reasons: string[]; data_up_to: string; amount: number } | null;  // review rule at approval
   what_happened_next?: { month: string; days_below_zero: number; min_balance: number }[];
 }
-export interface Sim { months: number[]; p10: number[]; p50: number[]; p90: number[]; dip: number; start: number;
+export interface Sim { months: number[]; p10: number[]; p50: number[]; p90: number[]; dip: number; start: number; ee?: number[]; pfe95?: number[];
   p_survive_6: number; p_survive_12: number; insufficient_history: boolean; n_paths: number; history_months: number }
 export interface Verdict { answer: "yes" | "no" | "paper" | "fragile"; headline: string; reason: string | null; futures: string | null;
   drivers: { driver: string; what: string; direction: number; months: number | null }[]; threshold_months: number }
@@ -52,6 +54,11 @@ export interface WatchRow { account_id: number; ltr: number; ltr_pct_rank: numbe
   realistic_runway_ei: number; answer_key_runway_ei: number; reasons: string; overdraft_next_12m?: boolean | null;
   cause?: string | null; action?: string | null; cause_code?: string | null }
 export interface Watch { asof: string | null; n_in_view: number; rows: WatchRow[]; reveal?: { top_hit: number; base_rate: number }; calls?: Record<string, number> }
+export interface BookTier { tier: "overdrawn" | "act" | "new_hot" | "watch" | "stable" | "new"; label: string; action: string; customers: number;
+  tested_rate: number | null; tested_share_of_overdrafts: number | null }
+export interface Book { asof: string | null; customers: number; tiers: BookTier[]; act_causes: Record<string, number>; tested_on: string | null;
+  summary: { focus_customers: number; focus_customer_share: number; stable_customer_share: number;
+    tested_focus_customer_share: number | null; tested_focus_overdraft_share: number | null; tested_stable_rate: number | null } }
 export interface Twist { settings: Scenario; source: string; disagree: string[]; chips: string[] }
 // evidence.json is large; screens read the fields they need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,6 +86,7 @@ export const api = {
   message: (a: number, asof: Asof, lang: "en" | "fr") =>
     call<{ text: string; source: string }>(`/api/ai/message/${a}${asof ? `?asof=${asof}&lang=${lang}` : `?lang=${lang}`}`, {}),
   watchlist: (asof: Asof) => call<Watch>(`/api/watchlist${q(asof)}`),
+  book: (asof: Asof) => call<Book>(`/api/book${q(asof)}`),
   portfolio: (scenario: Scenario) => call<{ month: number; standard: number; realistic: number }[]>("/api/portfolio", { scenario }),
   evidence: () => call<Evidence>("/api/evidence"),
 };

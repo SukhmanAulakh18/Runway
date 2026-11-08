@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, kmoney, money, monthName, pct, type Asof, type Diagnosis } from "../api";
 import type { Nav } from "../App";
 import { BalanceChart, Legend } from "../charts";
-import { Failed, GLOSSARY, Kpi, Loading } from "./ui";
+import { CountUp, Failed, GLOSSARY, Kpi, Loading } from "./ui";
 
 function Source({ s }: { s: string }) {
   return <span className={`src ${s.startsWith("AI") ? "" : "tpl"}`}>{s.startsWith("AI") ? "AI · every number checked" : "Template (AI off or unsure)"}</span>;
@@ -102,7 +102,9 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
           <h1 className="title" style={{ margin: 0 }}>Customer {c.account_id}</h1>
           {c.owner_age != null && <span className="badge muted">Owner {c.owner_age}</span>}
           {t?.bottom_10 && <span className="badge ours">Riskiest 10%</span>}
-          {!t?.scorable && <span className="badge muted">Too new to score</span>}
+          {!t?.scorable && (c.tier?.key === "new_hot"
+            ? <span className="badge ours" title={c.tier.action}>New and swinging: top 10% of new accounts</span>
+            : <span className="badge muted">Too new to score</span>)}
         </div>
       </div>
 
@@ -131,7 +133,7 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
       <section className="grid g4">
         <div className="card ink">
           {c.risk.validated_population
-            ? <Kpi tip={GLOSSARY.risk} label="Chance of a first overdraft, next 12 months" value={pct(c.risk.p_12m, 1)} note="Calibrated on 2024, checked on 2025. If nothing changes." />
+            ? <Kpi tip={GLOSSARY.risk} label="Chance of a first overdraft, next 12 months" value={<CountUp text={pct(c.risk.p_12m, 1)} />} note="Calibrated on 2024, checked on 2025. If nothing changes." />
             : c.repeat
               ? <Kpi tip="Tested out of time: among customers overdrawn this much in one year, the share overdrawn again the next year."
                   label="Overdrawn again within a year" value={pct(c.repeat.rate)}
@@ -147,6 +149,13 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
       </section>
 
       {c.diagnosis && <NextBestAction dx={c.diagnosis} nav={nav} tested={tested} />}
+
+      {c.when && (
+        <p className="callout" style={{ margin: 0 }}>
+          <b>When?</b> Among the {c.when.customers.toLocaleString()} customers in the same group ({c.when.group}), {pct(c.when.within_6, 1)} had a first overdraft within 6 months,
+          {" "}{pct(c.when.within_12, 1)} within 12 and {pct(c.when.within_24, 1)} within 24 ({c.when.cohort}; survival analysis).{c.when.group === "riskiest 10%" ? " Most of it comes early: act this week." : ""}
+        </p>
+      )}
 
       <Assistant key={`${c.account_id}-${c.asof}`} acct={c.account_id} asof={c.asof as Asof} />
 
@@ -208,8 +217,9 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
         </div>
       </section>
 
-      <section className="card">
-        <div className="card-head"><div><h2>The judges' numbers</h2><p className="sub">Exactly the Tangerine README definitions, from monthly_summary.csv.</p></div>
+      <details className="card fold">
+        <summary><h2>The judges' numbers</h2><span className="sub">I, S, B, H, F, P from the Tangerine README. Standard runway: {c.standard_runway.label}. Show the table</span></summary>
+        <div className="card-head"><div><h2 className="sr-only">The judges' numbers</h2><p className="sub">Exactly the Tangerine README definitions, from monthly_summary.csv.</p></div>
           <button className="btn" onClick={() => nav.go("stress")}>Apply a shock →</button></div>
         <table className="tbl">
           <tbody>
@@ -219,7 +229,7 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
               .map(([k, label, v]) => <tr key={k}><td style={{ width: 40 }}><b>{k}</b></td><td>{label}</td><td className="num">{money(v)}</td></tr>)}
           </tbody>
         </table>
-      </section>
+      </details>
     </main>
   );
 }

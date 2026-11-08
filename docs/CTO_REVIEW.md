@@ -91,7 +91,7 @@ Corrections to the critique:
   dip (median $8.5K). It works as a *limit*, not cash: 97% of it is never drawn.
 - **Fees are tiny. Agreed.** Pitch retention and credit losses (76/76), not fees.
 - **Trough as a probability:** done via the calibrated simulation (`engine.overdraft_risk`), which ranks at least as
-  well as the trough (AUC 0.877 vs 0.860) and is validated out of time. A second logistic on the trough adds nothing.
+  well as the trough (AUC 0.882 vs 0.860; was 0.877 before forward loan payments) and is validated out of time. A second logistic on the trough adds nothing.
 - **Dip timing:** from the 1M transactions, 58% of customers dip within ±5 days of the same day in at least 70% of months.
   `engine.cushion(..., dip_table=engine.load_dip_days())` returns the usual day only when it's reliable. 93172's isn't, and the engine says so.
 

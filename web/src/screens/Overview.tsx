@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, kmoney, money, monthName, pct, NO_SHOCK } from "../api";
 import type { Nav } from "../App";
 import { Legend, PortfolioChart } from "../charts";
-import { Failed, Kpi, Loading } from "./ui";
+import { CountUp, Failed, Kpi, Loading } from "./ui";
 
 export default function Overview({ nav }: { nav: Nav }) {
   const ev = useQuery({ queryKey: ["evidence"], queryFn: api.evidence, staleTime: Infinity });
@@ -37,16 +37,18 @@ export default function Overview({ nav }: { nav: Nav }) {
 
       {ev.isPending ? <Loading h={130} /> : ev.isError ? <Failed error={ev.error} /> : im && y25 && (
         <section className="grid g4" aria-label="Headline results">
-          <div className="card hero"><Kpi label="Flag 10% of customers, catch" value={pct(im.caught_share)}
+          <div className="card hero"><Kpi label="Flag 10% of customers, catch" value={<CountUp text={pct(im.caught_share)} />}
             note={`${im.caught} of ${im.first_overdrafts} first overdrafts in 2025, tested on data the model never saw`} /></div>
-          <div className="card"><Kpi label="Risk vs everyone else" value={`${y25.risk_ratio.toFixed(1)}×`}
+          <div className="card"><Kpi label="Risk vs everyone else" value={<CountUp text={`${y25.risk_ratio.toFixed(1)}×`} />}
             note={`${pct(y25.low10_rate, 1)} vs ${pct(y25.rest_rate, 2)}. Holds in 2023, 2024 and 2025`} /></div>
-          <div className="card ours"><Kpi label="Dip-sized buffer covers" value={pct(im.buffer.covered_share)}
+          <div className="card ours"><Kpi label="Dip-sized buffer covers" value={<CountUp text={pct(im.buffer.covered_share)} />}
             note={`${kmoney(im.buffer.drawn_total)} drawn of ${kmoney(im.buffer.limits_total)} in limits`} /></div>
-          <div className="card"><Kpi label="Personal alert warns" value={`${im.alert.median_lead_months} mo early`}
+          <div className="card"><Kpi label="Personal alert warns" value={<CountUp text={`${im.alert.median_lead_months} mo early`} />}
             note={`${im.alert.fired_before} of ${im.caught}; a $100 alert: ${im.alert.generic_100_fired_before}.${im.alert.fired_for_quiet_share != null ? ` Pinged ${pct(im.alert.fired_for_quiet_share)} of flagged customers who never needed it` : ""}`} /></div>
         </section>
       )}
+
+      <BookCard nav={nav} />
 
       <section className="grid g-7-5">
         <div className="card">
@@ -131,5 +133,45 @@ export default function Overview({ nav }: { nav: Nav }) {
         </div>
       </section>
     </main>
+  );
+}
+
+const TIER_CLASS: Record<string, string> = { overdrawn: "t-bad", act: "t-act", new_hot: "t-newhot", watch: "t-watch", stable: "t-stable", new: "t-new" };
+
+/** The whole book: every customer in one tier, with its action and the tier's tested overdraft rate. */
+function BookCard({ nav }: { nav: Nav }) {
+  const q = useQuery({ queryKey: ["book", nav.asof], queryFn: () => api.book(nav.asof) });
+  if (q.isPending) return <Loading h={160} />;
+  if (q.isError) return <Failed error={q.error} />;
+  const b = q.data, s = b.summary;
+  return (
+    <section className="card" aria-label="The whole book">
+      <div className="card-head"><div>
+        <h2>The whole book: {b.customers.toLocaleString("en-CA")} customers, one action each</h2>
+        <p className="sub">
+          {pct(s.focus_customer_share)} of customers at this date need an advisor (already overdrawn, riskiest 10%, or a new account that swings hard); {pct(s.stable_customer_share)} are stable and need nothing.
+          {s.tested_focus_overdraft_share != null && s.tested_focus_customer_share != null && s.tested_stable_rate != null &&
+            <> Tested on {b.tested_on}: those tiers were <b>{pct(s.tested_focus_customer_share)}</b> of customers and produced <b>{pct(s.tested_focus_overdraft_share)}</b> of the next year's overdrafts; the stable tier overdrew {pct(s.tested_stable_rate, 1)}.</>}
+          {b.tested_on && <> Rates come from a year already over at this date.</>}
+        </p></div></div>
+      <div className="bookbar" role="img" aria-label={b.tiers.map((t) => `${t.label}: ${t.customers}`).join("; ")}>
+        {b.tiers.filter((t) => t.customers > 0).map((t) => (
+          <span key={t.tier} className={TIER_CLASS[t.tier]} style={{ flexGrow: t.customers }} title={`${t.label}: ${t.customers.toLocaleString("en-CA")}`} />
+        ))}
+      </div>
+      <table className="tbl" style={{ marginTop: 10 }}>
+        <thead><tr><th>Tier</th><th className="num">Customers</th><th className="num">Overdrew next year</th><th className="num">Share of all overdrafts</th><th>Action</th></tr></thead>
+        <tbody>{b.tiers.map((t) => (
+          <tr key={t.tier}>
+            <td><span className={`dot ${TIER_CLASS[t.tier]}`} aria-hidden="true" /> <b>{t.label}</b></td>
+            <td className="num">{t.customers.toLocaleString("en-CA")}</td>
+            <td className="num">{pct(t.tested_rate, 1)}</td>
+            <td className="num">{pct(t.tested_share_of_overdrafts)}</td>
+            <td>{t.action}{t.tier === "act" && Object.keys(b.act_causes).length > 0 &&
+              <span className="muted"> ({Object.entries(b.act_causes).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(", ")})</span>}</td>
+          </tr>))}
+        </tbody></table>
+      <p className="sub" style={{ marginTop: 8 }}>New accounts can't be scored by the trough (it needs 12 months), so they get their own test: swings in money in, chosen on 2023 and 2024 and confirmed on 2025 (the top 10% of new accounts caught 13 of 32 first overdrafts, 18.6% vs 3.0%). Accounts under 3 months stay unscored.</p>
+    </section>
   );
 }

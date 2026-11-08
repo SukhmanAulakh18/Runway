@@ -41,14 +41,27 @@ All out of time: features up to December, outcome the next year.
 |---|---|
 | Riskiest 10% → first overdraft | 12.8–17.9× everyone else in 2023, 2024 and 2025; AUC 0.84–0.86 |
 | Robust to confounders | Odds ratio 16.8 (95% CI 9.5–29.7) after balance size, account age, unemployment |
-| Multiple testing | 37 of 45 ideas survive Benjamini–Hochberg (q = 0.10); failures listed in the app |
+| Multiple testing | 48 of 57 ideas survive Benjamini–Hochberg (q = 0.10); failures listed in the app |
 | Forecast calibration (2025) | Predicted 1.61% vs 1.61% observed; AUC 0.88; Brier 0.0142 beats the base rate 0.0158 |
 | Product backtest (2025) | Flag 10% → 34 of 55 first overdrafts; dip-sized buffer covers 27 of 34; alert fires before 23 of 34, median 3 months early, pinging 22% of flagged customers who never needed it |
 | Loan review rule (all 682 loans) | Holds 17%; catches 41 of 76 defaults; held loans default 34.7% vs 6.2% (clean outcome: 10.2% vs 3.4%, p = 0.003) |
+| Time to first overdraft (survival) | Never-overdrawn customers scored Dec 2022 and Dec 2023, followed 24 months: hazard ratio for the flag 11.2 (95% CI 5.2–23.9) and 12.4 (7.2–21.2); 2–4× higher in the first 6 months; log-rank p < 1e-9 |
+| Champion vs challenger (2025) | Gradient boosting on 12 features: 39 vs 34 of 55 caught, AUC 0.865 vs 0.860; not significant (McNemar p = 0.18, bootstrap AUC p = 0.84); its top feature is the trough. Trough kept |
 | Simulation audit | Deterministic; stable across seeds; monotonic in shock size; 0 errors over 4,500 accounts × 3 README twists |
 
 Independence: validation here was done by the same team with automated, reproducible tests. Before production, an
 independent reviewer (E-23 3.4) should re-run `python evidence.py` and challenge the choices in section 6.
+
+## 4b. Fairness
+Checked by owner gender and age band for 2024 and 2025 (`evidence.json -> fairness`). Flag-rate ratio women ÷ men: 1.12
+and 0.86, both within the four-fifths band (0.8–1.25). Catch rate (share of first overdrafts flagged): women 71% vs men
+50% in 2024, 50% vs 72% in 2025. The gap flips direction and is significant in neither (Fisher p = 0.30, 0.10). Gender
+and age are never model inputs. 60+ customers are rarely flagged because most are steady pensioners with a near-zero
+overdraft rate. Both fairness measures are monitored (section 5).
+
+## 4c. Scale
+The core signal is one SQL query (`sql/trough.sql`, standard window functions) that runs inside a data warehouse. A test
+checks it returns the same trough and the same riskiest-10% flags as the Python engine on all 4,500 accounts.
 
 ## 5. Ongoing monitoring (E-23 3.6)
 E-23 requires defined breach thresholds but sets no numbers. These are our stated choices:
@@ -59,6 +72,8 @@ E-23 requires defined breach thresholds but sets no numbers. These are our state
 | Money in drift (PSI) | same | 0.004 |
 | Early-warning AUC, each year | breach < 0.75 | 0.84 / 0.84 / 0.86 |
 | Calibration, predicted ÷ actual | breach outside 0.67–1.5 | 1.00 |
+| Fairness: flag-rate ratio women ÷ men | watch outside 0.8–1.25 (four-fifths rule) | 0.86 |
+| Fairness: catch-rate gap women vs men | watch p < 0.05, breach p < 0.01 | p = 0.10 |
 | Data quality | breach if any check fails | all pass |
 
 A breach triggers re-validation and a review of the risk rating. CI checks every pull request (`.github/workflows/ci.yml`).
@@ -75,6 +90,8 @@ A breach triggers re-validation and a review of the risk rating. CI checks every
 - **It never calculates.** Every number in AI text must appear in the engine's facts (`verify_numbers`), and simulation counts can't be called a "chance" (`verify_wording`); otherwise a template is used.
 - Hard 6-second limit, then rules or template; tests use fakes, so they never call the live model.
 - Customer messages carry no risk percentages; credit is offered only after a call.
+
+- **Measured, not assumed.** `scripts/eval_ai.py` scores the twist-card reader on tuned and held-out cards (an invented shock counts as an error) and writes `docs/AI_EVAL.md`. Offline rules: 8/16 on the first held-out set; generalised on it, then 15/16 (94%) on a fresh held-out set frozen beforehand. Gemini on the same held-out set: 14/16 (88%), median 1.3 s.
 
 ## 8. Decommissioning (E-23 D.2)
 Retire on repeated monitoring breaches or a change in data or use. Keep the last version and its `evidence.json` as a

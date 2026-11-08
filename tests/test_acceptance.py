@@ -398,7 +398,9 @@ def test_evidence_self_correction_and_extended_bh(d):
     ext = full["multiple_testing_extended"]
     # base family + 8 steering tests + the diagnosis tests added Nov 8 (8 of them): every idea tried is counted
     assert len(full["diagnoses"]["tests"]) == 8
-    assert ext["tests"] == full["multiple_testing"]["tests"] + 8 + len(full["diagnoses"]["tests"])
+    # + the 12 new-account candidate tests (Nov 8): a test that's run must be counted
+    assert len(full["new_accounts"]["tests"]) == 12
+    assert ext["tests"] == full["multiple_testing"]["tests"] + 8 + len(full["diagnoses"]["tests"]) + len(full["new_accounts"]["tests"])
     assert all(r["survives"] for r in ext["rows"] if r["log_row"] in (7, "E4", 15))   # trough + steering hold
     assert full["impact"]["2024-12"]["alert"]["quiet_flagged"] > 0
 
@@ -480,3 +482,70 @@ def test_evidence_monitoring_no_breaches(d):
 def test_overdraft_cost_tangerine_terms():
     c = E.overdraft_cost(6000, 1)
     assert c["fee"] == 5 and c["interest"] == pytest.approx(95.0) and c["total"] == pytest.approx(100.0)   # 6000 x 19% / 12
+
+
+@pytest.mark.parametrize("asof", ["2024-12", "2025-12"])
+def test_sql_trough_matches_engine(d, asof):
+    """sql/trough.sql (warehouse-ready) gives the same trough and the same riskiest-10% flags as the Python engine."""
+    import sqlite3
+    from pathlib import Path
+    con = sqlite3.connect(":memory:")
+    d["monthly"][["account_id", "month", "min_balance", "avg_daily_balance"]].to_sql("monthly_summary", con, index=False)
+    sql = (Path(__file__).resolve().parent.parent / "sql" / "trough.sql").read_text()
+    q = pd.read_sql_query(sql, con, params={"asof": asof}).set_index("account_id")
+    t = E.ltr_table(d, asof=asof)
+    assert len(q) == len(t)
+    assert np.allclose(q.ltr.to_numpy(), t.ltr.reindex(q.index).to_numpy(), atol=1e-9)
+    py_flag = (t.scorable & (t.ltr_pct_rank <= 0.10)).reindex(q.index)
+    assert (q.riskiest_10.astype(bool) == py_flag).all()
+
+
+@pytest.mark.slow
+def test_evidence_fairness_and_lessons(d):
+    import evidence
+    fr = evidence.fairness(d)
+    assert fr["flag_ratio_in_band"] and fr["gap_direction_flips"] and all(r["catch_gap_p"] >= 0.05 for r in fr["by_year"])
+    ev = evidence.main(n_boot=200)
+    assert {l["group"] for l in ev["lessons"]} == {"Rejected", "Not claimed", "One year only"}
+    assert any(r["metric"].startswith("Fairness") for r in ev["monitoring"]["rows"]) and ev["monitoring"]["breaches"] == []
+
+
+# ---------------------------------------------------------------- The whole book (Nov 8)
+def test_book_tiers_partition_and_order(d):
+    t = E.book_tiers(d, "2024-12")
+    assert set(t.unique()) <= set(E.BOOK_TIERS) and len(t) == d["monthly"][d["monthly"].month <= "2024-12"].account_id.nunique()
+    assert t.loc[93172] == "act"
+    lt = E.ltr_table(d, asof="2024-12")
+    assert (lt.loc[t[t == "act"].index].ltr_pct_rank <= 0.10).all()
+    assert not lt.loc[t[t == "new"].index].scorable.any()
+
+
+def test_new_account_swing_flag_is_new_accounts_only_and_top_10pct(d):
+    n = E.new_account_swing(d, "2024-12")
+    months = d["monthly"][d["monthly"].month <= "2024-12"].groupby("account_id").size().reindex(n.index)
+    assert months.between(E.NEW_MIN_MONTHS, E.LTR_MIN_HISTORY - 1).all()
+    assert abs(n.flag.mean() - E.NEW_SWING_SHARE) < 0.02
+    t = E.book_tiers(d, "2024-12")
+    assert (t[t == "new_hot"].index.isin(n[n.flag].index)).all()
+def test_survival_uses_only_completed_cohorts():
+    assert E.survival_score_month(None) == "2023-12"        # today: followed 2024-2025
+    assert E.survival_score_month("2024-12") == "2022-12"   # Dec 2024 view: followed 2023-2024 only (no lookahead)
+
+
+def test_when_overdraft_riskiest_group(d):
+    D = E.survival_cohort(d, "2023-12")
+    c = E.survival_curves(D)
+    r = c["riskiest 10%"]["overdrawn_by_month"]
+    assert r[0] == 0 and r[6] <= r[12] <= r[24] and r[24] > 5 * c["everyone else"]["overdrawn_by_month"][24]
+    w = E.when_overdraft(0.05, c, "2023-12")
+    assert w["group"] == "riskiest 10%" and w["within_12"] == pytest.approx(r[12])
+
+
+@pytest.mark.slow
+def test_evidence_survival_and_challenger(d):
+    import evidence
+    for c in evidence.survival(d)["cohorts"]:
+        assert c["hazard_ratio_flag_ci95"][0] > 3 and c["hazard_ratio_first_6_months"] > 1 and c["logrank_p"] < 1e-6
+    ch = evidence.challenger(d)
+    assert ch["top_features"][0]["feature"] == "trough"          # the challenger's most important input is the trough
+    assert ch["mcnemar_p"] > 0.05 and ch["auc_diff_p_boot"] > 0.05   # statistically tied: champion stays

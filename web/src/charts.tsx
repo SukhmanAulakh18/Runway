@@ -3,7 +3,7 @@ import {
 } from "recharts";
 import { kmoney, money, monthName, pct, type Month, type Sim } from "./api";
 
-const C = { ours: "#f26a1b", oursSoft: "#ffc9a3", std: "#64748b", bad: "#dc2626", ink: "#0f172a", ink3: "#5f6b7d", line: "#e6e8ee" };
+const C = { ours: "#f26a1b", oursSoft: "#ffc9a3", std: "#64748b", bad: "#dc2626", ink: "#24170f", ink3: "#6a5a4e", line: "#e6e8ee" };
 const axis = { stroke: C.ink3, fontSize: 11.5, tickLine: false, axisLine: false } as const;
 const grid = <CartesianGrid stroke={C.line} vertical={false} />;
 
@@ -123,10 +123,11 @@ export function PairBars({ data, a, b, height = 230, fmt = (v: number) => pct(v,
   );
 }
 
-export function Legend({ items }: { items: { label: string; kind: "ours" | "std" | "ink" | "bad" | "soft" }[] }) {
+export function Legend({ items }: { items: { label: string; kind: "ours" | "std" | "ink" | "bad" | "soft" | "grey" }[] }) {
   const style = (k: string) => ({
     ours: { background: C.ours }, ink: { background: C.ink }, bad: { background: C.bad }, soft: { background: C.oursSoft },
     std: { background: `repeating-linear-gradient(90deg, ${C.std} 0 4px, transparent 4px 6px)` },
+    grey: { background: `repeating-linear-gradient(90deg, ${C.ink3} 0 4px, transparent 4px 6px)` },
   } as Record<string, React.CSSProperties>)[k];
   return (
     <div className="chips" style={{ gap: 14 }}>
@@ -136,5 +137,26 @@ export function Legend({ items }: { items: { label: string; kind: "ours" | "std"
         </span>
       ))}
     </div>
+  );
+}
+
+
+/** Kaplan-Meier: share of customers who have had a first overdraft, by month since scoring, per trough group. */
+export function SurvivalChart({ curves, height = 260 }: { curves: Record<string, { overdrawn_by_month: number[] }>; height?: number }) {
+  const names = Object.keys(curves);
+  const colors = [C.ours, C.ink, C.ink3];   // matches Legend kinds ours / ink / grey
+  const data = curves[names[0]].overdrawn_by_month.map((_, k) => Object.fromEntries([["m", k], ...names.map((n) => [n, curves[n].overdrawn_by_month[k]])]));
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <ComposedChart data={data} margin={{ top: 10, right: 12, left: 4, bottom: 0 }}>
+        {grid}
+        <XAxis dataKey="m" {...axis} tickFormatter={(m) => `M${m}`} interval={2} />
+        <YAxis {...axis} tickFormatter={(v) => pct(v)} width={44} />
+        <ReferenceLine x={6} stroke={C.ink3} strokeDasharray="3 3" label={{ value: "6 months", position: "insideTopLeft", fill: C.ink3, fontSize: 11 }} />
+        {names.map((n, i) => <Line key={n} dataKey={n} type="stepAfter" stroke={colors[i]} strokeWidth={i === 0 ? 2.5 : 2}
+          strokeDasharray={i === 2 ? "5 4" : undefined} dot={false} name={n} />)}
+        <Tooltip content={<Tip rows={(r) => names.map((n) => [n, pct(r[n] as number, 1)] as [string, string])} />} labelFormatter={(m) => `Month ${m}`} />
+      </ComposedChart>
+    </ResponsiveContainer>
   );
 }

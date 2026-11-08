@@ -35,7 +35,7 @@ Runway is an engine plus an advisor dashboard (React, FastAPI, Python; Streamlit
 1. **The low point predicts first overdrafts.** Flag the 10% with the lowest trough and you catch **34 of 55 (62%)**
    first overdrafts in 2025, tested on data the model never saw. The flagged group's risk is **12.8–17.9×** everyone
    else's, in **each of 2023, 2024 and 2025** (AUC 0.84–0.86). It survives controls for balance size, account age and
-   unemployment (**odds ratio 16.8, 95% CI 9.5–29.7**) and multiple-testing correction (**37 of 45** ideas tested survive).
+   unemployment (**odds ratio 16.8, 95% CI 9.5–29.7**) and multiple-testing correction (**48 of 57** ideas tested survive).
 2. **Customers steer back, which is why naive simulations fail.** After a month at their own low, money in beats money
    out the next month **36 percentage points more often** than after a normal month; with the same months in random
    order it is only **18 points**. **87–91% of customers** show it, in both years. A simulation that replays months randomly can't steer back: it predicted **15%** would go overdrawn
@@ -51,7 +51,9 @@ Runway is an engine plus an advisor dashboard (React, FastAPI, Python; Streamlit
 6. **The cause decides the action, and one cause hides in plain sight.** Inside the flagged 10%, customers whose money
    in fell 25%+ overdrew **20% vs 8%** of other flagged customers in 2025 (same direction in 2024, too few to be sure),
    so they are called first. Adding these reasons to the score did **not** catch more (33 vs 34 of 55), so they choose
-   the action rather than replace the score. And a loan granted in the last 12 months is invisible to any runway built on
+   the action rather than replace the score. A gradient-boosting challenger on 12 features caught **39 vs 34**, a gap that is not significant
+   (McNemar p = 0.18), and its top feature was the trough itself, so the one explainable ratio stays champion. Survival
+   analysis says when to act: flagged customers have **11–12×** the hazard of a first overdraft, highest in the first 6 months. And a loan granted in the last 12 months is invisible to any runway built on
    past spending: **186** customers at Dec 2024. Our demo customer 93172 got a **$166,958** loan the same month her
    balance hit $238; counting its **$4,638/month** payment drops her realistic runway from **26.7 to 2.4 months**.
 7. **Why a lender cares:** every one of the **76** borrowers who was ever overdrawn defaulted; **27** loans
@@ -64,6 +66,12 @@ Runway is an engine plus an advisor dashboard (React, FastAPI, Python; Streamlit
 8. **Where the standard formula misleads:** it pays EI forever (39% "last a year" vs 22% if EI stops at 6 months),
    cuts pensions in a layoff (740 pensioners), ignores the EI cap (57% of customers), and its medians call 1,181
    customers deficit-spenders when 97.5% of them actually end up with more money.
+
+## How a bank would roll it out
+Three months in shadow mode (score the book, no contact), then a controlled pilot (half of flagged customers get the
+call, alert and transfer offer), then scale into the advisor CRM and loan origination. The core signal is one SQL query
+(`sql/trough.sql`), checked equal to the Python on every account. Fairness checked by gender and age in two years: no
+consistent gap; monitored every period. Model card in the OSFI E-23 format (`docs/MODEL_CARD.md`).
 
 ## What we don't claim (said first)
 - The trough and the plain lowest balance are statistically tied; our claim is that **the low point beats both runway

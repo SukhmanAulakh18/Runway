@@ -73,7 +73,7 @@ def render(c):
                          xaxis_title="Months after the shock", legend=dict(orientation="h", y=-0.3))
         st.plotly_chart(fo, width="stretch")
     st.caption("Linear program (scipy HiGHS): minimise total cuts subject to the projected balance staying above the overdraft line "
-               "each month; bills and insurance are never cut. Re-solved every month with new data, it's a receding-horizon plan.")
+               "each month; bills and insurance are never cut. Solved once here; re-solved each month with new data it would become a receding-horizon plan.")
     best = max([l for l in levers if l.get("gain")], key=lambda l: l["gain"], default=None)
     nxt = next((m for m in g["milestones"] if not m["done"]), None)
     facts = {"realistic_runway": real_res["label"], "answer_key_runway": key_res["label"],

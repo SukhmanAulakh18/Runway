@@ -112,3 +112,26 @@ def test_watchlist_is_a_call_list():
     row = next(r for r in w["rows"] if r["account_id"] == 93172)
     assert row["cause"] == "Money in is falling" and row["action"] == "Call this week"
     assert sum(w["calls"].values()) == len(w["rows"])
+
+
+def test_book_covers_every_customer_without_lookahead():
+    b = client.get("/api/book", params={"asof": "2024-12"}).json()
+    assert sum(t["customers"] for t in b["tiers"]) == b["customers"]
+    assert b["tested_on"] == "Dec 2023 → 2024"                 # Dec 2024 view: rates from a year already over
+    tiers = {t["tier"]: t for t in b["tiers"]}
+    assert tiers["stable"]["tested_rate"] < 0.01 < tiers["act"]["tested_rate"] < tiers["overdrawn"]["tested_rate"]
+    assert client.get("/api/book").json()["tested_on"] == "Dec 2024 → 2025"
+
+
+def test_book_sentence_uses_one_population():
+    s = client.get("/api/book").json()["summary"]             # today: tested on the Dec 2024 cohort -> 2025
+    # was 0.085 / 0.60 before the new-account tier was added (Nov 8): overdrawn + act + new_hot
+    assert s["tested_focus_customer_share"] == pytest.approx(0.101, abs=0.003)
+    assert s["tested_focus_overdraft_share"] == pytest.approx(0.684, abs=0.01) and s["tested_stable_rate"] < 0.01
+
+
+
+def test_customer_tier_for_new_account():
+    t = api._tiers("2024-12"); a = int(t[t == "new_hot"].index[0])
+    c = client.get(f"/api/customer/{a}", params={"asof": "2024-12"}).json()
+    assert c["tier"]["key"] == "new_hot" and not c["trough"]["scorable"]

@@ -460,6 +460,65 @@ def repeat_overdraft(acct: int, d: dict, rates: dict) -> dict | None:
             "tested_on": f"{rates['year'] - 1} -> {rates['year']}", "never_overdrawn_rate": rates["never_overdrawn_rate"]}
 
 
+# ---------------------------------------------------------------------------
+# Survival: WHEN does a first overdraft come? Kaplan-Meier by trough group over 24 months, never-overdrawn customers
+# scored at December. A cohort's 24-month follow-up must end by the view date (no lookahead): today uses the cohort
+# scored Dec 2023 (followed 2024-2025); the Dec 2024 view uses Dec 2022 (followed 2023-2024). evidence.json -> survival.
+# ---------------------------------------------------------------------------
+SURV_GROUPS = [(0.10, "riskiest 10%"), (0.30, "next 20%"), (1.01, "everyone else")]
+SURV_HORIZON = 24
+
+
+def survival_cohort(d: dict, score_month: str, horizon: int = SURV_HORIZON) -> pd.DataFrame:
+    """One row per never-overdrawn, scorable customer at `score_month`: months to first overdraft (or censoring), group."""
+    m = d["monthly"]; past = m[m.month <= score_month]
+    g = past.groupby("account_id"); nh = g.size(); clean = g.days_below_zero.sum() == 0
+    t = ltr_table(d, asof=score_month)
+    pop = [a for a in t.index if nh.get(a, 0) >= LTR_MIN_HISTORY and clean.get(a, False)]
+    start = pd.Period(score_month) + 1
+    fut = m[(m.month > score_month) & m.account_id.isin(pop)][["account_id", "month", "days_below_zero"]].copy()
+    fut["k"] = (pd.PeriodIndex(fut.month, freq="M") - start).map(lambda x: x.n) + 1
+    fut = fut[fut.k <= horizon]
+    ev = fut[fut.days_below_zero > 0].groupby("account_id").k.min()
+    last = fut.groupby("account_id").k.max()
+    rank = t.loc[pop].ltr.rank(pct=True)
+    group = [next(name for cut, name in SURV_GROUPS if r <= cut) for r in rank]
+    avg = past[past.account_id.isin(pop)].groupby("account_id").tail(6).groupby("account_id").avg_daily_balance.mean()
+    D = pd.DataFrame({"time": ev.reindex(pop).fillna(last.reindex(pop)).fillna(0).astype(float),
+                      "event": ev.reindex(pop).notna().astype(int).values, "group": group, "rank": rank.values,
+                      "log_balance": np.log(avg.reindex(pop).clip(lower=1)).values, "history": nh.reindex(pop).astype(float).values}, index=pop)
+    return D[D.time > 0]
+
+
+def survival_curves(D: pd.DataFrame, horizon: int = SURV_HORIZON) -> dict:
+    """Kaplan-Meier share overdrawn by month 0..horizon for each trough group (censoring handled)."""
+    from statsmodels.duration.survfunc import SurvfuncRight
+    out = {}
+    for _, name in SURV_GROUPS:
+        g = D[D.group == name]
+        sf = SurvfuncRight(g.time, g.event)
+        surv = pd.Series(sf.surv_prob, index=sf.surv_times)
+        curve = [float(1 - (surv[surv.index <= k].iloc[-1] if (surv.index <= k).any() else 1.0)) for k in range(horizon + 1)]
+        out[name] = {"customers": int(len(g)), "first_overdrafts": int(g.event.sum()), "overdrawn_by_month": curve}
+    return out
+
+
+def survival_score_month(asof: str | None) -> str:
+    """Latest December cohort whose 24-month follow-up is complete by the view date."""
+    year = int(asof[:4]) if asof else int(END_OF_DATA.year)
+    return f"{year - 2}-12"
+
+
+def when_overdraft(pct_rank: float | None, curves: dict, score_month: str) -> dict | None:
+    """'Among customers like this, X% had a first overdraft within 6 / 12 / 24 months' (their trough group's curve)."""
+    if pct_rank is None:
+        return None
+    name = next(n for cut, n in SURV_GROUPS if pct_rank <= cut)
+    c = curves[name]["overdrawn_by_month"]
+    return {"group": name, "within_6": c[6], "within_12": c[12], "within_24": c[24], "customers": curves[name]["customers"],
+            "cohort": f"scored {score_month}, followed {int(score_month[:4]) + 1}-{int(score_month[:4]) + 2}"}
+
+
 def overdraft_risk(acct: int, d: dict) -> dict:
     """Calibrated chance of a first overdraft in the next 12 months if nothing changes (no shock).
 
@@ -755,7 +814,9 @@ def net_flow_filter(acct: int, d: dict) -> dict:
 
 def optimize_cuts(acct: int, d: dict, sc: Scenario, horizon: int = 12, max_cut_share: float = 0.5,
                   pessimistic: bool = True, n_paths: int = 2000) -> dict:
-    """Constrained-optimal cut schedule (linear program, re-solved monthly = receding-horizon / MPC).
+    """Constrained-optimal cut schedule: one linear program over the next `horizon` months, solved once.
+    (Re-solving it every month as new data arrives would make it a receding-horizon / MPC policy; that is a
+    production step, not done here, and its stability is not analysed.)
 
     Finds the longest stretch T <= horizon for which the balance can be kept above the overdraft line
     (the customer's typical in-month dip) in a bad (10th percentile) or typical (median) outcome, and the
@@ -805,6 +866,54 @@ def realistic_vec(d: dict, window: int = WINDOW, ei_rate: float = EI_RATE) -> pd
     gap = out - (prot + np.minimum(ei_rate * earned, EI_MONTHLY_MAX))
     rw = np.where(usable <= 0, 0.0, np.where(gap <= 0, RUNWAY_CAP, np.minimum(usable / gap.where(gap > 0), RUNWAY_CAP)))
     return pd.DataFrame({"realistic_runway_ei": np.round(rw, 1)}, index=inc.index)
+
+
+# ---------------------------------------------------------------------------
+# The whole book: every customer gets one tier and one kind of action, so the bank sees its full workload,
+# not only the advisor's call list. Priority order; data up to `asof` only (no lookahead).
+# ---------------------------------------------------------------------------
+BOOK_TIERS = {
+    "overdrawn": ("Already overdrawn this year", "Recovery plan: fixed instalments + alert at their own danger level"),
+    "act": ("Act now: riskiest 10% by trough", "Advisor contact, matched to the cause (call, auto-save, alert, loan review)"),
+    "new_hot": ("New and swinging: top 10% of new accounts", "Welcome check-in call + personal alert"),
+    "watch": ("Watch: next 20%", "Automatic personal alert only, no call"),
+    "stable": ("Stable", "Nothing: standard service"),
+    "new": ("Too new to score", "Standard alerts until there is enough history"),
+}
+# New accounts (3-11 months) can't be scored by the trough (it needs 12 months, and its out-of-time AUC on new accounts
+# is 0.55-0.71). Swings in money in are: chosen on 2023 and 2024 (most overdrafts caught at a 10% flag of 4 candidates, both
+# years: 5 of 15, 13 of 28), confirmed on 2025:
+# the top 10% catch 13 of 32 first overdrafts, 18.6% vs 3.0% (evidence.json -> new_accounts).
+NEW_MIN_MONTHS, NEW_SWING_SHARE = 3, 0.10
+
+
+def new_account_swing(d: dict, asof: str | None = None) -> pd.DataFrame:
+    """For accounts with 3-11 months up to `asof`: sd of monthly money in (opening month dropped), its percentile among
+    new accounts, and the flag (top 10%)."""
+    m = d["monthly"] if asof is None else d["monthly"][d["monthly"].month <= asof]
+    m = m.sort_values(["account_id", "month"])
+    n = m.groupby("account_id").size()
+    new = n[(n >= NEW_MIN_MONTHS) & (n < LTR_MIN_HISTORY)].index
+    w = m[m.account_id.isin(new)]
+    w = w[w.groupby("account_id").cumcount() > 0]                       # the opening month starts near $0
+    sd = w.groupby("account_id").money_in.std().reindex(new)
+    sd = sd.fillna(sd.median())
+    rank = sd.rank(pct=True)
+    return pd.DataFrame({"money_in_sd": sd, "pct_rank": rank, "flag": rank > 1 - NEW_SWING_SHARE})
+WATCH_SHARE = 0.30   # act = riskiest 10%, watch = the next 20% (pct rank 0.10-0.30)
+
+
+def book_tiers(d: dict, asof: str | None = None) -> pd.Series:
+    """One tier per account (keys of BOOK_TIERS), most urgent first, from data up to `asof`."""
+    t = ltr_table(d, asof=asof)
+    m = d["monthly"] if asof is None else d["monthly"][d["monthly"].month <= asof]
+    overdrawn = m.sort_values(["account_id", "month"]).groupby("account_id").tail(12).groupby("account_id").days_below_zero.sum() > 0
+    r = t.ltr_pct_rank
+    hot = new_account_swing(d, asof).flag.reindex(t.index).fillna(False).to_numpy(dtype=bool)
+    tier = np.select([overdrawn.reindex(t.index).fillna(False).to_numpy(), ~t.scorable.to_numpy() & hot, ~t.scorable.to_numpy(),
+                      (r <= 0.10).to_numpy(), (r <= WATCH_SHARE).to_numpy()],
+                     ["overdrawn", "new_hot", "new", "act", "watch"], default="stable")
+    return pd.Series(tier, index=t.index, name="tier")
 
 
 def watchlist(d: dict) -> pd.DataFrame:

@@ -85,10 +85,16 @@ def main(n_boot=1000, seed=0):
     ev["self_correction"] = self_correction(d)
     ev["segment"] = segment_profile(d)
     ev["loan_policy"] = loan_policy(d)
+    ev["fairness"] = fairness(d)
+    ev["survival"] = survival(d)
+    ev["challenger"] = challenger(d)
     ev["monitoring"] = monitoring(d, ev)
     ev["repeat_overdraft"] = {str(y): E.repeat_rates(d["monthly"], y) for y in (2024, 2025)}
     ev["diagnoses"] = diagnoses(d)
+    ev["new_accounts"] = new_accounts(d)   # before the extended family: its 12 tests belong in it
     ev["multiple_testing_extended"] = multiple_testing_extended(ev)
+    ev["book"] = book(d)
+    ev["lessons"] = lessons(ev)   # last: reads diagnoses and the extended multiple-testing family
     return ev
 
 def _ltr_backtest(m, year, window=6, pct=0.10):
@@ -417,6 +423,14 @@ def monitoring(d, ev):
                      "threshold": f"breach < {AUC_FLOOR}"})
     rows.append({"metric": "Risk forecast calibration, 2025 (predicted / actual)", "value": ratio,
                  "status": status(not (CALIBRATION_BAND[0] <= ratio <= CALIBRATION_BAND[1])), "threshold": f"breach outside {CALIBRATION_BAND[0]}-{CALIBRATION_BAND[1]}"})
+    fr = ev.get("fairness")
+    if fr:
+        r25 = fr["by_year"][-1]
+        rows.append({"metric": "Fairness: flag rate, women vs men (2025)", "value": r25["flag_rate_ratio_women_to_men"],
+                     "status": status(False, not (FOUR_FIFTHS[0] <= r25["flag_rate_ratio_women_to_men"] <= FOUR_FIFTHS[1])),
+                     "threshold": f"watch outside {FOUR_FIFTHS[0]}-{FOUR_FIFTHS[1]} (four-fifths rule)"})
+        rows.append({"metric": "Fairness: catch-rate gap, women vs men (2025, Fisher p)", "value": r25["catch_gap_p"],
+                     "status": status(r25["catch_gap_p"] < 0.01, r25["catch_gap_p"] < 0.05), "threshold": "watch p < 0.05, breach p < 0.01"})
     rows.append({"metric": "Data quality: money in/out parts add up", "value": min(checks["money_in_parts_add_up"], checks["money_out_parts_add_up"]),
                  "status": status(min(checks["money_in_parts_add_up"], checks["money_out_parts_add_up"]) < 0.999), "threshold": "breach < 99.9% of rows"})
     rows.append({"metric": "Data quality: missing or negative values", "value": checks["missing_values"] + checks["negative_flows"],
@@ -427,6 +441,219 @@ def monitoring(d, ev):
                     "These thresholds are stated choices; a breach triggers re-validation."}
 
 
+FOUR_FIFTHS = (0.8, 1.25)   # flag-rate ratio band between groups (the "four-fifths rule" convention)
+
+
+def fairness(d):
+    """Does the early warning treat groups alike? For 2024 and 2025: flag rate and catch rate (share of first overdrafts
+    flagged) by owner gender and age band. Fisher test on the catch-rate gap. Groups are never inputs to the score."""
+    from scipy.stats import fisher_exact
+    cl = pd.read_csv(E.DATA / "clients.csv", parse_dates=["birth_date"]); dp = pd.read_csv(E.DATA / "dispositions.csv")
+    own = dp[dp.type == "owner"].merge(cl, on="client_id").set_index("account_id")
+    out = []
+    for year in (2024, 2025):
+        nv, pre, y, ltr, low = _ltr_backtest(d["monthly"], year)
+        f, yy = low.reindex(nv).astype(bool).values, y.reindex(nv).astype(bool).values
+        age = ((pd.Timestamp(f"{year - 1}-12-31") - own.birth_date.reindex(nv)).dt.days / 365.25).values
+        groups = {"women": (own.gender.reindex(nv) == "F").values, "men": (own.gender.reindex(nv) == "M").values,
+                  "under 30": age < 30, "30-44": (age >= 30) & (age < 45), "45-59": (age >= 45) & (age < 60), "60+": age >= 60}
+        rows = {}
+        for g, m in groups.items():
+            ev_ = yy & m
+            rows[g] = {"customers": int(m.sum()), "flag_rate": float(f[m].mean()), "first_overdrafts": int(ev_.sum()),
+                       "caught": int((ev_ & f).sum()), "catch_rate": float((ev_ & f).sum() / max(ev_.sum(), 1))}
+        w, mn = rows["women"], rows["men"]
+        out.append({"predicted_year": year, "groups": rows,
+                    "flag_rate_ratio_women_to_men": w["flag_rate"] / max(mn["flag_rate"], 1e-9),
+                    "catch_gap_p": float(fisher_exact([[w["caught"], w["first_overdrafts"] - w["caught"]],
+                                                       [mn["caught"], mn["first_overdrafts"] - mn["caught"]]])[1])})
+    flips = (out[0]["groups"]["women"]["catch_rate"] - out[0]["groups"]["men"]["catch_rate"]) * \
+            (out[1]["groups"]["women"]["catch_rate"] - out[1]["groups"]["men"]["catch_rate"]) < 0
+    ok_ratio = all(FOUR_FIFTHS[0] <= r["flag_rate_ratio_women_to_men"] <= FOUR_FIFTHS[1] for r in out)
+    return {"by_year": out, "gap_direction_flips": bool(flips), "flag_ratio_in_band": bool(ok_ratio),
+            "verdict": ("No consistent gender gap: flag rates stay within the four-fifths band and the catch-rate gap "
+                        "changes direction between years, significant in neither." if flips and ok_ratio and
+                        all(r["catch_gap_p"] >= 0.05 for r in out) else "Check: a gap persists; see by_year."),
+            "note": "Gender and age are not model inputs. 60+ customers are rarely flagged because most are steady pensioners "
+                    "and their overdraft rate is near zero. Small samples (14-29 overdrafts per group): keep monitoring."}
+
+
+def new_accounts(d):
+    """New accounts (3-11 months, never overdrawn): which signal flags next-year first overdrafts?
+    Protocol: 4 candidates, pick the one that catches most at a 10% flag in 2023 and 2024, confirm on 2025. Opening month dropped. All 12 tests are
+    added to the extended multiple-testing family."""
+    from scipy.stats import fisher_exact
+    m = d["monthly"].sort_values(["account_id", "month"])
+    cands = {"money in swing (sd)": lambda g: g.money_in.std(), "money out per month": lambda g: g.money_out.mean(),
+             "money in per month": lambda g: g.money_in.mean(), "average balance": lambda g: g.avg_daily_balance.mean()}
+    by_year, tests = [], []
+    for asof in ("2022-12", "2023-12", "2024-12"):
+        y_year = str(int(asof[:4]) + 1)
+        past = m[m.month <= asof]; nxt = m[m.month.str[:4] == y_year]
+        n = past.groupby("account_id").size(); full = nxt.groupby("account_id").size() == 12
+        clean = past.groupby("account_id").days_below_zero.sum() == 0
+        pop = [a for a in n.index if E.NEW_MIN_MONTHS <= n[a] < E.LTR_MIN_HISTORY and full.get(a, False) and clean.get(a, False)]
+        P = past[past.account_id.isin(pop)]; P = P[P.groupby("account_id").cumcount() > 0]
+        g = P.groupby("account_id")
+        y = (nxt.groupby("account_id").days_below_zero.sum() > 0).reindex(pop).astype(int)
+        row = {"predicted_year": int(y_year), "accounts": len(pop), "overdrafts": int(y.sum()), "rate": float(y.mean()), "candidates": {}}
+        for name, f in cands.items():
+            v = f(g).reindex(pop); v = v.fillna(v.median())
+            flag = v.rank(pct=True) > 1 - E.NEW_SWING_SHARE
+            a1, n1, a0, n0 = int(y[flag].sum()), int(flag.sum()), int(y[~flag].sum()), int((~flag).sum())
+            pval = float(fisher_exact([[a1, n1 - a1], [a0, n0 - a0]], alternative="greater")[1])
+            row["candidates"][name] = {"auc": float(roc_auc_score(y, v)), "flagged": n1, "caught": a1,
+                                       "flagged_rate": a1 / n1 if n1 else None, "rest_rate": a0 / n0 if n0 else None, "p": pval}
+            tests.append({"log_row": 19, "hypothesis": f"New accounts: top 10% by {name} overdraw more ({y_year})", "p": pval})
+        by_year.append(row)
+    pick = {r["predicted_year"]: max(r["candidates"], key=lambda k: (r["candidates"][k]["caught"], r["candidates"][k]["auc"])) for r in by_year}
+    return {"protocol": "4 candidates; chosen on 2023 and 2024 (most first overdrafts caught at a 10% flag in both years), confirmed on 2025; opening month dropped",
+            "chosen": "money in swing (sd)", "best_by_year": {str(k): v for k, v in pick.items()},
+            "confirmed_2025": by_year[-1]["candidates"]["money in swing (sd)"], "trough_on_new_accounts_auc": "0.55-0.71 (weak, inconsistent)",
+            "by_year": by_year, "tests": tests}
+
+
+def book(d):
+    """The whole book: every customer in one tier (engine.book_tiers) at Dec of year N, outcome = any overdraft in N+1.
+    Three cohorts so every Time Machine view can show rates from a year that is already over (no lookahead)."""
+    m = d["monthly"]; out = {}
+    for asof in ("2022-12", "2023-12", "2024-12"):
+        t = E.book_tiers(d, asof); y = str(int(asof[:4]) + 1)
+        nxt = m[m.month.str[:4] == y]; full = nxt.groupby("account_id").size() == 12
+        od = nxt.groupby("account_id").days_below_zero.sum() > 0
+        keep = full[full].index.intersection(t.index)
+        df = pd.DataFrame({"tier": t.reindex(keep), "od": od.reindex(keep)})
+        total = int(df.od.sum())
+        rows = {}
+        for k in E.BOOK_TIERS:
+            g = df[df.tier == k]
+            rows[k] = {"customers_scored": int((t == k).sum()), "with_full_next_year": int(len(g)), "overdrew": int(g.od.sum()),
+                       "rate": float(g.od.mean()) if len(g) else None, "share_of_overdrafts": float(g.od.sum() / total) if total else None}
+        out[asof] = {"outcome_year": int(y), "overdrafts": total, "accounts": int(len(df)), "tiers": rows}
+    return out
+
+
+def lessons(ev):
+    """The ideas that didn't hold up, grouped in plain words with what we did about each (for the Evidence page)."""
+    mt = {r["hypothesis"]: r for r in ev["multiple_testing_extended"]["rows"]}
+    def p(prefix):
+        return [r["p"] for h, r in mt.items() if h.startswith(prefix)]
+    return [
+        {"group": "Rejected", "idea": "Bills that leave before the paycheque cause overdrafts",
+         "result": "The opposite: those customers overdrew less, in both years.", "decision": "Dropped. No 'move the bill date' action."},
+        {"group": "Rejected", "idea": "One combined score (trough + every reason) catches more",
+         "result": "It caught {combined} vs the trough's {trough_only} of {events} first overdrafts.".format(
+             **ev["diagnoses"]["combined_model"]["catch_at_10pct"]),
+         "decision": "Kept the simple trough as the score; reasons only choose the action."},
+        {"group": "Not claimed", "idea": "The trough ratio beats the plain lowest balance",
+         "result": f"Statistically tied (p = {p('Trough beats Lowest')[0]:.2f}).",
+         "decision": "We claim the low point beats both runway formulas, not that the ratio beats the low point."},
+        {"group": "One year only", "idea": "Money in falling predicts overdrafts inside the riskiest 10%",
+         "result": "Significant in 2025; same direction in 2024 but too few cases to be sure.",
+         "decision": "Used to choose the action (call first); not claimed as proven."},
+        {"group": "One year only", "idea": "Big cash-flow swings predict overdrafts inside the riskiest 10%",
+         "result": "Significant in 2025; no difference in 2024.",
+         "decision": "Used to choose the action (auto-save good months); not claimed as proven."},
+        {"group": "One year only", "idea": "A heavy new loan predicts overdrafts inside the riskiest 10%",
+         "result": "Same direction both years, but only 5 and 10 customers.", "decision": "Kept as a loan-review prompt; not claimed."},
+        {"group": "One year only", "idea": "Weak 'steering back' predicts who in the riskiest 10% overdraws",
+         "result": "Held in 2025, not in 2024.", "decision": "Reported, not used."},
+    ]
+
+
+def survival(d):
+    """WHEN a first overdraft comes. Two cohorts (scored Dec 2022 and Dec 2023, each followed 24 months):
+    Kaplan-Meier by trough group, log-rank test, and a discrete-time hazard model (logit on person-months; the data are
+    monthly, so most event times are tied and a Cox model is unstable). Controls standardised."""
+    import statsmodels.api as sm
+    from statsmodels.duration.survfunc import survdiff
+    out = []
+    for score in ("2022-12", "2023-12"):
+        D = E.survival_cohort(d, score)
+        stat, p = survdiff(D.time, D.event, D.group)
+        t = D.time.astype(int).to_numpy(); e = D.event.to_numpy()
+        rows = np.repeat(np.arange(len(D)), t); k = np.concatenate([np.arange(1, n + 1) for n in t])
+        y = np.zeros(len(rows)); y[(np.cumsum(t) - 1)[e == 1]] = 1
+        Z = D[["log_balance", "history"]]; Z = (Z - Z.mean()) / Z.std()
+        X = pd.DataFrame({"flag": (D["group"] == "riskiest 10%").astype(float).to_numpy()[rows],
+                          "log_balance": Z["log_balance"].to_numpy()[rows], "history": Z["history"].to_numpy()[rows],
+                          "first_6_months": (k <= 6).astype(float)})
+        r = sm.Logit(y, sm.add_constant(X)).fit(disp=0)
+        ci = np.exp(r.conf_int())
+        out.append({"scored": score, "followed": f"{int(score[:4]) + 1}-{int(score[:4]) + 2}", "customers": int(len(D)),
+                    "first_overdrafts": int(D.event.sum()), "curves": E.survival_curves(D),
+                    "logrank_chi2": float(stat), "logrank_p": float(p),
+                    "hazard_ratio_flag": float(np.exp(r.params["flag"])), "hazard_ratio_flag_ci95": [float(ci.loc["flag", 0]), float(ci.loc["flag", 1])],
+                    "hazard_ratio_first_6_months": float(np.exp(r.params["first_6_months"])), "first_6_months_p": float(r.pvalues["first_6_months"]),
+                    "flag_p": float(r.pvalues["flag"])})
+    return {"design": "Never-overdrawn, 12+ months of history, scored at December; first month with a day below $0 within 24 months; "
+                      "censored when data stop. Kaplan-Meier by trough group; discrete-time hazard (logit on person-months) adjusted "
+                      "for balance size and account age.", "cohorts": out}
+
+
+def _features(d, year):
+    """Everything known at December of year-1 for the trough backtest population (no outcome information)."""
+    m = d["monthly"]
+    nv, pre, y, ltr, low = _ltr_backtest(m, year)
+    P = pre[pre.account_id.isin(nv)].sort_values(["account_id", "month"])
+    w12 = P.groupby("account_id").tail(12); w6 = P.groupby("account_id").tail(6)
+    g12, g6 = w12.groupby("account_id"), w6.groupby("account_id")
+    net = (w12.money_in - w12.money_out).groupby(w12.account_id)
+    last3 = P.groupby("account_id").tail(3).groupby("account_id").money_in.mean()
+    prev9 = w12.groupby("account_id").head(9).groupby("account_id").money_in.mean()
+    L = d["loans"]; start = pd.Timestamp(f"{year - 1}-12-31")
+    cl = pd.read_csv(E.DATA / "clients.csv", parse_dates=["birth_date"]); dp = pd.read_csv(E.DATA / "dispositions.csv")
+    own = dp[dp.type == "owner"].merge(cl, on="client_id").set_index("account_id")
+    X = pd.DataFrame({
+        "trough": ltr, "lowest_balance": g6.min_balance.min(), "average_balance": g6.avg_daily_balance.mean(),
+        "money_in": g12.money_in.mean(), "money_out": g12.money_out.mean(),
+        "swing": net.std() / g6.avg_daily_balance.mean().abs().clip(lower=1), "money_in_trend": last3 / prev9.clip(lower=1),
+        "months_history": P.groupby("account_id").size(),
+        "has_loan": pd.Series(L[L.loan_start <= start].set_index("account_id").amount.notna()).reindex(nv).fillna(False).astype(float),
+        "pension_share": g12.pension_in.sum() / g12.money_in.sum().clip(lower=1), "cash_share": g12.cash_deposits.sum() / g12.money_in.sum().clip(lower=1),
+        "owner_age": (start - own.birth_date).dt.days / 365.25,
+    }).reindex(nv)
+    return X.astype(float), y.reindex(nv).astype(int)
+
+
+def challenger(d, seed=0):
+    """Champion vs challenger, out of time: gradient boosting on 12 features (fit on 2023->2024, judged on 2024->2025)
+    against the one-number trough. Same population and outcome as the headline backtest."""
+    from sklearn.ensemble import HistGradientBoostingClassifier
+    from sklearn.inspection import permutation_importance
+    Xtr, ytr = _features(d, 2024); Xte, yte = _features(d, 2025)
+    gb = HistGradientBoostingClassifier(max_depth=3, learning_rate=0.05, max_iter=300, l2_regularization=1.0,
+                                        class_weight="balanced", random_state=seed).fit(Xtr, ytr)
+    p_gb = gb.predict_proba(Xte)[:, 1]
+    def caught(score):   # first overdrafts in the top 10% by score
+        top = pd.Series(score, index=Xte.index).rank(pct=True, ascending=False) <= 0.10
+        return int(yte[top.values].sum())
+    trough_score = -Xte.trough.to_numpy()
+    rng = np.random.default_rng(seed); diffs = []
+    for _ in range(1000):
+        i = rng.integers(0, len(yte), len(yte))
+        if yte.values[i].sum() > 0:
+            diffs.append(roc_auc_score(yte.values[i], p_gb[i]) - roc_auc_score(yte.values[i], trough_score[i]))
+    from scipy.stats import binomtest
+    y = yte.to_numpy()
+    topg = pd.Series(p_gb).rank(pct=True, ascending=False).to_numpy() <= 0.10
+    topt = pd.Series(trough_score).rank(pct=True, ascending=False).to_numpy() <= 0.10
+    only_gb, only_tr = int(((y == 1) & topg & ~topt).sum()), int(((y == 1) & topt & ~topg).sum())
+    mcnemar_p = float(binomtest(only_gb, only_gb + only_tr).pvalue) if only_gb + only_tr else 1.0
+    imp = permutation_importance(gb, Xte, yte, scoring="roc_auc", n_repeats=10, random_state=seed)
+    top = sorted(zip(Xte.columns, imp.importances_mean), key=lambda x: -x[1])[:5]
+    return {"design": "fit on features at Dec 2023 -> overdrafts in 2024; judged on Dec 2024 -> 2025; never-overdrawn customers",
+            "features": list(Xte.columns), "test_accounts": int(len(yte)), "test_events": int(yte.sum()),
+            "auc": {"trough (champion)": float(roc_auc_score(yte, trough_score)), "gradient boosting (challenger)": float(roc_auc_score(yte, p_gb))},
+            "caught_top10": {"trough (champion)": caught(trough_score), "gradient boosting (challenger)": caught(p_gb)},
+            "auc_diff_ci95": [float(x) for x in np.percentile(diffs, [2.5, 97.5])], "auc_diff_p_boot": _p_boot(diffs),
+            "caught_by_both": int(((y == 1) & topg & topt).sum()), "caught_only_challenger": only_gb, "caught_only_champion": only_tr,
+            "mcnemar_p": mcnemar_p,
+            "top_features": [{"feature": f, "auc_drop": float(v)} for f, v in top],
+            "decision": "Keep the trough as champion: statistically tied, explainable, one SQL query, easy to monitor. "
+                        "Re-test the challenger in the pilot on Tangerine data; it graduates if it keeps winning."}
+
+
 def multiple_testing_extended(ev, q=0.10):
     """The 29-test family plus the self-correction and diagnosis tests, so the headline claim counts every idea we tried."""
     from statsmodels.stats.multitest import multipletests
@@ -435,6 +662,8 @@ def multiple_testing_extended(ev, q=0.10):
         tag = f"{r['predicted_year']}, low = bottom {int(r['low_month_cutoff'] * 100)}%"
         rows.append({"log_row": 15, "hypothesis": f"Customers steer back after a low month ({tag})", "test": "sign test vs shuffled", "p": r["p_gap"], "source": "data"})
         rows.append({"log_row": 16, "hypothesis": f"Weak steering predicts overdraft in the riskiest 10% ({tag})", "test": "Mann-Whitney", "p": r["p_weak_predicts"], "source": "data"})
+    for t in ev.get("new_accounts", {}).get("tests", []):
+        rows.append({"log_row": t["log_row"], "hypothesis": t["hypothesis"], "test": "Fisher exact", "p": t["p"], "source": "data"})
     for t in ev.get("diagnoses", {}).get("tests", []):
         rows.append({"log_row": t["log_row"], "hypothesis": t["hypothesis"], "test": "Fisher exact", "p": t["p"], "source": "data"})
     reject, p_bh, _, _ = multipletests([r["p"] for r in rows], alpha=q, method="fdr_bh")

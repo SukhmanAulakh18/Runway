@@ -64,3 +64,8 @@ def standing_orders():
 @st.cache_resource
 def repeat_table(year: int):
     return E.repeat_rates(load_all()[0]["monthly"], year)   # out of time: year = the Time Machine year
+
+
+@st.cache_resource
+def survival_table(score_month: str):
+    return E.survival_curves(E.survival_cohort(load_all()[0], score_month))   # Kaplan-Meier by trough group
