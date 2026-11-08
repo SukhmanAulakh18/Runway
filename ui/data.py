@@ -54,3 +54,8 @@ def trough_table(asof):
 @st.cache_resource
 def dip_days():
     return E.load_dip_days()   # None if transactions.csv is absent; ~5 s once
+
+
+@st.cache_resource
+def standing_orders():
+    return E.load_standing_orders()   # end-of-2025 snapshot: today's view only

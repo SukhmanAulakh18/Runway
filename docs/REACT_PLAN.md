@@ -1,5 +1,16 @@
 # Runway React frontend: plan and rules
 
+> **Status (Sat Nov 7, late): built.** `api.py` + `web/` (Vite, React 19, TanStack Query, Recharts; no Tailwind/shadcn).
+> `api.py` calls `ui.context.build_context()`, the same function Streamlit uses, so both frontends show identical numbers.
+> Screens: 01 Who's at risk · 02 Know the customer · 03 Stress test · 04 Make a plan · 05 Why trust it.
+> Contract tests: `pytest -q tests/test_api.py` (answer key 3.4 / 4.0 / 3.4, 93172 Dec 2024, 404/422, watchlist 14/50).
+>
+> ```bash
+> cd web && npm install && npm run build && cd ..   # once, or after any web/ change
+> uvicorn api:app --port 8000                        # one server: API + dashboard at http://localhost:8000
+> # live-reload while editing the UI: `cd web && npm run dev` (http://localhost:5173, proxies /api to :8000)
+> ```
+
 The **engine stays in Python**. React only draws. `api.py` (FastAPI) sits between them.
 **Streamlit stays as the backup demo** until React passes the midnight checkpoint.
 

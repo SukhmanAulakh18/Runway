@@ -177,3 +177,17 @@ def test_load_env_file(tmp_path, monkeypatch):
     assert os.environ["RUNWAY_TEST_C"] == "from_env"   # the real environment wins
     for k in ("RUNWAY_TEST_A", "RUNWAY_TEST_B"):
         monkeypatch.delenv(k)
+
+
+def test_numbers_reads_french_formats():
+    assert ai._numbers("un coussin de 6 527 $ et 4,0 %") == [6527.0, 4.0]
+    assert ai._numbers("a buffer of $6,527 and 4.0%") == [6527.0, 4.0]
+
+
+def test_gemini_brief_rejected_when_number_invented(monkeypatch):
+    f = {"money_in_per_month": 100, "money_out_per_month": 90, "average_balance": 500, "lowest_balance_6_months": 20,
+         "lowest_as_pct_of_average": 4.0, "riskiest_pct_of_customers": 1.6, "overdraft_risk_pct": 4.0,
+         "cushion": {"amount": 300, "move_now": 0, "dip_day": None}, "flags": []}
+    monkeypatch.setattr(ai, "_client", _FakeGemini("They need a cushion of $9,999."))
+    text, source = ai.advisor_brief(f)
+    assert source == "template" and "$300" in text
