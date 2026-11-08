@@ -50,6 +50,17 @@ All out of time: features up to December, outcome the next year.
 Independence: validation here was done by the same team with automated, reproducible tests. Before production, an
 independent reviewer (E-23 3.4) should re-run `python evidence.py` and challenge the choices in section 6.
 
+## 4b. Fairness
+Checked by owner gender and age band for 2024 and 2025 (`evidence.json -> fairness`). Flag-rate ratio women ÷ men: 1.12
+and 0.86, both within the four-fifths band (0.8–1.25). Catch rate (share of first overdrafts flagged): women 71% vs men
+50% in 2024, 50% vs 72% in 2025. The gap flips direction and is significant in neither (Fisher p = 0.30, 0.10). Gender
+and age are never model inputs. 60+ customers are rarely flagged because most are steady pensioners with a near-zero
+overdraft rate. Both fairness measures are monitored (section 5).
+
+## 4c. Scale
+The core signal is one SQL query (`sql/trough.sql`, standard window functions) that runs inside a data warehouse. A test
+checks it returns the same trough and the same riskiest-10% flags as the Python engine on all 4,500 accounts.
+
 ## 5. Ongoing monitoring (E-23 3.6)
 E-23 requires defined breach thresholds but sets no numbers. These are our stated choices:
 
@@ -59,6 +70,8 @@ E-23 requires defined breach thresholds but sets no numbers. These are our state
 | Money in drift (PSI) | same | 0.004 |
 | Early-warning AUC, each year | breach < 0.75 | 0.84 / 0.84 / 0.86 |
 | Calibration, predicted ÷ actual | breach outside 0.67–1.5 | 1.00 |
+| Fairness: flag-rate ratio women ÷ men | watch outside 0.8–1.25 (four-fifths rule) | 0.86 |
+| Fairness: catch-rate gap women vs men | watch p < 0.05, breach p < 0.01 | p = 0.10 |
 | Data quality | breach if any check fails | all pass |
 
 A breach triggers re-validation and a review of the risk rating. CI checks every pull request (`.github/workflows/ci.yml`).

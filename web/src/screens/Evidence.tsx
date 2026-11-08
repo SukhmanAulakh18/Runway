@@ -131,21 +131,44 @@ export default function Evidence() {
         </section>
       )}
 
-      <section className="grid g2" style={{ alignItems: "start" }}>
+      {e.fairness && (
+        <section className="card">
+          <h2>Fairness: does it treat women and men alike?</h2>
+          <p className="sub" style={{ marginBottom: 8 }}>{e.fairness.verdict} {e.fairness.note}</p>
+          <table className="tbl"><thead><tr><th>Predicting</th><th className="num">Flagged: women / men</th><th className="num">Ratio</th><th className="num">Overdrafts caught: women / men</th><th className="num">Gap p-value</th></tr></thead>
+            <tbody>{(e.fairness.by_year as { predicted_year: number; flag_rate_ratio_women_to_men: number; catch_gap_p: number; groups: Record<string, { flag_rate: number; caught: number; first_overdrafts: number; catch_rate: number }> }[]).map((y) => {
+              const w = y.groups.women, m = y.groups.men;
+              return <tr key={y.predicted_year}><td>{y.predicted_year}</td><td className="num">{pct(w.flag_rate, 1)} / {pct(m.flag_rate, 1)}</td>
+                <td className="num">{y.flag_rate_ratio_women_to_men.toFixed(2)}</td>
+                <td className="num">{w.caught} of {w.first_overdrafts} ({pct(w.catch_rate)}) / {m.caught} of {m.first_overdrafts} ({pct(m.catch_rate)})</td>
+                <td className="num">{y.catch_gap_p.toFixed(2)}</td></tr>;
+            })}</tbody></table>
+          <p className="sub" style={{ marginTop: 8 }}>Ratio band 0.8–1.25 is the "four-fifths rule" convention. Gender and age are never inputs to the score. Both are now monitored in Model health.</p>
+        </section>
+      )}
+
+      {e.lessons && (
         <details className="card fold">
-          <summary><h2>What didn't survive, said out loud</h2><span className="sub">{mt.did_not_survive.length} of {mt.tests} ideas didn't hold up. Show them</span></summary>
-          <div className="list">{mt.did_not_survive.map((d: string) => <div key={d} className="list-row"><span>{d}</span><span className="chip">Not significant</span></div>)}</div>
-          <p className="callout" style={{ marginTop: 10 }}>The trough and the plain lowest balance are statistically tied. Our claim is the low point beats both runway formulas, not that the ratio beats the low point.</p>
+          <summary><h2>What we tried that didn't hold up, and what we did about it</h2>
+            <span className="sub">{mt.did_not_survive.length} of {mt.tests} tests didn't survive correction. {Object.entries((e.lessons as { group: string }[]).reduce((a: Record<string, number>, l) => ({ ...a, [l.group]: (a[l.group] ?? 0) + 1 }), {})).map(([g, n]) => `${n} ${g.toLowerCase()}`).join(" · ")}. Show them</span></summary>
+          <table className="tbl"><thead><tr><th>Idea</th><th>Result</th><th>What we did</th></tr></thead>
+            <tbody>{(e.lessons as { group: string; idea: string; result: string; decision: string }[]).map((l) => (
+              <tr key={l.idea}><td><span className={`chip ${l.group === "Rejected" ? "warn" : l.group === "Not claimed" ? "amber" : ""}`}>{l.group}</span> {l.idea}</td>
+                <td>{l.result}</td><td>{l.decision}</td></tr>))}</tbody></table>
         </details>
-        <div className="card">
-          <h2>Limits</h2>
-          <div className="list">
-            {["Re-dated 1990s Czech bank data (PKDD'99), not real Tangerine customers.",
-              "Most money in is cash, so a job loss assumes all non-pension money in stops: the biggest assumption in the model.",
-              "Loan status D means 'in debt', so part of the overdraft → default link is by definition. The before-the-loan results don't have that problem.",
-              "An early-warning signal, not a cause."].map((l) => <div key={l} className="list-row"><span>{l}</span></div>)}
-          </div>
-        </div>
+      )}
+
+      <section className="card">
+        <h2>Limits, what we did about each, and what fixes it in production</h2>
+        <table className="tbl"><thead><tr><th>Limit</th><th>What we did</th><th>In production</th></tr></thead>
+          <tbody>{([
+            ["Re-dated 1990s Czech bank data, not Tangerine customers", "Tested out of time on three separate years; nothing tuned on the year it was judged on", "Re-fit thresholds on Tangerine data during a 3-month shadow run before any customer contact"],
+            ["Money in is mostly cash, so we can't see pay", "A slider shows the assumption; the verdict says when it drives the answer", "Use payroll tags on deposits to measure real income"],
+            ["Loan status D ('in debt') is partly defined by overdraft", e.loan_policy ? `Also report the clean outcome (finished unpaid): ${pct(e.loan_policy.finished_unpaid.default_rate_held, 1)} vs ${pct(e.loan_policy.finished_unpaid.default_rate_not_held, 1)}` : "Report the clean outcome alongside", "Track real charge-offs and recoveries"],
+            ["An early-warning signal, not a cause", "Used to decide who to call, never to decline credit automatically", "A controlled pilot measures whether outreach actually prevents overdrafts"],
+            ["Small samples (55 first overdrafts in 2025; 14–29 per gender)", "Report confidence intervals, both years, and multiple-testing correction", "Larger book, monthly monitoring with breach thresholds (Model health)"],
+            ["Possible unequal treatment of groups", "Checked by gender and age in two years: no consistent gap", "Monitor flag and catch rates by group every period"],
+          ] as const).map(([a, b, c]) => <tr key={a}><td><b>{a}</b></td><td>{b}</td><td className="muted">{c}</td></tr>)}</tbody></table>
       </section>
     </main>
   );

@@ -65,6 +65,12 @@ Runway is an engine plus an advisor dashboard (React, FastAPI, Python; Streamlit
    cuts pensions in a layoff (740 pensioners), ignores the EI cap (57% of customers), and its medians call 1,181
    customers deficit-spenders when 97.5% of them actually end up with more money.
 
+## How a bank would roll it out
+Three months in shadow mode (score the book, no contact), then a controlled pilot (half of flagged customers get the
+call, alert and transfer offer), then scale into the advisor CRM and loan origination. The core signal is one SQL query
+(`sql/trough.sql`), checked equal to the Python on every account. Fairness checked by gender and age in two years: no
+consistent gap; monitored every period. Model card in the OSFI E-23 format (`docs/MODEL_CARD.md`).
+
 ## What we don't claim (said first)
 - The trough and the plain lowest balance are statistically tied; our claim is that **the low point beats both runway
   formulas**.
