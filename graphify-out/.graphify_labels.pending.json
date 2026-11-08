@@ -19,7 +19,7 @@
   "17": "review.md",
   "18": "task.md",
   "19": "api.ts",
-  "20": "Runway React frontend: plan and rules",
+  "20": "audit_data.py",
   "21": "What we found, in plain words",
   "22": "Runway 🍊",
   "23": "package.json",
@@ -44,10 +44,12 @@
   "42": "6. Screen by screen: which call, which field",
   "43": "trough_evidence",
   "44": "_FakeGemini",
-  "45": "parse_twist_offline",
+  "45": "test_ai_cards.py",
   "46": "sim_calibration",
   "47": "_load_env",
   "48": "confounders",
-  "49": "Path",
-  "50": "slow"
+  "49": "parse_twist",
+  "50": "slow",
+  "51": "Path",
+  "52": "slow"
 }

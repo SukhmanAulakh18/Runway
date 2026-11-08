@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, money, monthName, pct, type Asof } from "../api";
 import type { Nav } from "../App";
 import { BalanceChart, Legend } from "../charts";
-import { Failed, Kpi, Loading } from "./ui";
+import { Failed, GLOSSARY, Info, Kpi, Loading } from "./ui";
 
 function Source({ s }: { s: string }) {
   return <span className={`src ${s.startsWith("AI") ? "" : "tpl"}`}>{s.startsWith("AI") ? "AI · every number checked" : "Template (AI off or unsure)"}</span>;
@@ -80,15 +80,15 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
       <section className="grid g4">
         <div className="card ink">
           {c.risk.validated_population
-            ? <Kpi label="Chance of a first overdraft, next 12 months" value={pct(c.risk.p_12m, 1)} note="Calibrated on 2024, checked on 2025. If nothing changes." />
+            ? <Kpi tip={GLOSSARY.risk} label="Chance of a first overdraft, next 12 months" value={pct(c.risk.p_12m, 1)} note="Calibrated on 2024, checked on 2025. If nothing changes." />
             : <Kpi label="First-overdraft forecast" value="n/a" size="md" note="Only for customers with 12+ months who were never overdrawn" />}
         </div>
         <div className="card ours">
-          <Kpi label="Liquidity trough (lowest ÷ average, 6 mo)" value={t ? pct(t.ltr) : "–"}
+          <Kpi tip={GLOSSARY.trough} label="Liquidity trough (lowest ÷ average, 6 mo)" value={t ? pct(t.ltr) : "–"}
             note={t?.pct_rank != null ? `Riskier than ${pct(1 - t.pct_rank)} of customers` : "Needs 12+ months of history"} />
         </div>
-        <div className="card"><Kpi swatch="std" label="Standard runway (no shock)" value={c.standard_runway.label} size="md" note="Judges' formula, medians" /></div>
-        <div className="card"><Kpi swatch="ours" label="Realistic runway (no shock)" value={c.realistic_runway.label} size="md" note="Last 12 months, dip-aware" /></div>
+        <div className="card"><Kpi swatch="std" tip={GLOSSARY.standard} label="Standard runway (no shock)" value={c.standard_runway.label} size="md" note="Judges' formula, medians" /></div>
+        <div className="card"><Kpi swatch="ours" tip={GLOSSARY.realistic} label="Realistic runway (no shock)" value={c.realistic_runway.label} size="md" note="Last 12 months, dip-aware" /></div>
       </section>
 
       <Assistant key={`${c.account_id}-${c.asof}`} acct={c.account_id} asof={c.asof as Asof} />
@@ -122,7 +122,7 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
             </div>
           )}
           <div className="card ours">
-            <h2>The fix: a cushion sized to their own dip</h2>
+            <h2>The fix: a cushion sized to their own dip <Info tip={GLOSSARY.cushion} /></h2>
             <p style={{ margin: "8px 0 12px" }}>Keep <b>{money(c.cushion.buffer)}</b> available (overdraft protection or an auto-transfer), the size of their usual in-month dip, and alert them before the balance gets that low.
               {c.cushion.dip_day_reliable && c.cushion.dip_day && <> Their balance usually bottoms out around day {c.cushion.dip_day}.</>}</p>
             <button className="btn ours" onClick={() => nav.go("plan")}>Open the plan →</button>

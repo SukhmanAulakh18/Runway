@@ -5,7 +5,7 @@ track README exactly, so live-twist numbers match their answer key.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import os
 from pathlib import Path
 
@@ -299,6 +299,64 @@ def _sim_paths(acct: int, d: dict, sc: Scenario, months: int, n_paths: int, hist
     # and Brier 0.0152 -> 0.0145 after calibration (evidence.json -> sim_calibration). The standard formula keeps B.
     start = float(h.month_end_balance.iloc[-1]) - sc.one_off_cost - sc.one_off_months_of_spending * r.spending
     return start + np.cumsum(income - spend, axis=1), start, r, n
+
+
+MAKE_IT_MONTHS = 6   # the twist cards' horizon ("EI for 6 months... do they make it?")
+
+
+def verdict(p: Profile, key_res: dict, real_res: dict, r: Realistic, sc: Scenario, sim: dict | None = None) -> dict:
+    """Plain answer to "do they make it?" and what drives the realistic runway, in months (attribution).
+
+    Each driver flips one realistic choice back to the standard formula's assumption and re-runs realistic_runway.
+    direction -1 = our choice shortens the runway, +1 = it lengthens it. months = the size, or None when one side sits
+    at the 120-month cap (then it "makes the difference" rather than a number of months).
+    One-at-a-time attribution: effects don't add up when choices interact (said in Q&A); direction and ranking hold.
+    """
+    std, real = key_res["runway"], real_res["runway"]
+    drivers = []
+    def effect(name, what, alt_r, alt_sc):
+        alt = realistic_runway(alt_r, alt_sc)["runway"]
+        diff = real - alt
+        if abs(diff) < 0.05:
+            return
+        capped = alt >= RUNWAY_CAP or real >= RUNWAY_CAP
+        drivers.append({"driver": name, "what": what, "direction": 1 if diff > 0 else -1,
+                        "months": None if capped else round(diff, 1)})
+    if abs(r.spending - p.spending) > 1 or abs(r.income - p.income) > 1:
+        effect("Recent months", f"their last {r.window_months} months average ${r.income:,.0f} in and ${r.spending:,.0f} out "
+               f"(all-history medians: ${p.income:,.0f} and ${p.spending:,.0f})",
+               replace(r, income=p.income, spending=p.spending, earned_income=max(p.income - r.protected_income, 0.0)), sc)
+    if sc.job_loss and sc.ei_cap:
+        effect("EI cap", f"EI is capped at $729 a week (about ${EI_MONTHLY_MAX:,.0f} a month)", r, replace(sc, ei_cap=False))
+    if sc.job_loss and sc.ei_months > 0:
+        effect("EI ends", f"EI stops after {sc.ei_months} months", r, replace(sc, ei_months=10_000))
+    if sc.job_loss and r.protected_income > 1:
+        effect("Pension keeps coming", f"${r.protected_income:,.0f} a month of pension and interest keeps coming",
+               replace(r, protected_income=0.0, earned_income=r.income), sc)
+    if r.dip > 1:
+        effect("In-month dip", f"the balance dips ${r.dip:,.0f} within a typical month", replace(r, dip=0.0), sc)
+    drivers.sort(key=lambda x: -1e9 if x["months"] is None else -abs(x["months"]))
+    answer = "yes" if real >= MAKE_IT_MONTHS else ("paper" if std >= MAKE_IT_MONTHS else "no")
+    if answer == "yes":
+        headline = ("Yes. Money in still covers money out after this shock." if real >= RUNWAY_CAP
+                    else f"Yes. Realistically they last {real_res['label']}.")
+    elif answer == "paper":
+        headline = f"Only on paper. The standard formula says {key_res['label']}; realistically {real_res['label']}."
+    else:
+        headline = ("No. This shock wipes out their usable savings straight away." if real <= 0
+                    else f"No. Realistically they run out in about {real_res['label']} ({key_res['label']} on the standard formula).")
+    want = 1 if answer == "yes" else -1
+    top = next((x for x in drivers if x["direction"] == want), None)
+    if real <= 0 and r.buffer - r.dip <= 0:
+        reason = f"Their usable savings were already gone before the shock (average balance {'-' if r.buffer < 0 else ''}${abs(r.buffer):,.0f})."
+    elif top:
+        reason = (f"The biggest reason: {top['what']}." if top["months"] is None
+                  else f"The biggest reason: {top['what']} ({top['months']:+.1f} months).")
+    else:
+        reason = None
+    futures = f"{round(sim['p_survive_6'] * 10)} of 10 simulated futures last 6 months." if sim else None
+    return {"answer": answer, "headline": headline, "reason": reason, "futures": futures, "drivers": drivers,
+            "threshold_months": MAKE_IT_MONTHS}
 
 
 def simulate(acct: int, d: dict, sc: Scenario, months: int = 24, n_paths: int = 2000,

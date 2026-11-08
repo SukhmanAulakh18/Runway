@@ -30,7 +30,9 @@ export interface Customer {
 }
 export interface Sim { months: number[]; p10: number[]; p50: number[]; p90: number[]; dip: number; start: number;
   p_survive_6: number; p_survive_12: number; insufficient_history: boolean; n_paths: number; history_months: number }
-export interface ShockRes { scenario: Scenario; standard: RunwayRes; realistic: RunwayRes; why_different: string[]; simulation: Sim;
+export interface Verdict { answer: "yes" | "no" | "paper"; headline: string; reason: string | null; futures: string | null;
+  drivers: { driver: string; what: string; direction: number; months: number | null }[]; threshold_months: number }
+export interface ShockRes { scenario: Scenario; standard: RunwayRes; realistic: RunwayRes; why_different: string[]; simulation: Sim; verdict: Verdict;
   judge_check: { I: number; S: number; B: number; H: number } }
 export interface PlanRes {
   cushion: Cushion;

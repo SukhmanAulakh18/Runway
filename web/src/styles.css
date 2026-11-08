@@ -195,3 +195,27 @@ details.judge code { font-size: 13px; background: #f1f3f7; padding: 8px 10px; bo
 @media (max-width: 1100px) { .how { grid-template-columns: 1fr; } }
 
 .tbl .chip { white-space: nowrap; max-width: 240px; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; }
+
+/* ---------- plain-language tips ---------- */
+.info { position: relative; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%;
+  font-size: 10.5px; font-weight: 800; background: #e3e7ee; color: var(--ink-2); cursor: help; margin-left: 4px; flex: none; }
+.card.ink .info, .card.hero .info { background: rgb(255 255 255 / 0.22); color: #fff; }
+.info:hover::after, .info:focus::after { content: attr(data-tip); position: absolute; left: 50%; top: 22px; transform: translateX(-50%);
+  width: 260px; padding: 9px 11px; border-radius: 10px; background: var(--ink); color: #f1f5f9; font-size: 12.5px; font-weight: 500;
+  line-height: 1.4; letter-spacing: 0; text-transform: none; z-index: 20; box-shadow: 0 8px 24px rgb(15 23 42 / 0.25); white-space: normal; }
+
+/* ---------- verdict ---------- */
+.verdict { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 340px); gap: 20px; align-items: center;
+  background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--ink-3); border-radius: var(--r); padding: 18px 22px; }
+.verdict.yes { border-left-color: var(--good); } .verdict.no { border-left-color: var(--bad); } .verdict.paper { border-left-color: #d97706; }
+.verdict-tag { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; padding: 10px 16px; border-radius: 12px; white-space: nowrap; }
+.verdict.yes .verdict-tag { background: var(--good-soft); color: var(--good); }
+.verdict.no .verdict-tag { background: var(--bad-soft); color: #b91c1c; }
+.verdict.paper .verdict-tag { background: #fef3c7; color: #92400e; font-size: 22px; }
+.verdict-h { font-size: 21px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.3; margin: 4px 0 6px; }
+.drivers { display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; }
+.drivers .row { display: grid; grid-template-columns: 120px 1fr auto; gap: 8px; align-items: center; }
+.drivers .track { height: 8px; background: #eef0f4; border-radius: 4px; overflow: hidden; }
+.drivers .fill { height: 100%; border-radius: 4px; background: var(--bad); }
+.drivers .fill.up { background: var(--good); }
+@media (max-width: 1100px) { .verdict { grid-template-columns: 1fr; } }

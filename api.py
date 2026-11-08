@@ -125,6 +125,7 @@ def shock(acct: int, req: ShockReq):
     c = ctx(acct, req.asof, sc)
     return clean({"scenario": sc, "standard": c.key_res, "realistic": c.real_res,
                   "why_different": E.explain_difference(c.p, c.r, sc), "simulation": c.sim,
+                  "verdict": E.verdict(c.p, c.key_res, c.real_res, c.r, sc, c.sim),
                   "judge_check": {"I": c.p.income, "S": c.p.spending, "B": c.p.buffer, "H": c.p.household_bills}})
 
 

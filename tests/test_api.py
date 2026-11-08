@@ -77,3 +77,8 @@ def test_brief_and_message_offline_templates_verify(lang):
     assert ai.verify_numbers(m["text"], msg_facts) and ai.verify_wording(m["text"], msg_facts)
     assert "%" not in m["text"]   # no risk numbers go to the customer
     assert client.post("/api/ai/message/93172", params={"lang": "de"}).status_code == 422
+
+
+def test_shock_includes_verdict():
+    v = client.post("/api/shock/20111", json={"scenario": {"job_loss": True, "bills_increase_pct": 0.15}}).json()["verdict"]
+    assert v["answer"] == "no" and v["headline"].startswith("No.") and "1 of 10" in v["futures"]
