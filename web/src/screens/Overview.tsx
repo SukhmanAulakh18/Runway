@@ -93,7 +93,10 @@ export default function Overview({ nav }: { nav: Nav }) {
               <p className="sub">Never overdrawn yet, ranked by how close their balance gets to $0. Each row has its own cause and next step. Click to open.</p>
               {wl.data?.calls && <div className="chips" style={{ marginTop: 8 }}>{Object.entries(wl.data.calls).map(([a, n]) => <span key={a} className="chip ours"><b>{n}</b>&nbsp;· {a}</span>)}</div>}
             </div>
-            {wl.data?.reveal && <span className="badge bad">{wl.data.reveal.top_hit} of {wl.data.rows.length} overdrawn next year</span>}
+            <div className="head-actions">
+              {wl.data?.reveal && <span className="badge bad">{wl.data.reveal.top_hit} of {wl.data.rows.length} overdrawn next year</span>}
+              <a className="btn sm" href={`/api/watchlist.csv${nav.asof ? `?asof=${nav.asof}` : ""}`} download>Export CSV</a>
+            </div>
           </div>
           {wl.data?.reveal && (
             <p className="callout bad" style={{ marginTop: 0 }}>

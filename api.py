@@ -7,7 +7,9 @@ so the two frontends can never disagree. `asof` (Time Machine) cuts the data for
 """
 from __future__ import annotations
 
+import csv
 import dataclasses
+import io
 import json
 import logging
 import math
@@ -18,7 +20,7 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -198,6 +200,28 @@ def watchlist(asof: Optional[str] = ASOF, early_only: bool = True, limit: int = 
         out["reveal"] = {"top_hit": int(top.overdraft_next_12m.fillna(False).sum()),
                          "base_rate": float(w.overdraft_next_12m.fillna(False).mean())}
     return clean(out)
+
+
+@app.get("/api/watchlist.csv")
+def watchlist_csv(asof: Optional[str] = ASOF):
+    """The advisor call list as a spreadsheet: the same rows the table shows (built from watchlist(), never recomputed)."""
+    w = watchlist(asof=asof, early_only=True, limit=50)
+    cols = [("account_id", "Account"), ("ltr", "Lowest vs average (6 months)"), ("ltr_pct_rank", "Riskier than share of customers"),
+            ("min_balance", "Lowest balance"), ("cause", "Cause"), ("action", "Next step"), ("reasons", "Why flagged")]
+    if asof:
+        cols.append(("overdraft_next_12m", "Overdrawn in the next 12 months"))
+    buf = io.StringIO(); out = csv.writer(buf)
+    out.writerow([h for _, h in cols])
+    def cell(k, v):   # display formatting only: round the ratios, Yes/No for the outcome
+        if v is None:
+            return ""
+        if k == "overdraft_next_12m":
+            return "Yes" if v else "No"
+        return round(v, 4) if k in ("ltr", "ltr_pct_rank") else v
+    for r in w["rows"]:
+        out.writerow([cell(k, r.get(k)) for k, _ in cols])
+    name = f"runway_call_list_{asof or 'today'}.csv"
+    return Response(buf.getvalue(), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @lru_cache(maxsize=8)

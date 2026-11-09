@@ -287,3 +287,11 @@ details.fold[open] > summary { margin-bottom: 12px; }
 .hookstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 10px 0 6px; }
 .hookstats b { display: block; font-size: 26px; letter-spacing: -0.02em; } .hookstats span { font-size: 13px; color: var(--ink-3); }
 @media (max-width: 700px) { .hookstats { grid-template-columns: 1fr; } }
+
+/* Low-point tank (story step 2) and the call-list export */
+.beat-meter { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.lowpoint { flex: none; color: var(--ink); }
+.lp-fill { transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(var(--lvl)); animation: lp-drain 1.4s ease-out; }
+@keyframes lp-drain { from { transform: scaleY(1); } to { transform: scaleY(var(--lvl)); } }
+@media (prefers-reduced-motion: reduce) { .lp-fill { animation: none; } }
+.head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }

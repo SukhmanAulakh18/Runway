@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, kmoney, money, monthName, pct, type Asof, type Diagnosis } from "../api";
 import type { Nav } from "../App";
-import { BalanceChart, Legend } from "../charts";
+import { LowPointMeter, BalanceChart, Legend } from "../charts";
 import { CountUp, Failed, GLOSSARY, Kpi, Loading } from "./ui";
 
 function Source({ s }: { s: string }) {
@@ -118,7 +118,10 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
           ["Do this", pr ? <><b>{pr.short ?? pr.title}</b>: {pr.title.toLowerCase()}.</> : <>Alert + auto-transfer of <b>{money(c.cushion.buffer)}</b>.</>],
         ];
         return <section className="story" aria-label="The story in four steps">{beats.map(([h, b], i) => (
-          <div key={h} className={`card ${i === 3 ? "ours" : ""}`}><p className="eyebrow">{i + 1} · {h}</p><p style={{ margin: "6px 0 0" }}>{b}</p></div>))}</section>;
+          <div key={h} className={`card ${i === 3 ? "ours" : ""}`}><p className="eyebrow">{i + 1} · {h}</p>
+            {i === 1 && t ? <div className="beat-meter"><p style={{ margin: "6px 0 0" }}>{b}</p>
+              <LowPointMeter ratio={t.ltr} avg={money(t.avg_balance)} low={money(t.min_balance)} /></div>
+              : <p style={{ margin: "6px 0 0" }}>{b}</p>}</div>))}</section>;
       })()}
 
       <p className="summary">

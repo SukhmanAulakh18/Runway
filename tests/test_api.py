@@ -184,3 +184,19 @@ def test_measured_ai_accuracy_is_served_when_present():
     if "ai_eval" in ev:   # written by scripts/eval_ai.py; the Stress screen shows it next to the twist card
         a = ev["ai_eval"]
         assert a["held_out_cards"] == 16 and 0 <= a["rules_correct"] <= 16 and (a["ai_correct"] is None or 0 <= a["ai_correct"] <= 16)
+
+
+def test_call_list_csv_matches_the_table():
+    """Export CSV is the same call list the table shows: same accounts, same order, one header row, and it parses back cleanly."""
+    import csv, io
+    r = client.get("/api/watchlist.csv", params={"asof": "2024-12"})
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/csv")
+    assert "runway_call_list_2024-12.csv" in r.headers["content-disposition"]
+    rows = list(csv.reader(io.StringIO(r.text)))
+    table = client.get("/api/watchlist", params={"asof": "2024-12"}).json()["rows"]
+    assert rows[0][0] == "Account" and "Next step" in rows[0] and "Overdrawn in the next 12 months" in rows[0]
+    assert [int(x[0]) for x in rows[1:]] == [t["account_id"] for t in table] and len(rows) == 51
+    assert 93172 in [int(x[0]) for x in rows[1:]]
+    assert {x[-1] for x in rows[1:]} <= {"Yes", "No"} and all(len(x[1].split(".")[-1]) <= 4 for x in rows[1:])   # readable in a spreadsheet
+    today = list(csv.reader(io.StringIO(client.get("/api/watchlist.csv").text)))
+    assert "Overdrawn in the next 12 months" not in today[0]      # no future outcome column outside the Time Machine
