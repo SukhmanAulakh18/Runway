@@ -45,6 +45,7 @@ python scripts/smoke.py http://localhost:8080          # against Docker or the C
 | Survival (`survival_cohort`, `when_overdraft`) | Customer, Evidence | Dec 2024 view | uses the 2022 cohort; 6 ≤ 12 ≤ 24-month shares |
 | Challenger (`evidence.challenger`) | Evidence | 2025 | trough is the top feature; McNemar and AUC p > 0.05 |
 | Runway vs formula (`evidence.out_of_time` etc.) | Evidence | 2025 | realistic AUC above the formula's, CI above 0 |
+| Customers like this (`like_cohort`, `like_this`) | Customer | pools for Dec 2022 / 2023 / 2024 | 1,556 / 2,213 / 3,417 customers with 18 / 34 / 55 first overdrafts: the same populations as the three-year backtest; never overdrawn before the cohort month; outcome from the next year only |
 
 ## 3. Known limits of the tests
 - Data tests can't run on GitHub (the data is never committed); they run locally before every merge.

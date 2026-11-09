@@ -67,5 +67,10 @@ def repeat_table(year: int):
 
 
 @st.cache_resource
+def like_table(cohort_month: str):
+    return E.like_cohort(load_all()[0], cohort_month)   # features + next-year outcome for the 'customers like this' pool
+
+
+@st.cache_resource
 def survival_table(score_month: str):
     return E.survival_curves(E.survival_cohort(load_all()[0], score_month))   # Kaplan-Meier by trough group

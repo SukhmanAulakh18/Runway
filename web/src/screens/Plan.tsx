@@ -17,6 +17,8 @@ export default function Plan({ nav }: { nav: Nav }) {
   const p = q.data, cu = p.cushion, o = p.optimiser, im = ev.data?.impact?.["2024-12"];
   const bc = ev.data?.buffer_confidence?.["2024-12"];
   const levers = p.backup.levers.filter((l) => l.gain !== 0);
+  const months = (v: number) => (v >= 120 ? "120+" : String(v));
+  const best = levers.find((l) => l.action.startsWith("Combined")) ?? [...levers].sort((a, b) => b.runway - a.runway)[0];   // engine's own numbers, no maths here
 
   return (
     <main className="page fade" style={{ opacity: q.isPlaceholderData ? 0.6 : 1 }}>
@@ -33,6 +35,15 @@ export default function Plan({ nav }: { nav: Nav }) {
             <p className="why">{p.diagnosis.primary.why}</p>
             <p className="act"><b>Action:</b> {p.diagnosis.primary.action}</p>
           </div>
+        </section>
+      )}
+
+      {best && best.runway > p.backup.base_runway && (
+        <section className="card shift" aria-label="What the plan buys">
+          <div><p className="eyebrow">Realistic runway{shocked ? " under your shock" : " today"}</p><b>{months(p.backup.base_runway)} months</b></div>
+          <span className="arrow" aria-hidden="true">→</span>
+          <div><p className="eyebrow">With the plan</p><b>{months(best.runway)} months</b></div>
+          <p className="sub">{best.action}: {best.how.toLowerCase()}{best.monthly_saving > 0 ? `, saving ${money(best.monthly_saving)} a month` : ""}. Estimated by the engine on this customer's own numbers.</p>
         </section>
       )}
 

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 import engine as E
-from ui.data import dip_days, repeat_table, standing_orders, survival_table, trough_table
+from ui.data import dip_days, like_table, repeat_table, standing_orders, survival_table, trough_table
 
 
 @dataclass
@@ -31,6 +31,7 @@ class Context:
     committed: dict | None = None  # engine.committed_outflows: standing orders (today only; None when asof is set)
     loan_check: dict | None = None  # engine.loan_check: review rule at loan approval
     when: dict | None = None  # engine.when_overdraft: survival curve of their trough group (past cohort only)
+    like: dict | None = None  # engine.like_this: the nearest past customers and what happened to them (past cohort only)
     repeat: dict | None = None  # engine.repeat_overdraft: overdrawn in the last 12 months -> tested repeat rate
     diagnosis: dict | None = None  # engine.diagnose: why they're at risk and the matched action, most urgent first
 
@@ -86,4 +87,6 @@ def build_context(d, people, EV, accounts, acct, asof, sc) -> Context:
                    committed=None if asof else E.committed_outflows(acct, standing_orders()),
                    repeat=E.repeat_overdraft(acct, d, repeat_table(int(asof[:4]) if asof else 2025)),
                    when=(E.when_overdraft(lt["pct_rank"] if lt else None, survival_table(E.survival_score_month(asof)), E.survival_score_month(asof))
-                         if lt and not (a_rows.days_below_zero > 0).any() else None))   # Dec 2024 view: rates from 2023 -> 2024 only
+                         if lt and not (a_rows.days_below_zero > 0).any() else None),   # Dec 2024 view: rates from 2023 -> 2024 only
+                   like=(E.like_this(like_table(E.like_cohort_month(asof)), E.like_query(a_rows, lt, acct), E.like_cohort_month(asof))
+                         if lt and lt["scorable"] and not (a_rows.days_below_zero > 0).any() else None))

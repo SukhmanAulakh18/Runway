@@ -163,6 +163,14 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
         </p>
       )}
 
+      {c.like && (
+        <p className="callout" style={{ margin: 0 }}>
+          <b>Customers like this.</b> Of the {c.like.k} customers who looked most like this one a year earlier (similar low point, balance size and swings in money in),
+          {" "}<b>{c.like.overdrawn}</b> were overdrawn the next year: <b>{pct(c.like.share)}</b>, against {pct(c.like.base_rate, 1)} of all {c.like.pool.toLocaleString("en-CA")} customers in that group ({c.like.cohort}).
+          Descriptive, not a probability, and a new loan is not part of the match.
+        </p>
+      )}
+
       <Assistant key={`${c.account_id}-${c.asof}`} acct={c.account_id} asof={c.asof as Asof} />
 
       <section className="grid g-7-5" style={{ alignItems: "start" }}>
