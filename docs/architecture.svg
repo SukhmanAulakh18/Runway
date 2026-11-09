@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 380" width="1000" height="380" role="img" aria-label="Every number comes from one engine. The screens only display it, and the AI only turns the engine's numbers into sentences, which a checker rejects if they contain any number the engine did not produce." font-family="Arial, Helvetica, sans-serif">
+  <title>How a click becomes numbers: one engine, and an AI that can only reword them</title>
+  <desc>Screens ask the API; the API asks the engine; the engine reads the data cut at the as-of month and returns numbers. For AI text the engine's numbers go to Gemini as facts, Gemini returns sentences, and a number check rejects any sentence with a number that is not in the facts, falling back to a template.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#24170f"/></marker>
+    <marker id="o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#c94a0c"/></marker>
+  </defs>
+  <rect width="1000" height="380" fill="#ffffff"/>
+
+  <!-- top row: the number path -->
+  <g stroke="#24170f" stroke-width="1.5">
+    <rect x="20" y="40" width="150" height="100" rx="10" fill="#ffffff"/>
+    <rect x="280" y="40" width="150" height="100" rx="10" fill="#ffffff"/>
+    <rect x="540" y="40" width="170" height="100" rx="10" fill="#fff1e6" stroke="#c94a0c" stroke-width="3"/>
+    <rect x="820" y="40" width="160" height="100" rx="10" fill="#eef1f5"/>
+  </g>
+  <g fill="#24170f" text-anchor="middle">
+    <text x="95" y="72" font-size="16" font-weight="700">Screens</text>
+    <text x="95" y="94" font-size="12">React, 5 screens</text>
+    <text x="95" y="112" font-size="12">display only,</text>
+    <text x="95" y="128" font-size="12">never calculate</text>
+
+    <text x="355" y="72" font-size="16" font-weight="700">API</text>
+    <text x="355" y="94" font-size="12">FastAPI</text>
+    <text x="355" y="112" font-size="12">cuts the data at</text>
+    <text x="355" y="128" font-size="12">the as-of month</text>
+
+    <text x="625" y="72" font-size="16" font-weight="700" fill="#c94a0c">Engine</text>
+    <text x="625" y="94" font-size="12">engine.py: ALL the maths</text>
+    <text x="625" y="112" font-size="12">runways, trough, forecast,</text>
+    <text x="625" y="128" font-size="12">tiers, loan check</text>
+
+    <text x="900" y="72" font-size="16" font-weight="700">Data</text>
+    <text x="900" y="94" font-size="12">9 CSV files</text>
+    <text x="900" y="112" font-size="12">never committed</text>
+    <text x="900" y="128" font-size="12">to GitHub</text>
+  </g>
+  <g stroke="#24170f" stroke-width="1.5" fill="none">
+    <line x1="172" y1="75" x2="278" y2="75" marker-end="url(#a)"/>
+    <line x1="278" y1="105" x2="172" y2="105" marker-end="url(#a)"/>
+    <line x1="432" y1="75" x2="538" y2="75" marker-end="url(#a)"/>
+    <line x1="538" y1="105" x2="432" y2="105" marker-end="url(#a)"/>
+    <line x1="818" y1="90" x2="712" y2="90" marker-end="url(#a)"/>
+  </g>
+  <g fill="#24170f" font-size="11" text-anchor="middle">
+    <text x="225" y="66">asks</text><text x="225" y="122">numbers (JSON)</text>
+    <text x="485" y="66">asks</text><text x="485" y="122">numbers</text>
+    <text x="765" y="80">reads rows</text><text x="765" y="108">to the as-of</text>
+  </g>
+
+  <!-- bottom row: the words path -->
+  <g stroke="#24170f" stroke-width="1.5">
+    <rect x="540" y="240" width="170" height="100" rx="10" fill="#ffffff"/>
+    <rect x="280" y="240" width="150" height="100" rx="10" fill="#f4ede7"/>
+  </g>
+  <g fill="#24170f" text-anchor="middle">
+    <text x="625" y="272" font-size="16" font-weight="700">AI (Gemini)</text>
+    <text x="625" y="294" font-size="12">on Vertex AI</text>
+    <text x="625" y="312" font-size="12">reads twist cards,</text>
+    <text x="625" y="328" font-size="12">writes sentences</text>
+
+    <text x="355" y="272" font-size="16" font-weight="700">Number check</text>
+    <text x="355" y="294" font-size="12">rejects any number</text>
+    <text x="355" y="312" font-size="12">not in the facts;</text>
+    <text x="355" y="328" font-size="12">else a template</text>
+  </g>
+  <g stroke="#c94a0c" stroke-width="2" fill="none">
+    <line x1="625" y1="142" x2="625" y2="238" marker-end="url(#o)"/>
+  </g>
+  <g stroke="#24170f" stroke-width="1.5" fill="none">
+    <line x1="538" y1="290" x2="432" y2="290" marker-end="url(#a)"/>
+    <line x1="355" y1="238" x2="355" y2="142" marker-end="url(#a)"/>
+  </g>
+  <g fill="#c94a0c" font-size="11" font-weight="700"><text x="635" y="192">facts: the engine's numbers</text></g>
+  <g fill="#24170f" font-size="11" text-anchor="middle">
+    <text x="485" y="282">sentences</text>
+  </g>
+  <g fill="#24170f" font-size="11"><text x="365" y="192">checked words</text></g>
+
+  <!-- the one rule -->
+  <text x="20" y="372" font-size="12" fill="#24170f" font-weight="700">One rule: a number is never calculated on a screen or by the AI, so it cannot differ between two places or be invented.</text>
+</svg>

@@ -160,3 +160,23 @@ export function SurvivalChart({ curves, height = 260 }: { curves: Record<string,
     </ResponsiveContainer>
   );
 }
+
+
+/** The low point as a tank: the tank is the customer's average balance, the fill is their lowest balance (engine's lowest ÷ average).
+ *  A meter in the dataviz sense: fill carries the state, the track is a lighter step of the same hue. Numbers are in the label and
+ *  the text beside it; the level is drawn at least a hairline so a near-empty tank still reads. */
+export function LowPointMeter({ ratio, avg, low }: { ratio: number; avg: string; low: string }) {
+  const r = Math.min(Math.max(ratio, 0), 1), level = Math.max(r, 0.05);
+  const label = `Average balance ${avg}; lowest balance ${low}, ${pct(r)} of the average`;
+  return (
+    <svg className="lowpoint" viewBox="0 0 28 56" width="36" height="72" role="img" aria-label={label} style={{ ["--lvl" as string]: level }}>
+      <title>{label}</title>
+      <defs><clipPath id="lp-clip"><rect x="2" y="2" width="24" height="52" rx="6" /></clipPath></defs>
+      <g clipPath="url(#lp-clip)">
+        <rect x="2" y="2" width="24" height="52" fill="var(--ours-soft)" />
+        <rect className="lp-fill" x="2" y="2" width="24" height="52" fill="var(--ours-fill)" />
+      </g>
+      <rect x="2" y="2" width="24" height="52" rx="6" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}

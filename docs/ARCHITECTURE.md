@@ -1,5 +1,8 @@
 # Architecture: the tech, and how everything works
 
+![How a click becomes numbers: Screens ask the API, the API asks the engine, the engine reads the data and returns numbers; the AI only rewords the engine's numbers and a number check rejects anything else.](architecture.svg)
+
+
 This explains how Runway is built, in plain language first and technical detail second. If you only read one section, read "The big picture".
 
 ---
