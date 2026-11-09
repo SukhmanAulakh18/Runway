@@ -200,3 +200,12 @@ def test_call_list_csv_matches_the_table():
     assert {x[-1] for x in rows[1:]} <= {"Yes", "No"} and all(len(x[1].split(".")[-1]) <= 4 for x in rows[1:])   # readable in a spreadsheet
     today = list(csv.reader(io.StringIO(client.get("/api/watchlist.csv").text)))
     assert "Overdrawn in the next 12 months" not in today[0]      # no future outcome column outside the Time Machine
+
+
+def test_customers_like_this_on_the_customer_screen():
+    c = client.get("/api/customer/93172", params={"asof": "2024-12"}).json()
+    like = c["like"]
+    assert like["k"] == 100 and like["cohort"] == "Dec 2023 → 2024"        # Dec 2024 view: a pool whose outcome year is 2024
+    assert like["share"] > like["base_rate"] and len(like["examples"]) == 5
+    assert client.get("/api/customer/51816", params={"asof": "2024-12"}).json()["like"] is None   # already overdrawn: not a first-overdraft comparison
+    assert client.get("/api/customer/21284", params={"asof": "2024-12"}).json()["like"] is None   # too new to rank

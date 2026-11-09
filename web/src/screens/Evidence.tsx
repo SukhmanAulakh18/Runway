@@ -24,6 +24,27 @@ export default function Evidence() {
         <h1 className="title">Tested on years the model never saw. <em>Reported even where it failed.</em></h1>
       </div>
 
+      {(() => {
+        const y25 = e.trough.by_year.find((r: { predicted_year: number }) => r.predicted_year === 2025);
+        const hh = e.out_of_time;
+        return (
+          <section aria-label="Proof in 30 seconds">
+            <h2 className="eyebrow" style={{ margin: "0 0 8px" }}>Proof in 30 seconds</h2>
+            <div className="grid g4">
+              <div className="card hero"><Kpi label="Flag 10% of customers, catch" value={`${y25.low10_events} of ${y25.new_overdrafts}`}
+                note={`first overdrafts in 2025. The riskiest 10% were ${Math.min(...rr).toFixed(0)}–${Math.max(...rr).toFixed(0)}× likelier, three years running`} /></div>
+              <div className="card"><Kpi label={`When we say ${pct(cal.calibrated_mean, 1)}, it happens`} value={`${pct(cal.calibrated_mean, 1)} vs ${pct(cal.observed_rate, 1)}`}
+                note="Predicted vs actual overdrafts in 2025, after correcting a simulation that was 8× too pessimistic" /></div>
+              <div className="card ours"><Kpi label="Beats the judges' formula" value={`AUC ${hh.auc_realistic.toFixed(2)} vs ${hh.auc_answer_key.toFixed(2)}`}
+                note="At telling who goes overdrawn in 2025. 0.5 is a coin toss" /></div>
+              <div className="card"><Kpi label="The judges' formula, kept exact" value="36,000 cases"
+                note="An independent re-implementation agrees on every one: 4,500 accounts × 8 scenarios" /></div>
+            </div>
+            <h2 className="eyebrow" style={{ margin: "20px 0 8px" }}>The full evidence, for people who check</h2>
+          </section>
+        );
+      })()}
+
       <section className="grid g4">
         <div className="card"><Kpi label="Findings that survive multiple-testing correction" value={`${mt.survive} of ${mt.tests}`} note="Benjamini–Hochberg, q = 0.10" /></div>
         <div className="card"><Kpi label="Odds ratio after controls" value={`${cf.odds_ratio.toFixed(1)}×`} note={`95% CI ${cf.or_ci95[0].toFixed(1)}–${cf.or_ci95[1].toFixed(1)}; balance size, account age, unemployment`} /></div>

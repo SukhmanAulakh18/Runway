@@ -519,6 +519,61 @@ def when_overdraft(pct_rank: float | None, curves: dict, score_month: str) -> di
             "cohort": f"scored {score_month}, followed {int(score_month[:4]) + 1}-{int(score_month[:4]) + 2}"}
 
 
+# ---------------------------------------------------------------------------
+# Customers like this: the nearest past customers (same low point, balance size and swings in money in, one year earlier)
+# and what actually happened to them next. Descriptive evidence for a call, not a probability. The pool is the December cohort
+# whose next year is already over at the view date, so it never looks ahead (same rule as the whole-book rates).
+# ---------------------------------------------------------------------------
+LIKE_K = 100   # k=30 was noisy (leave-one-out AUC 0.76 / 0.83); 100 is stable (0.80 / 0.87, vs the trough alone 0.84 / 0.86). A within-cohort sanity check, not an out-of-time test
+
+
+def like_cohort_month(asof: str | None) -> str:
+    month = asof or "2025-12"
+    done_year = int(month[:4]) if month[5:] == "12" else int(month[:4]) - 1
+    return f"{done_year - 1}-12"
+
+
+def like_features(past: pd.DataFrame, t: pd.DataFrame) -> pd.DataFrame:
+    """Matching features from months up to the score month: trough rank (0 = most fragile), log average balance,
+    and swings in money in (sd / mean over the last 12 months)."""
+    w = past.sort_values(["account_id", "month"]).groupby("account_id").tail(12).groupby("account_id").money_in
+    swing = (w.std() / w.mean().clip(lower=1.0)).fillna(0.0)
+    return pd.DataFrame({"pct": t.ltr_pct_rank, "log_bal": np.log(t.avg_balance.clip(lower=1.0)), "swing": swing.reindex(t.index)})
+
+
+def like_query(a_rows: pd.DataFrame, lt: dict, acct: int) -> dict:
+    """The same features for one customer, from their own months up to the view date."""
+    t = pd.DataFrame({"avg_balance": [lt["avg_balance"]], "ltr_pct_rank": [lt["pct_rank"]]}, index=pd.Index([acct], name="account_id"))
+    return like_features(a_rows, t).iloc[0].to_dict()
+
+
+def like_cohort(d: dict, cohort_month: str) -> pd.DataFrame:
+    """Customers scorable at the cohort month, never overdrawn before it, with a full next year: features + whether they
+    went below $0 in that next year."""
+    m = d["monthly"]; past = m[m.month <= cohort_month]
+    t = ltr_table(d, asof=cohort_month)
+    f = like_features(past, t)
+    never = (past.groupby("account_id").days_below_zero.sum() == 0).reindex(t.index).fillna(False).astype(bool)
+    nxt = m[m.month.str[:4] == str(int(cohort_month[:4]) + 1)].groupby("account_id")
+    full = (nxt.size() == 12).reindex(t.index).fillna(False).astype(bool)
+    out = f[t.scorable & never & full].copy()
+    out["overdrawn"] = (nxt.days_below_zero.sum() > 0).reindex(out.index).astype(bool)
+    return out.dropna()
+
+
+def like_this(cohort: pd.DataFrame, feats: dict, cohort_month: str, k: int = LIKE_K) -> dict | None:
+    cols = ["pct", "log_bal", "swing"]
+    if cohort.empty or any(pd.isna(feats[c]) for c in cols):
+        return None
+    sd = cohort[cols].std(ddof=0).replace(0, 1.0)
+    dist = np.sqrt((((cohort[cols] - pd.Series(feats)[cols]) / sd) ** 2).sum(axis=1))
+    near = cohort.loc[dist.nsmallest(k).index]          # nearest first
+    y = int(cohort_month[:4])
+    return {"k": int(len(near)), "overdrawn": int(near.overdrawn.sum()), "share": float(near.overdrawn.mean()),
+            "base_rate": float(cohort.overdrawn.mean()), "pool": int(len(cohort)), "cohort": f"Dec {y} → {y + 1}",
+            "examples": [{"account_id": int(a), "overdrawn": bool(h)} for a, h in near.overdrawn.head(5).items()]}
+
+
 def overdraft_risk(acct: int, d: dict) -> dict:
     """Calibrated chance of a first overdraft in the next 12 months if nothing changes (no shock).
 

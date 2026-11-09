@@ -117,7 +117,7 @@ def customer(acct: int, asof: Optional[str] = ASOF):
                      "days_below_zero", "household_bills", "insurance", "loan_payments", "pension_in"]]
     out = {"account_id": acct, "asof": asof, "owner_age": c.age, "flags": c.flags,
            "profile": c.p, "standard_runway": c.key_res, "realistic": c.r, "realistic_runway": c.real_res,
-           "trough": c.lt, "loan": c.LR, "loan_check": c.loan_check, "risk": c.risk, "cushion": c.cushion, "committed": c.committed, "repeat": c.repeat, "when": c.when, "diagnosis": c.diagnosis,
+           "trough": c.lt, "loan": c.LR, "loan_check": c.loan_check, "risk": c.risk, "cushion": c.cushion, "committed": c.committed, "repeat": c.repeat, "when": c.when, "like": c.like, "diagnosis": c.diagnosis,
            "last_activity": c.a_rows.month.max(), "history": hist}
     t = _tiers(asof)
     out["tier"] = {"key": t.get(acct), "label": E.BOOK_TIERS[t[acct]][0], "action": E.BOOK_TIERS[t[acct]][1]} if acct in t.index else None

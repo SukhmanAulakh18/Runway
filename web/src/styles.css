@@ -295,3 +295,10 @@ details.fold[open] > summary { margin-bottom: 12px; }
 @keyframes lp-drain { from { transform: scaleY(1); } to { transform: scaleY(var(--lvl)); } }
 @media (prefers-reduced-motion: reduce) { .lp-fill { animation: none; } }
 .head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+
+/* Plan: what the plan buys */
+.shift { display: grid; grid-template-columns: auto auto auto 1fr; gap: 6px 22px; align-items: center; }
+.shift b { font-size: 34px; letter-spacing: -0.02em; display: block; }
+.shift .arrow { font-size: 26px; color: var(--ours-ink); font-weight: 700; }
+.shift .sub { margin: 0; }
+@media (max-width: 900px) { .shift { grid-template-columns: auto auto auto; } .shift .sub { grid-column: 1 / -1; } }
