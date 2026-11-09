@@ -23,7 +23,7 @@ const PITCH: { tab: Tab; title: string; cue: string; shock?: Partial<Scenario> }
   { tab: "evidence", title: "Why trust it", cue: "Tested on years the model never saw. Model health shows no breaches, and everything that failed is listed. Now: pick any account and any twist card." },
 ];
 
-export interface Nav { acct: number; asof: Asof; scenario: Scenario; go: (t: Tab, acct?: number) => void; setScenario: (s: Scenario) => void }
+export interface Nav { acct: number; asof: Asof; scenario: Scenario; go: (t: Tab, acct?: number, asof?: Asof) => void; setScenario: (s: Scenario) => void }
 
 function readUrl() {
   const p = new URLSearchParams(location.search);
@@ -53,7 +53,7 @@ export default function App() {
     qc.prefetchQuery({ queryKey: ["watchlist", "2024-12"], queryFn: () => api.watchlist("2024-12") });
   }, [qc]);
 
-  const go = (t: Tab, a?: number) => { if (a) setAcct(a); setTab(t); window.scrollTo({ top: 0 }); };
+  const go = (t: Tab, a?: number, w?: Asof) => { if (a) setAcct(a); if (w !== undefined) setAsof(w); setTab(t); window.scrollTo({ top: 0 }); };   // w: undefined keeps the Time Machine, null = Today
   const [step, setStep] = useState<number | null>(null);
   const pitch = (i: number | null) => {
     setStep(i);

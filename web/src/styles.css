@@ -276,3 +276,14 @@ details.fold[open] > summary { margin-bottom: 12px; }
 .t-stable { background: #c9cfd9; }
 .t-new { background: repeating-linear-gradient(45deg, #c9cfd9 0 4px, #e9ecf1 4px 8px); }
 .t-newhot { background: repeating-linear-gradient(45deg, var(--ours-fill) 0 4px, #f6a46b 4px 8px); }
+
+/* Overview: preset customers and the "running hot" strip */
+.presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 10px; }
+.preset { text-align: left; display: flex; flex-direction: column; gap: 3px; padding: 11px 13px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--card); }
+.preset b { font-size: 14px; } .preset span { font-size: 12.5px; color: var(--ink-3); }
+.preset:hover, .preset:focus-visible { border-color: var(--ours-ink); background: var(--ours-soft); }
+.preset.surprise { background: var(--ink); border-color: var(--ink); } .preset.surprise b { color: var(--paper); } .preset.surprise span { color: #c9b8a8; }
+.preset:disabled { opacity: .6; cursor: default; }
+.hookstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 10px 0 6px; }
+.hookstats b { display: block; font-size: 26px; letter-spacing: -0.02em; } .hookstats span { font-size: 13px; color: var(--ink-3); }
+@media (max-width: 700px) { .hookstats { grid-template-columns: 1fr; } }

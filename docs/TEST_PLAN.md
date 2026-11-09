@@ -13,7 +13,7 @@ python scripts/smoke.py http://localhost:8080          # against Docker or the C
 
 | Stage | What could go wrong | Check | Where |
 |---|---|---|---|
-| Requirements | The judges' formula drifts from the README | Answer-key tests: 20111 job loss 3.4 months, one-month repair 4.0, combo 3.4 | `test_acceptance.py`, `test_api.py`, `scripts/smoke.py` |
+| Requirements | The judges' formula drifts from the README | Answer-key tests: 20111 job loss 3.4 months, one-month repair 4.0, combo 3.4; **and an independent re-implementation (plain Python, no pandas, loan status from the status letter) agrees on all 36,000 cases = 4,500 accounts × 8 scenarios** | `test_acceptance.py`, `test_api.py`, `test_formula_all_accounts.py`, `scripts/smoke.py` |
 | Design | Maths leaks into the screens or the AI | Rule: all maths in `engine.py`; the AI contract test fails if `Scenario` or the plan facts change shape | `test_ai_cards.py::test_ai_engine_contract` |
 | Build: engine | A calculation is wrong or looks into the future | Unit and acceptance tests per function, including no-lookahead guards (Time Machine, loans from the month granted, survival cohort two years back) | `test_acceptance.py` (65 tests) |
 | Build: statistics | A finding stops holding when code changes | Slow tests rebuild each evidence section and assert the claim: trough risk ratio, calibration, BH survivors, loan rule, fairness, survival hazard ratio, challenger tie, buffer curve | `pytest -m slow` (14) |

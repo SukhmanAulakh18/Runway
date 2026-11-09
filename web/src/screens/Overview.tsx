@@ -1,8 +1,37 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, kmoney, money, monthName, pct, NO_SHOCK } from "../api";
-import type { Nav } from "../App";
+import { api, kmoney, money, monthName, pct, NO_SHOCK, type Asof, type Scenario } from "../api";
+import type { Nav, Tab } from "../App";
 import { Legend, PortfolioChart } from "../charts";
 import { CountUp, Failed, Kpi, Loading } from "./ui";
+
+type Preset = { label: string; why: string; acct: number; tab: Tab; when: Asof; shock?: Partial<Scenario> };
+const PRESETS: Preset[] = [
+  { label: "The hidden loan", why: "Looks fine, then a $167K loan: 93172", acct: 93172, tab: "customer", when: "2024-12" },
+  { label: "The README twist", why: "Job loss + bills +15% on 20111: the answer key", acct: 20111, tab: "stress", when: null, shock: { job_loss: true, bills_increase_pct: 0.15 } },
+  { label: "Already overdrawn", why: "Recovery plan first: 51816", acct: 51816, tab: "customer", when: "2024-12" },
+  { label: "A stable customer", why: "Nothing to do: 97909", acct: 97909, tab: "customer", when: null },
+  { label: "New and swinging", why: "Too new for the trough: 21284", acct: 21284, tab: "customer", when: "2024-12" },
+];
+
+/** One click into a real account, in the story it tells best (also sets the Time Machine and any twist). */
+function TryIt({ nav }: { nav: Nav }) {
+  const accts = useQuery({ queryKey: ["accounts"], queryFn: api.accounts, staleTime: Infinity });
+  const open = (p: Preset) => { nav.setScenario(p.shock ? { ...NO_SHOCK, ...p.shock } : NO_SHOCK); nav.go(p.tab, p.acct, p.when); };
+  const surprise = () => {
+    const l = accts.data;
+    if (l?.length) { nav.setScenario(NO_SHOCK); nav.go("customer", l[Math.floor(Math.random() * l.length)], null); }
+  };
+  return (
+    <section className="card" aria-label="Try it on a customer">
+      <h2>Try it on a customer</h2>
+      <p className="sub">One click opens a real account in the story it tells best.</p>
+      <div className="presets">
+        {PRESETS.map((p) => <button key={p.label} className="preset" onClick={() => open(p)}><b>{p.label}</b><span>{p.why}</span></button>)}
+        <button className="preset surprise" onClick={surprise} disabled={!accts.data}><b>Surprise me</b><span>A random customer from the 4,500</span></button>
+      </div>
+    </section>
+  );
+}
 
 export default function Overview({ nav }: { nav: Nav }) {
   const ev = useQuery({ queryKey: ["evidence"], queryFn: api.evidence, staleTime: Infinity });
@@ -23,17 +52,11 @@ export default function Overview({ nav }: { nav: Nav }) {
         <h1 className="title">Banks watch the average balance. <em>Overdrafts happen at the low point.</em></h1>
         <p className="lede">
           Built for a bank's customer-care and risk teams. Some customers look healthy on average but dip close to $0 every
-          month. Runway finds them before their first overdraft and tells the advisor exactly what to offer.
+          month. Runway <b>spots</b> them before their first overdraft, <b>explains</b> why, and tells the advisor how to <b>act</b>.
         </p>
       </div>
 
-      <section className="howto" aria-label="How it works">
-        {[["Spot", "Flag customers whose balance keeps dipping near $0, even when the average looks fine."],
-          ["Explain", "Show why in plain words: the dip, the risk, and what a job loss or repair would do."],
-          ["Act", "Match the action to the cause: a call when money in falls, a loan review, auto-saving good months, and a cushion with an alert sized to their own dip. Message ready in English or French."]].map(([h, t], i) => (
-          <div key={h} className="card"><span className="n">{i + 1}</span><div><h2>{h}</h2><p className="sub" style={{ marginTop: 4 }}>{t}</p></div></div>
-        ))}
-      </section>
+      <TryIt nav={nav} />
 
       {ev.isPending ? <Loading h={130} /> : ev.isError ? <Failed error={ev.error} /> : im && y25 && (
         <section className="grid g4" aria-label="Headline results">
@@ -48,9 +71,21 @@ export default function Overview({ nav }: { nav: Nav }) {
         </section>
       )}
 
+      {seg && (
+        <section className="card" aria-label="Who the riskiest customers are">
+          <h2>The riskiest 10% aren't poor. They're running hot.</h2>
+          <div className="hookstats">
+            <div><b>{money(seg["money in per month"].riskiest_10)}</b><span>money in a month, vs {money(seg["money in per month"].everyone_else)} for everyone else</span></div>
+            <div><b>{pct(seg["has a loan"].riskiest_10)}</b><span>carry a loan, vs {pct(seg["has a loan"].everyone_else)}</span></div>
+            <div><b>{pct(seg["pensioner"].riskiest_10, 1)}</b><span>are pensioners, vs {pct(seg["pensioner"].everyone_else)}</span></div>
+          </div>
+          <p className="sub">Where they live, joint accounts and district salaries make no difference. Descriptive, tested; not causal.</p>
+        </section>
+      )}
+
       <BookCard nav={nav} />
 
-      <section className="grid g-7-5">
+      <section className="grid">
         <div className="card">
           <div className="card-head">
             <div>
@@ -92,7 +127,12 @@ export default function Overview({ nav }: { nav: Nav }) {
           )}
         </div>
 
-        <div className="grid" style={{ alignContent: "start" }}>
+      </section>
+
+      <details className="card fold">
+        <summary><h2>More for the bank team: a bank-wide layoff and the lending check</h2>
+          <span className="sub">{at6 ? `If everyone lost their job, ${pct(at6.standard)} still have money at month 6 on the standard formula; ${pct(at6.realistic)} in reality. ` : ""}Show the charts</span></summary>
+        <div className="grid g2" style={{ marginTop: 12, alignItems: "start" }}>
           <div className="card">
             <h2>{at6 ? `If everyone lost their job: the standard formula says ${pct(at6.standard)} still have money at month 6. Realistically, ${pct(at6.realistic)}.`
               : "Bank view: a layoff hits everyone at once"}</h2>
@@ -119,19 +159,8 @@ export default function Overview({ nav }: { nav: Nav }) {
             )}
             <button className="btn" style={{ marginTop: 12 }} onClick={() => nav.go("evidence")}>See the evidence →</button>
           </div>
-          {seg && (
-            <div className="card">
-              <h2>Who the riskiest 10% are: not poor, but running hot</h2>
-              <div className="list" style={{ marginTop: 6 }}>
-                <div className="list-row"><span>Money in per month (median)</span><b>{money(seg["money in per month"].riskiest_10)} vs {money(seg["money in per month"].everyone_else)}</b></div>
-                <div className="list-row"><span>Carry a loan</span><b>{pct(seg["has a loan"].riskiest_10)} vs {pct(seg["has a loan"].everyone_else)}</b></div>
-                <div className="list-row"><span>Pensioners</span><b>{pct(seg["pensioner"].riskiest_10, 1)} vs {pct(seg["pensioner"].everyone_else)}</b></div>
-              </div>
-              <p className="sub" style={{ marginTop: 8 }}>Where they live, joint accounts and district salaries make no difference. Descriptive, tested; not causal.</p>
-            </div>
-          )}
         </div>
-      </section>
+      </details>
     </main>
   );
 }
@@ -159,7 +188,8 @@ function BookCard({ nav }: { nav: Nav }) {
           <span key={t.tier} className={TIER_CLASS[t.tier]} style={{ flexGrow: t.customers }} title={`${t.label}: ${t.customers.toLocaleString("en-CA")}`} />
         ))}
       </div>
-      <table className="tbl" style={{ marginTop: 10 }}>
+      <div style={{ overflowX: "auto", marginTop: 10 }} tabIndex={0} role="region" aria-label="Whole-book tiers, scrollable">
+      <table className="tbl">
         <thead><tr><th>Tier</th><th className="num">Customers</th><th className="num">Overdrew next year</th><th className="num">Share of all overdrafts</th><th>Action</th></tr></thead>
         <tbody>{b.tiers.map((t) => (
           <tr key={t.tier}>
@@ -171,6 +201,7 @@ function BookCard({ nav }: { nav: Nav }) {
               <span className="muted"> ({Object.entries(b.act_causes).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(", ")})</span>}</td>
           </tr>))}
         </tbody></table>
+      </div>
       <p className="sub" style={{ marginTop: 8 }}>New accounts can't be scored by the trough (it needs 12 months), so they get their own test: swings in money in, chosen on 2023 and 2024 and confirmed on 2025 (the top 10% of new accounts caught 13 of 32 first overdrafts, 18.6% vs 3.0%). Accounts under 3 months stay unscored.</p>
     </section>
   );
