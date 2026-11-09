@@ -2515,6 +2515,129 @@
       ]
     }
   },
+  "capacity": {
+    "design": "flag the riskiest X% by the trough at December; first overdrafts the next year among customers never overdrawn before",
+    "cuts": [
+      0.02,
+      0.05,
+      0.1,
+      0.2,
+      0.3
+    ],
+    "by_year": {
+      "2023": [
+        {
+          "flag_share": 0.02,
+          "flagged": 32,
+          "caught": 5,
+          "events": 18,
+          "accounts": 1556
+        },
+        {
+          "flag_share": 0.05,
+          "flagged": 78,
+          "caught": 10,
+          "events": 18,
+          "accounts": 1556
+        },
+        {
+          "flag_share": 0.1,
+          "flagged": 156,
+          "caught": 12,
+          "events": 18,
+          "accounts": 1556
+        },
+        {
+          "flag_share": 0.2,
+          "flagged": 312,
+          "caught": 14,
+          "events": 18,
+          "accounts": 1556
+        },
+        {
+          "flag_share": 0.3,
+          "flagged": 467,
+          "caught": 15,
+          "events": 18,
+          "accounts": 1556
+        }
+      ],
+      "2024": [
+        {
+          "flag_share": 0.02,
+          "flagged": 45,
+          "caught": 7,
+          "events": 34,
+          "accounts": 2213
+        },
+        {
+          "flag_share": 0.05,
+          "flagged": 111,
+          "caught": 14,
+          "events": 34,
+          "accounts": 2213
+        },
+        {
+          "flag_share": 0.1,
+          "flagged": 222,
+          "caught": 20,
+          "events": 34,
+          "accounts": 2213
+        },
+        {
+          "flag_share": 0.2,
+          "flagged": 443,
+          "caught": 26,
+          "events": 34,
+          "accounts": 2213
+        },
+        {
+          "flag_share": 0.3,
+          "flagged": 664,
+          "caught": 28,
+          "events": 34,
+          "accounts": 2213
+        }
+      ],
+      "2025": [
+        {
+          "flag_share": 0.02,
+          "flagged": 69,
+          "caught": 16,
+          "events": 55,
+          "accounts": 3417
+        },
+        {
+          "flag_share": 0.05,
+          "flagged": 171,
+          "caught": 27,
+          "events": 55,
+          "accounts": 3417
+        },
+        {
+          "flag_share": 0.1,
+          "flagged": 342,
+          "caught": 34,
+          "events": 55,
+          "accounts": 3417
+        },
+        {
+          "flag_share": 0.2,
+          "flagged": 684,
+          "caught": 42,
+          "events": 55,
+          "accounts": 3417
+        },
+        {
+          "flag_share": 0.3,
+          "flagged": 1025,
+          "caught": 45,
+          "events": 55,
+          "accounts": 3417
+        }
+      ]
+    }
+  },
   "lessons": [
     {
       "group": "Rejected",

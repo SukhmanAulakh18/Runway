@@ -65,6 +65,11 @@ export interface Twist { settings: Scenario; source: string; disagree: string[];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Evidence = any;
 
+export interface BankCaseRow { flag_share: number; calls_per_year: number; catches_per_year: number; catch_share: number; calls_per_catch: number; precision: number }
+export interface BankCaseReq { customers: number; flag_share: number; cost_per_call: number | null; value_per_prevented: number | null; prevent_rate: number; relative_reduction: number }
+export interface BankCase { years: string[]; customers: number; rows: BankCaseRow[]; chosen: BankCaseRow; cost?: number; break_even_value_per_prevented?: number;
+  value?: number; net?: number; pilot: { relative_reduction: number; control_rate: number; per_arm: number; total: number; years_of_flags: number | null } }
+
 async function call<T>(path: string, body?: unknown): Promise<T> {
   const r = await fetch(path, body === undefined ? undefined
     : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -90,6 +95,7 @@ export const api = {
   book: (asof: Asof) => call<Book>(`/api/book${q(asof)}`),
   portfolio: (scenario: Scenario) => call<{ month: number; standard: number; realistic: number }[]>("/api/portfolio", { scenario }),
   evidence: () => call<Evidence>("/api/evidence"),
+  bankCase: (r: BankCaseReq) => call<BankCase>("/api/bank-case", r),
 };
 
 // ---- formatting only (no arithmetic on money beyond display rounding) ----

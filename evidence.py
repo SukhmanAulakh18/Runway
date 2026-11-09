@@ -95,6 +95,7 @@ def main(n_boot=1000, seed=0):
     ev["multiple_testing_extended"] = multiple_testing_extended(ev)
     ev["book"] = book(d)
     ev["buffer_confidence"] = buffer_confidence(d)
+    ev["capacity"] = capacity(d)
     ev["lessons"] = lessons(ev)   # last: reads diagnoses and the extended multiple-testing family
     return ev
 
@@ -512,6 +513,21 @@ def new_accounts(d):
             "chosen": "money in swing (sd)", "best_by_year": {str(k): v for k, v in pick.items()},
             "confirmed_2025": by_year[-1]["candidates"]["money in swing (sd)"], "trough_on_new_accounts_auc": "0.55-0.71 (weak, inconsistent)",
             "by_year": by_year, "tests": tests}
+
+
+def capacity(d):
+    """Capacity trade-off: flag the riskiest X% by the trough; how many first overdrafts that catches and how many customers
+    must be called. Same populations as the three-year backtest (features to December, outcome the next year)."""
+    m = d["monthly"]; cuts = (0.02, 0.05, 0.10, 0.20, 0.30); by_year = {}
+    for yr in (2023, 2024, 2025):
+        rows = []
+        for pct in cuts:
+            nv, pre, y, ltr, low = _ltr_backtest(m, yr, pct=pct)
+            rows.append({"flag_share": pct, "flagged": int(low.sum()), "caught": int(y[low].sum()),
+                         "events": int(y.sum()), "accounts": int(len(nv))})
+        by_year[str(yr)] = rows
+    return {"design": "flag the riskiest X% by the trough at December; first overdrafts the next year among customers never overdrawn before",
+            "cuts": list(cuts), "by_year": by_year}
 
 
 def buffer_confidence(d):

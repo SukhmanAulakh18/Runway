@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, kmoney, money, monthName, pct, NO_SHOCK, type Asof, type Scenario } from "../api";
 import type { Nav, Tab } from "../App";
 import { Legend, PortfolioChart } from "../charts";
+import BankCase from "./BankCase";
 import { CountUp, Failed, Kpi, Loading } from "./ui";
 
 type Preset = { label: string; why: string; acct: number; tab: Tab; when: Asof; shock?: Partial<Scenario> };
@@ -84,6 +85,12 @@ export default function Overview({ nav }: { nav: Nav }) {
       )}
 
       <BookCard nav={nav} />
+
+      <details className="card fold">
+        <summary><h2>For the bank: set your capacity and break-even</h2>
+          <span className="sub">How many calls each flag size means, what it catches, what a call must be worth, and how big a pilot has to be. Show the calculator</span></summary>
+        <BankCase />
+      </details>
 
       <section className="grid">
         <div className="card">

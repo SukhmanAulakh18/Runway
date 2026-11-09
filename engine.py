@@ -1115,3 +1115,100 @@ def portfolio_curve(d: dict, sc: Scenario, months: int = 24) -> pd.DataFrame:
     t = np.arange(0, months + 1)
     return pd.DataFrame({"month": t, "standard": [(key >= x).mean() for x in t],
                          "realistic": [(real >= x).mean() for x in t]})
+
+
+# ---------------------------------------------------------------------------
+# For the bank: capacity, break-even and pilot size. The catch counts are measured (evidence.json -> capacity, out of time);
+# every dollar figure is the bank's own input. A "catch" is a first overdraft among the flagged customers, not a prevention:
+# whether a call prevents it is what the pilot is for.
+# ---------------------------------------------------------------------------
+CAPACITY_YEARS = ("2024", "2025")
+
+
+def pilot_sample_size(p_control: float, relative_reduction: float, alpha: float = 0.05, power: float = 0.80) -> int:
+    """Customers needed in EACH arm of a flagged-customer pilot to detect a `relative_reduction` in the first-overdraft rate
+    (two-sided two-proportion z-test, normal approximation)."""
+    from scipy.stats import norm
+    p1, p2 = p_control, p_control * (1 - relative_reduction)
+    pbar = (p1 + p2) / 2
+    za, zb = norm.ppf(1 - alpha / 2), norm.ppf(power)
+    n = (za * np.sqrt(2 * pbar * (1 - pbar)) + zb * np.sqrt(p1 * (1 - p1) + p2 * (1 - p2))) ** 2 / (p1 - p2) ** 2
+    return int(np.ceil(n))
+
+
+def bank_case(capacity: dict, customers: int, flag_share: float, cost_per_call: float | None = None,
+              value_per_prevented: float | None = None, prevent_rate: float = 1.0, relative_reduction: float = 0.25,
+              years: tuple = CAPACITY_YEARS) -> dict:
+    """Scale the measured flag-size trade-off to a bank of `customers`, add the bank's own costs, and size a pilot.
+    Rates are pooled over `years` of the out-of-time backtest."""
+    pooled: dict[float, dict] = {}
+    for y in years:
+        for r in capacity["by_year"][y]:
+            a = pooled.setdefault(r["flag_share"], {"flagged": 0, "caught": 0, "events": 0, "accounts": 0})
+            for k in a:
+                a[k] += r[k]
+    if flag_share not in pooled:
+        raise ValueError(f"flag_share must be one of {sorted(pooled)}")
+    rows = [{"flag_share": s, "calls_per_year": a["flagged"] / a["accounts"] * customers,
+             "catches_per_year": a["caught"] / a["accounts"] * customers, "catch_share": a["caught"] / a["events"],
+             "calls_per_catch": a["flagged"] / a["caught"], "precision": a["caught"] / a["flagged"]}
+            for s, a in sorted(pooled.items())]
+    cur = next(r for r in rows if r["flag_share"] == flag_share)
+    out = {"years": list(years), "customers": customers, "rows": rows, "chosen": cur}
+    prevented = cur["catches_per_year"] * prevent_rate
+    if cost_per_call is not None and prevented > 0:
+        cost = cur["calls_per_year"] * cost_per_call
+        out["cost"] = cost
+        out["break_even_value_per_prevented"] = cost / prevented     # a prevented overdraft must be worth at least this
+        if value_per_prevented is not None:
+            out["value"] = prevented * value_per_prevented
+            out["net"] = out["value"] - cost
+    n = pilot_sample_size(cur["precision"], relative_reduction)
+    out["pilot"] = {"relative_reduction": relative_reduction, "control_rate": cur["precision"], "per_arm": n, "total": 2 * n,
+                    "years_of_flags": 2 * n / cur["calls_per_year"] if cur["calls_per_year"] else None}
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Data contract and batch scoring: what a bank must supply, checked before anything is scored.
+# ---------------------------------------------------------------------------
+REQUIRED_MONTHLY = ["account_id", "month", "money_in", "min_balance", "avg_daily_balance", "days_below_zero"]
+
+
+def check_monthly_contract(df: pd.DataFrame) -> list[str]:
+    """Problems that would make scoring wrong, in plain words; an empty list means the file can be scored."""
+    missing = [c for c in REQUIRED_MONTHLY if c not in df.columns]
+    if missing:
+        return [f"missing columns: {', '.join(missing)}"]
+    if df.empty:
+        return ["the file has no rows"]
+    problems = []
+    bad_month = ~df.month.astype(str).str.fullmatch(r"\d{4}-(0[1-9]|1[0-2])")
+    if bad_month.any():
+        problems.append(f"{int(bad_month.sum())} rows have a month that is not YYYY-MM")
+    if df.duplicated(["account_id", "month"]).any():
+        problems.append(f"{int(df.duplicated(['account_id', 'month']).sum())} duplicate account-month rows")
+    for c in ("money_in", "min_balance", "avg_daily_balance", "days_below_zero"):
+        n_bad = int(pd.to_numeric(df[c], errors="coerce").isna().sum())
+        if n_bad:
+            problems.append(f"{n_bad} rows have a missing or non-numeric {c}")
+    num = df[["min_balance", "avg_daily_balance", "days_below_zero"]].apply(pd.to_numeric, errors="coerce")
+    if (num.days_below_zero < 0).any():
+        problems.append("days_below_zero is negative on some rows")
+    if (num.min_balance > num.avg_daily_balance + 0.01).any():
+        problems.append(f"the lowest balance is above the average daily balance on {int((num.min_balance > num.avg_daily_balance + 0.01).sum())} rows")
+    return problems
+
+
+def score_book(monthly: pd.DataFrame, asof: str | None = None) -> pd.DataFrame:
+    """One row per account from a monthly summary that passes the contract: trough, rank, haircut and the whole-book tier."""
+    d = {"monthly": monthly.sort_values(["account_id", "month"]), "loans": pd.DataFrame()}
+    t = ltr_table(d, asof=asof)
+    tiers = book_tiers(d, asof)
+    out = pd.DataFrame({"tier": tiers, "tier_label": tiers.map(lambda k: BOOK_TIERS[k][0]), "action": tiers.map(lambda k: BOOK_TIERS[k][1]),
+                        "trough": t.ltr.round(4), "riskier_than_share": (1 - t.ltr_pct_rank).round(4),
+                        "lowest_balance": t.min_balance.round(2), "average_balance": t.avg_balance.round(2),
+                        "months_of_history": t.n_months})
+    out["haircut"] = (1 - t.ltr).clip(upper=1.0).round(4)
+    order = {k: i for i, k in enumerate(BOOK_TIERS)}
+    return out.assign(_o=tiers.map(order)).sort_values(["_o", "trough"]).drop(columns="_o").rename_axis("account_id").reset_index()
