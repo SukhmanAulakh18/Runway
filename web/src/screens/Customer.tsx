@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, kmoney, money, monthName, pct, type Asof, type Diagnosis } from "../api";
 import type { Nav } from "../App";
-import { LowPointMeter, BalanceChart, Legend } from "../charts";
-import { CountUp, Failed, GLOSSARY, Kpi, Loading } from "./ui";
+import { BalanceChart, Dots, Legend, LowPointMeter, RunwayBars, WhenBars } from "../charts";
+import { CountUp, Failed, GLOSSARY, Info, Kpi, Loading } from "./ui";
 
 function Source({ s }: { s: string }) {
   return <span className={`src ${s.startsWith("AI") ? "" : "tpl"}`}>{s.startsWith("AI") ? "AI · every number checked" : "Template (AI off or unsure)"}</span>;
@@ -66,12 +66,13 @@ function NextBestAction({ dx, nav, tested }: { dx: Diagnosis; nav: Nav; tested: 
         <p className="act"><b>Action:</b> {first.action}</p>
         {tested[first.code] && <p className="sub tested">{tested[first.code]}</p>}
       </div>
-      {rest.length > 0 && <div className="list">
+      {rest.length > 0 && <div className="also">
+        <p className="eyebrow" style={{ margin: "14px 0 6px" }}>Also in play</p>
         {rest.map((g) => (
-          <div key={g.code} className="list-row">
-            <b>{g.title}</b><span className="chip">{g.code === "dip" ? "Always" : "Also"}</span>
-            <span className="how">{g.why} <b>Action:</b> {g.action}{tested[g.code] ? ` (${tested[g.code]})` : ""}</span>
-          </div>))}
+          <details key={g.code} className="also-row">
+            <summary><b>{g.title}</b><span className="chip">{g.code === "dip" ? "Always" : "Also"}</span><span className="also-short">{g.short ?? g.action.split(":")[0]}</span></summary>
+            <p className="how">{g.why} <b>Action:</b> {g.action}{tested[g.code] ? ` (${tested[g.code]})` : ""}</p>
+          </details>))}
       </div>}
     </section>
   );
@@ -150,25 +151,40 @@ export default function CustomerScreen({ nav }: { nav: Nav }) {
           <Kpi tip={GLOSSARY.trough} label="Liquidity trough (lowest ÷ average, 6 mo)" value={t ? pct(t.ltr) : "–"}
             note={t?.pct_rank != null ? `Riskier than ${pct(1 - t.pct_rank)} of customers${t.haircut != null ? ` · a ${pct(t.haircut)} haircut at the low point` : ""}` : `Not ranked yet: ${t?.n_months ?? 0} of the 12 months needed to compare fairly`} />
         </div>
-        <div className="card"><Kpi swatch="std" tip={GLOSSARY.standard} label="Standard runway (no shock)" value={c.standard_runway.label} size="md" note="Judges' formula, medians" /></div>
-        <div className="card"><Kpi swatch="ours" tip={GLOSSARY.realistic} label="Realistic runway (no shock)" value={c.realistic_runway.label} size="md" note="Last 12 months, dip-aware" /></div>
+        <div className="card span2">
+          <p className="eyebrow" style={{ margin: 0 }}>Months their savings last, no shock<Info tip="The judges' formula uses medians and an average balance. Ours uses the last 12 months, keeps the in-month dip out of reach, caps EI and counts new loans." /></p>
+          <RunwayBars rows={[{ label: "Judges' formula", months: c.standard_runway.runway, text: c.standard_runway.label, kind: "std" },
+                             { label: "Realistic", months: c.realistic_runway.runway, text: c.realistic_runway.label, kind: "ours" }]} />
+        </div>
       </section>
 
       {c.diagnosis && <NextBestAction dx={c.diagnosis} nav={nav} tested={tested} />}
 
-      {c.when && (
-        <p className="callout" style={{ margin: 0 }}>
-          <b>When?</b> Among the {c.when.customers.toLocaleString()} customers in the same group ({c.when.group}), {pct(c.when.within_6, 1)} had a first overdraft within 6 months,
-          {" "}{pct(c.when.within_12, 1)} within 12 and {pct(c.when.within_24, 1)} within 24 ({c.when.cohort}; survival analysis).{c.when.group === "riskiest 10%" ? " Most of it comes early: act this week." : ""}
-        </p>
-      )}
-
-      {c.like && (
-        <p className="callout" style={{ margin: 0 }}>
-          <b>Customers like this.</b> Of the {c.like.k} customers who looked most like this one a year earlier (similar low point, balance size and swings in money in),
-          {" "}<b>{c.like.overdrawn}</b> were overdrawn the next year: <b>{pct(c.like.share)}</b>, against {pct(c.like.base_rate, 1)} of all {c.like.pool.toLocaleString("en-CA")} customers in that group ({c.like.cohort}).
-          Descriptive, not a probability, and a new loan is not part of the match.
-        </p>
+      {(c.when || c.like) && (
+        <section className="grid g2" style={c.when && c.like ? undefined : { gridTemplateColumns: "minmax(0, 1fr)" }} aria-label="When, and customers like this">
+          {c.when && (
+            <div className="card">
+              <h2>When do first overdrafts come?</h2>
+              <WhenBars points={[{ label: "Within 6 months", v: c.when.within_6 }, { label: "Within 12 months", v: c.when.within_12 }, { label: "Within 24 months", v: c.when.within_24 }]} />
+              <p className="sub" style={{ marginTop: 8 }}>{c.when.group === "riskiest 10%" ? "Most of it comes early: act this week. " : ""}
+                Share of the {c.when.customers.toLocaleString()} customers in the same group ({c.when.group}) with a first overdraft ({c.when.cohort}; survival analysis).</p>
+            </div>
+          )}
+          {c.like && (
+            <div className="card">
+              <h2>Customers like this</h2>
+              <div className="like-row">
+                <Dots hit={c.like.overdrawn} total={c.like.k} />
+                <div>
+                  <p style={{ margin: 0, fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>{c.like.overdrawn} of {c.like.k}</p>
+                  <p className="sub" style={{ margin: "2px 0 8px" }}>were overdrawn the next year, against {pct(c.like.base_rate, 1)} of all {c.like.pool.toLocaleString("en-CA")} customers ({c.like.cohort}).</p>
+                  <p className="sub" style={{ margin: 0 }}><span className="dot-key hit" aria-hidden="true" /> overdrawn <span className="dot-key" aria-hidden="true" /> stayed above $0</p>
+                </div>
+              </div>
+              <p className="sub" style={{ marginTop: 8 }}>The {c.like.k} customers who looked most like this one a year earlier (low point, balance size, swings in money in). Descriptive, not a probability; a new loan is not part of the match.</p>
+            </div>
+          )}
+        </section>
       )}
 
       <Assistant key={`${c.account_id}-${c.asof}`} acct={c.account_id} asof={c.asof as Asof} />

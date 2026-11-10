@@ -216,6 +216,9 @@ def watchlist(asof: Optional[str] = ASOF, early_only: bool = True, limit: int = 
     top["cause"] = [g["primary"]["title"] if g else None for g in dg]
     top["action"] = [g["primary"]["short"] if g else None for g in dg]
     top["cause_code"] = [g["primary"]["code"] if g else None for g in dg]
+    last = dd["monthly"].sort_values(["account_id", "month"]).groupby("account_id").tail(12)   # the last 12 months, for the row's sparkline
+    trend = {int(a): g[["min_balance", "avg_daily_balance"]].round(0).values.tolist() for a, g in last[last.account_id.isin(top.account_id)].groupby("account_id")}
+    top["trend"] = [trend.get(int(a)) for a in top.account_id]
     out = {"asof": asof, "n_in_view": len(w), "rows": top,
            "calls": top.groupby("action").size().sort_values(ascending=False).to_dict()}
     if asof:
@@ -265,6 +268,7 @@ def _book(asof: Optional[str]) -> dict:
     usable = [k for k, v in cohorts.items() if v["outcome_year"] <= done_year]
     tested = cohorts[max(usable)] if usable else None
     rows = [{"tier": k, "label": lab, "action": act_txt, "customers": int((tiers == k).sum()),
+             "customer_share": int((tiers == k).sum()) / len(tiers),
              "tested_rate": tested["tiers"][k]["rate"] if tested else None,
              "tested_share_of_overdrafts": tested["tiers"][k]["share_of_overdrafts"] if tested else None}
             for k, (lab, act_txt) in E.BOOK_TIERS.items()]

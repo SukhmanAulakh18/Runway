@@ -221,3 +221,13 @@ def test_bank_case_endpoint():
     assert "cost" not in only_measured and only_measured["chosen"]["calls_per_catch"] == pytest.approx(10.6, abs=0.8)   # ~10 calls per catch at a 10% flag
     assert client.post("/api/bank-case", json={"flag_share": 0.07}).status_code == 422
     assert client.post("/api/bank-case", json={"prevent_rate": 0}).status_code == 422
+
+
+def test_call_list_rows_carry_a_12_month_trend_and_book_rows_a_customer_share():
+    w = client.get("/api/watchlist", params={"asof": "2024-12"}).json()["rows"]
+    row = next(r for r in w if r["account_id"] == 93172)
+    assert len(row["trend"]) == 12 and all(len(p) == 2 and p[0] <= p[1] + 1 for p in row["trend"])   # [lowest, average] per month, lowest never above the average
+    assert min(p[0] for p in row["trend"][-6:]) == pytest.approx(row["min_balance"], abs=1)       # the sparkline agrees with the row's own lowest balance ($238)
+    b = client.get("/api/book", params={"asof": "2024-12"}).json()
+    assert sum(t["customer_share"] for t in b["tiers"]) == pytest.approx(1.0)
+    assert all(t["tested_share_of_overdrafts"] is None or 0 <= t["tested_share_of_overdrafts"] <= 1 for t in b["tiers"])

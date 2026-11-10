@@ -53,10 +53,10 @@ export interface PlanRes {
 }
 export interface WatchRow { account_id: number; ltr: number; ltr_pct_rank: number | null; min_balance: number; avg_balance: number;
   realistic_runway_ei: number; answer_key_runway_ei: number; reasons: string; overdraft_next_12m?: boolean | null;
-  cause?: string | null; action?: string | null; cause_code?: string | null }
+  cause?: string | null; action?: string | null; cause_code?: string | null; trend?: [number, number][] | null }
 export interface Watch { asof: string | null; n_in_view: number; rows: WatchRow[]; reveal?: { top_hit: number; base_rate: number }; calls?: Record<string, number> }
 export interface BookTier { tier: "overdrawn" | "act" | "new_hot" | "watch" | "stable" | "new"; label: string; action: string; customers: number;
-  tested_rate: number | null; tested_share_of_overdrafts: number | null }
+  customer_share: number; tested_rate: number | null; tested_share_of_overdrafts: number | null }
 export interface Book { asof: string | null; customers: number; tiers: BookTier[]; act_causes: Record<string, number>; tested_on: string | null;
   summary: { focus_customers: number; focus_customer_share: number; stable_customer_share: number;
     tested_focus_customer_share: number | null; tested_focus_overdraft_share: number | null; tested_stable_rate: number | null } }

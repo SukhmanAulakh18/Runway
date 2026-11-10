@@ -122,7 +122,7 @@ money; `api.py` calls `ui/context.build_context`, the same function Streamlit us
 
 | Screen | Shows |
 |---|---|
-| 01 Who's at risk | headline results; **For the bank** calculator (flag size, break-even, pilot size; folded); **the whole book** (tiers, actions, tested rates); advisor call list (cause → next step, Time Machine reveal); bank-wide job-loss curve; loan-approval rule; who the riskiest are |
+| 01 Who's at risk | headline results; **customers vs next year's overdrafts bars** (risk concentration at a glance); **For the bank** calculator (flag size, break-even, pilot size; folded); **the whole book** (tiers, actions, tested rates); advisor call list (cause → next step, Time Machine reveal); bank-wide job-loss curve; loan-approval rule; who the riskiest are |
 | 02 Know the customer | 4-step story strip; calibrated risk; trough; both runways; "why they're at risk, and what to do"; advisor assistant (brief, EN/FR message); balance chart; what happened next; loan card (would it have been held) |
 | 03 Stress test | twist card → chips (+ AI/rules disagreement flags) → verdict + drivers → runways → simulated futures → fan chart → exposure profile (risk teams) → judge check |
 | 04 Make a plan | first action; no-risk steps first with real costs; cushion backtest; cuts; backup levers; milestones; AI plan |

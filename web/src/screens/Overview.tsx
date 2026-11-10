@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, kmoney, money, monthName, pct, NO_SHOCK, type Asof, type Scenario } from "../api";
+import { useState } from "react";
+import { api, kmoney, money, monthName, pct, NO_SHOCK, type Asof, type BookTier, type Scenario } from "../api";
 import type { Nav, Tab } from "../App";
-import { Legend, PortfolioChart } from "../charts";
+import { Legend, PortfolioChart, Spark } from "../charts";
 import BankCase from "./BankCase";
 import { CountUp, Failed, Kpi, Loading } from "./ui";
 
@@ -38,10 +39,13 @@ export default function Overview({ nav }: { nav: Nav }) {
   const ev = useQuery({ queryKey: ["evidence"], queryFn: api.evidence, staleTime: Infinity });
   const wl = useQuery({ queryKey: ["watchlist", nav.asof], queryFn: () => api.watchlist(nav.asof) });
   const job = { ...NO_SHOCK, job_loss: true };
+  const [picked, setPicked] = useState<string | null>(null);
   const pc = useQuery({ queryKey: ["portfolio", job], queryFn: () => api.portfolio(job), staleTime: Infinity });
   const im = ev.data?.impact?.["2024-12"];
   const y25 = ev.data?.trough?.by_year?.find((r: { predicted_year: number }) => r.predicted_year === 2025);
   const at6 = pc.data?.find((p) => p.month === 6);
+  const shown = picked && wl.data?.calls?.[picked] ? picked : null;   // a filter that no longer exists in this view is ignored
+  const rows = (wl.data?.rows ?? []).filter((r) => !shown || r.action === shown);
   const lp = ev.data?.loan_policy;
   type Trait = { trait: string; riskiest_10: number; everyone_else: number };
   const seg = ev.data?.segment ? Object.fromEntries((ev.data.segment.rows as Trait[]).map((r) => [r.trait, r])) as Record<string, Trait> : null;
@@ -98,7 +102,12 @@ export default function Overview({ nav }: { nav: Nav }) {
             <div>
               <h2>Advisor call list{nav.asof ? `, as the bank saw it in ${monthName(nav.asof)}` : ""}</h2>
               <p className="sub">Never overdrawn yet, ranked by how close their balance gets to $0. Each row has its own cause and next step. Click to open.</p>
-              {wl.data?.calls && <div className="chips" style={{ marginTop: 8 }}>{Object.entries(wl.data.calls).map(([a, n]) => <span key={a} className="chip ours"><b>{n}</b>&nbsp;· {a}</span>)}</div>}
+              {wl.data?.calls && (
+                <div className="chips" style={{ marginTop: 8 }} role="group" aria-label="Show the call list for one next step">
+                  <button type="button" className="chip" aria-pressed={!shown} onClick={() => setPicked(null)}><b>{wl.data.rows.length}</b>&nbsp;· all</button>
+                  {Object.entries(wl.data.calls).map(([a, n]) => (
+                    <button type="button" key={a} className="chip ours" aria-pressed={shown === a} onClick={() => setPicked(shown === a ? null : a)}><b>{n}</b>&nbsp;· {a}</button>))}
+                </div>)}
             </div>
             <div className="head-actions">
               {wl.data?.reveal && <span className="badge bad">{wl.data.reveal.top_hit} of {wl.data.rows.length} overdrawn next year</span>}
@@ -116,13 +125,14 @@ export default function Overview({ nav }: { nav: Nav }) {
             <div style={{ maxHeight: 520, overflow: "auto" }} tabIndex={0} role="region" aria-label="Watchlist table, scrollable">
               <table className="tbl">
                 <thead><tr>
-                  <th>Account</th><th>Lowest vs average (6 mo)</th><th className="num" title="Percentile rank: 1.6% = in the riskiest 1.6% of customers">Top %</th>
+                  <th>Account</th><th>Last 12 months</th><th>Lowest vs average (6 mo)</th><th className="num" title="Percentile rank: 1.6% = in the riskiest 1.6% of customers">Top %</th>
                   <th className="num">Lowest</th><th>Cause → next step</th>{nav.asof && <th>Next 12 months</th>}
                 </tr></thead>
                 <tbody>
-                  {wl.data.rows.map((r) => (
+                  {rows.map((r) => (
                     <tr key={r.account_id} className={`row ${r.account_id === nav.acct ? "cur" : ""}`} onClick={() => nav.go("customer", r.account_id)}>
-                      <td><b>{r.account_id}</b></td>
+                      <td><button type="button" className="linkbtn" onClick={(e) => { e.stopPropagation(); nav.go("customer", r.account_id); }} aria-label={`Open customer ${r.account_id}`}><b>{r.account_id}</b></button></td>
+                      <td title="Lowest balance (line) inside the average balance (band), last 12 months">{r.trend ? <Spark points={r.trend} /> : <span className="muted">–</span>}</td>
                       <td><div className="bar-cell"><div className="bar-track"><div className="bar-fill" style={{ width: `${Math.max(r.ltr, 0) * 100}%` }} /></div>
                         <span style={{ width: 40 }}>{pct(r.ltr)}</span></div></td>
                       <td className="num">{r.ltr_pct_rank != null ? pct(r.ltr_pct_rank, 1) : "–"}</td>
@@ -193,10 +203,17 @@ function BookCard({ nav }: { nav: Nav }) {
             <> Tested on {b.tested_on}: those tiers were <b>{pct(s.tested_focus_customer_share)}</b> of customers and produced <b>{pct(s.tested_focus_overdraft_share)}</b> of the next year's overdrafts; the stable tier overdrew {pct(s.tested_stable_rate, 1)}.</>}
           {b.tested_on && <> Rates come from a year already over at this date.</>}
         </p></div></div>
-      <div className="bookbar" role="img" aria-label={b.tiers.map((t) => `${t.label}: ${t.customers}`).join("; ")}>
-        {b.tiers.filter((t) => t.customers > 0).map((t) => (
-          <span key={t.tier} className={TIER_CLASS[t.tier]} style={{ flexGrow: t.customers }} title={`${t.label}: ${t.customers.toLocaleString("en-CA")}`} />
-        ))}
+      <div className="conc" aria-label="Customers against next year's overdrafts, by tier">
+        {([["Customers", (t: BookTier) => t.customer_share], ["Next year's overdrafts", (t: BookTier) => t.tested_share_of_overdrafts]] as const).map(([name, val]) => (
+          b.tiers.some((t) => val(t) != null) && (
+          <div key={name} className="conc-row">
+            <span className="conc-label">{name}</span>
+            <div className="bookbar tall" role="img" aria-label={`${name}: ${b.tiers.filter((t) => (val(t) ?? 0) > 0).map((t) => `${t.label} ${pct(val(t) ?? 0)}`).join("; ")}`}>
+              {b.tiers.filter((t) => (val(t) ?? 0) > 0).map((t) => (
+                <span key={t.tier} className={TIER_CLASS[t.tier]} style={{ flexGrow: val(t) ?? 0 }} title={`${t.label}: ${pct(val(t) ?? 0)}`}>
+                  {(val(t) ?? 0) >= 0.07 && <i className={t.tier === "new_hot" ? "pill" : t.tier === "stable" || t.tier === "new" || t.tier === "watch" ? "dark" : ""}>{pct(val(t) ?? 0)}</i>}</span>))}
+            </div>
+          </div>)))}
       </div>
       <div style={{ overflowX: "auto", marginTop: 10 }} tabIndex={0} role="region" aria-label="Whole-book tiers, scrollable">
       <table className="tbl">

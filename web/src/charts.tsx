@@ -180,3 +180,64 @@ export function LowPointMeter({ ratio, avg, low }: { ratio: number; avg: string;
     </svg>
   );
 }
+
+
+/** Months their savings last, as bars on one 0-12+ axis with a dashed "safe cushion" line. The labels come from the engine
+ *  ("no shortfall (120+)"); the bar is clamped to the axis for display only. */
+export function RunwayBars({ rows, cap = 12, line = 6 }: { rows: { label: string; months: number; text: string; kind: "std" | "ours" }[]; cap?: number; line?: number }) {
+  const at = (m: number) => `${Math.min(Math.max(m, 0) / cap, 1) * 100}%`;
+  return (
+    <div className="rbars" role="img" aria-label={`${rows.map((r) => `${r.label}: ${r.text}`).join("; ")}. The dashed line marks ${line} months.`}>
+      {rows.map((r) => (
+        <div key={r.label} className="rbar-row">
+          <span className="rbar-label">{r.label}</span>
+          <div className="rbar-track"><div className={`rbar-fill ${r.kind}`} style={{ width: at(r.months) }} /><span className="rbar-line" style={{ left: at(line) }} /></div>
+          <b className="rbar-val">{r.text}</b>
+        </div>))}
+      <div className="rbar-axis"><span className="rbar-axis-label" style={{ left: at(line) }}>{line} months: a safe cushion</span></div>
+    </div>
+  );
+}
+
+/** 100 customers as 100 dots: the first `hit` are filled (overdrawn the next year), the rest hollow. */
+export function Dots({ hit, total, cols = 10 }: { hit: number; total: number; cols?: number }) {
+  const r = 5, pitch = 15, rows = Math.ceil(total / cols), w = cols * pitch - (pitch - 2 * r), h = rows * pitch - (pitch - 2 * r);
+  return (
+    <svg className="dots" viewBox={`0 0 ${w} ${h}`} width={w} height={h} role="img" aria-label={`${hit} of ${total} were overdrawn the next year`}>
+      {Array.from({ length: total }, (_, i) => (
+        <circle key={i} cx={(i % cols) * pitch + r} cy={Math.floor(i / cols) * pitch + r} r={r - 0.75} className={i < hit ? "dot-hit" : "dot-rest"} />))}
+    </svg>
+  );
+}
+
+/** First overdrafts by month for a customer's group: three bars on one scale, so "most of it comes early" is visible. */
+export function WhenBars({ points }: { points: { label: string; v: number }[] }) {
+  const top = Math.max(...points.map((p) => p.v), 0.0001);
+  return (
+    <div className="wbars" role="img" aria-label={points.map((p) => `${p.label}: ${pct(p.v, 1)}`).join("; ")}>
+      {points.map((p) => (
+        <div key={p.label} className="rbar-row">
+          <span className="rbar-label">{p.label}</span>
+          <div className="rbar-track"><div className="rbar-fill ours" style={{ width: `${(p.v / top) * 100}%` }} /></div>
+          <b className="rbar-val">{pct(p.v, 1)}</b>
+        </div>))}
+    </div>
+  );
+}
+
+/** A row's last 12 months in 96x28 pixels: the average balance as a light band, the lowest balance as a line, a hairline at $0.
+ *  Points are [lowest, average] per month, oldest first. Decorative: the row's text carries the numbers. */
+export function Spark({ points }: { points: [number, number][] }) {
+  const w = 96, h = 28, pad = 2;
+  const hi = Math.max(...points.map((p) => p[1]), 1), lo = Math.min(0, ...points.map((p) => p[0]));
+  const x = (i: number) => pad + (i / Math.max(points.length - 1, 1)) * (w - 2 * pad);
+  const y = (v: number) => h - pad - ((v - lo) / (hi - lo || 1)) * (h - 2 * pad);
+  const avg = points.map((p, i) => `${x(i)},${y(p[1])}`), low = points.map((p, i) => `${x(i)},${y(p[0])}`);
+  return (
+    <svg className="spark" viewBox={`0 0 ${w} ${h}`} width={w} height={h} aria-hidden="true">
+      <polygon points={[...avg, ...[...low].reverse()].join(" ")} className="spark-gap" />
+      <line x1={pad} x2={w - pad} y1={y(0)} y2={y(0)} className="spark-zero" />
+      <polyline points={low.join(" ")} className="spark-low" fill="none" />
+    </svg>
+  );
+}
