@@ -85,6 +85,15 @@ class PlanReq(ShockReq):
     pessimistic: bool = True
 
 
+class BankCaseReq(BaseModel):
+    customers: int = Field(100_000, ge=1, le=100_000_000)
+    flag_share: float = 0.10
+    cost_per_call: Optional[float] = Field(None, ge=0, le=100_000)
+    value_per_prevented: Optional[float] = Field(None, ge=0, le=1_000_000_000)
+    prevent_rate: float = Field(1.0, gt=0, le=1.0)
+    relative_reduction: float = Field(0.25, gt=0, lt=1)
+
+
 class TwistReq(BaseModel):
     text: str
 
@@ -178,6 +187,19 @@ def message(acct: int, asof: Optional[str] = ASOF, lang: str = Query("en", patte
     return {"text": text, "source": source, "lang": lang}
 
 
+@app.post("/api/bank-case")
+def bank_case(req: BankCaseReq):
+    """For the bank: the measured flag-size trade-off scaled to its book, its own costs, and a pilot size. No maths here."""
+    cap = (load_all()[2] or {}).get("capacity")
+    if cap is None:
+        raise HTTPException(404, "evidence.json has no capacity section: run python evidence.py")
+    try:
+        return clean(E.bank_case(cap, req.customers, req.flag_share, req.cost_per_call, req.value_per_prevented,
+                                 req.prevent_rate, req.relative_reduction))
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+
+
 @app.post("/api/twist")
 def twist(req: TwistReq):
     return clean(ai.parse_twist_checked(req.text))
@@ -194,6 +216,9 @@ def watchlist(asof: Optional[str] = ASOF, early_only: bool = True, limit: int = 
     top["cause"] = [g["primary"]["title"] if g else None for g in dg]
     top["action"] = [g["primary"]["short"] if g else None for g in dg]
     top["cause_code"] = [g["primary"]["code"] if g else None for g in dg]
+    last = dd["monthly"].sort_values(["account_id", "month"]).groupby("account_id").tail(12)   # the last 12 months, for the row's sparkline
+    trend = {int(a): g[["min_balance", "avg_daily_balance"]].round(0).values.tolist() for a, g in last[last.account_id.isin(top.account_id)].groupby("account_id")}
+    top["trend"] = [trend.get(int(a)) for a in top.account_id]
     out = {"asof": asof, "n_in_view": len(w), "rows": top,
            "calls": top.groupby("action").size().sort_values(ascending=False).to_dict()}
     if asof:
@@ -243,6 +268,7 @@ def _book(asof: Optional[str]) -> dict:
     usable = [k for k, v in cohorts.items() if v["outcome_year"] <= done_year]
     tested = cohorts[max(usable)] if usable else None
     rows = [{"tier": k, "label": lab, "action": act_txt, "customers": int((tiers == k).sum()),
+             "customer_share": int((tiers == k).sum()) / len(tiers),
              "tested_rate": tested["tiers"][k]["rate"] if tested else None,
              "tested_share_of_overdrafts": tested["tiers"][k]["share_of_overdrafts"] if tested else None}
             for k, (lab, act_txt) in E.BOOK_TIERS.items()]

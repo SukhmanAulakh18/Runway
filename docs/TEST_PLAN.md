@@ -46,6 +46,8 @@ python scripts/smoke.py http://localhost:8080          # against Docker or the C
 | Challenger (`evidence.challenger`) | Evidence | 2025 | trough is the top feature; McNemar and AUC p > 0.05 |
 | Runway vs formula (`evidence.out_of_time` etc.) | Evidence | 2025 | realistic AUC above the formula's, CI above 0 |
 | Customers like this (`like_cohort`, `like_this`) | Customer | pools for Dec 2022 / 2023 / 2024 | 1,556 / 2,213 / 3,417 customers with 18 / 34 / 55 first overdrafts: the same populations as the three-year backtest; never overdrawn before the cohort month; outcome from the next year only |
+| For the bank (`bank_case`, `pilot_sample_size`) | Overview | 5% flag, 100,000 customers, $12 a call, $150 per prevented overdraft, 30% prevented | Capacity rows consistent (bigger flag never catches fewer; 10% row = headline backtest in all three years); arithmetic checked by hand on a synthetic book; pilot size within 10% of statsmodels' power calculation |
+| Data contract and batch scoring (`check_monthly_contract`, `score_book`) | `scripts/score_book.py` | the real monthly file; broken files | Real file passes; each problem named (missing column, bad month, duplicate, missing value, lowest above average); scorer's tiers equal the app's whole-book tiers on all 4,500 accounts; the command refuses a broken file with exit code 1 |
 
 ## 3. Known limits of the tests
 - Data tests can't run on GitHub (the data is never committed); they run locally before every merge.

@@ -78,6 +78,9 @@ repeat-overdraft rates shown at an as-of date come from a year already over.
 | Optimiser (`optimize_cuts`) | one linear program (HiGHS) over 12 months, solved once: smallest cuts keeping the 10th-percentile path above the dip; bills/insurance never cut; reports `share_of_futures_protected`. **Not** MPC/receding-horizon. |
 | Book tiers (`book_tiers`) | see §1 (`WATCH_SHARE` 0.30). New accounts: `new_account_swing` = sd of monthly money in (opening month dropped), top 10% (`NEW_SWING_SHARE`) of accounts with 3–11 months (`NEW_MIN_MONTHS`). |
 | Survival (`survival_cohort`, `survival_curves`, `when_overdraft`) | time to first overdraft for never-overdrawn customers, 24 months, groups riskiest 10% / next 20% / rest; per-customer "When?" uses the cohort scored 2 years before the as-of month (`survival_score_month`: no lookahead). |
+| Customers like this (`like_cohort`, `like_this`) | The 100 nearest never-overdrawn customers a year earlier (trough rank, log balance, swings in money in) and what happened next; pool = the December whose next year is over at the view date (no lookahead); descriptive, not a probability. |
+| For the bank (`bank_case`, `pilot_sample_size`; `evidence.json -> capacity`) | The measured flag-size trade-off (2% to 30% flagged: first overdrafts caught, customers called per catch, 2024 and 2025 pooled) scaled to the bank's book; its own cost per call and value of preventing an overdraft give the break-even; a two-proportion sample-size for a half-and-half pilot. Dollar figures are inputs, never assumed. |
+| Data contract and batch scoring (`check_monthly_contract`, `score_book`, `scripts/score_book.py`) | What a bank must supply (`docs/BANK_READINESS.md`), checked before anything is scored; one row per account with tier, trough, haircut. |
 | SQL (`sql/trough.sql`) | the trough as one window query; a test checks identical values and flags to the Python on all accounts. |
 
 ---
@@ -119,7 +122,7 @@ money; `api.py` calls `ui/context.build_context`, the same function Streamlit us
 
 | Screen | Shows |
 |---|---|
-| 01 Who's at risk | headline results; **the whole book** (tiers, actions, tested rates); advisor call list (cause → next step, Time Machine reveal); bank-wide job-loss curve; loan-approval rule; who the riskiest are |
+| 01 Who's at risk | headline results; **customers vs next year's overdrafts bars** (risk concentration at a glance); **For the bank** calculator (flag size, break-even, pilot size; folded); **the whole book** (tiers, actions, tested rates); advisor call list (cause → next step, Time Machine reveal); bank-wide job-loss curve; loan-approval rule; who the riskiest are |
 | 02 Know the customer | 4-step story strip; calibrated risk; trough; both runways; "why they're at risk, and what to do"; advisor assistant (brief, EN/FR message); balance chart; what happened next; loan card (would it have been held) |
 | 03 Stress test | twist card → chips (+ AI/rules disagreement flags) → verdict + drivers → runways → simulated futures → fan chart → exposure profile (risk teams) → judge check |
 | 04 Make a plan | first action; no-risk steps first with real costs; cushion backtest; cuts; backup levers; milestones; AI plan |
@@ -128,7 +131,7 @@ money; `api.py` calls `ui/context.build_context`, the same function Streamlit us
 **Pitch mode** (top bar): five guided steps; Demo account 93172 at Dec 2024.
 
 API: `GET /api/health, /api/accounts, /api/customer/{acct}?asof, /api/watchlist?asof, /api/book?asof, /api/evidence`;
-`POST /api/shock/{acct}, /api/plan/{acct}, /api/write-plan, /api/ai/brief/{acct}, /api/ai/message/{acct}?lang, /api/twist, /api/portfolio`.
+`POST /api/bank-case`, `GET /api/watchlist.csv?asof`; `POST /api/shock/{acct}, /api/plan/{acct}, /api/write-plan, /api/ai/brief/{acct}, /api/ai/message/{acct}?lang, /api/twist, /api/portfolio`.
 `asof` must match `202[0-5]-MM`.
 
 ---

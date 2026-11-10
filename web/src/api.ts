@@ -53,10 +53,10 @@ export interface PlanRes {
 }
 export interface WatchRow { account_id: number; ltr: number; ltr_pct_rank: number | null; min_balance: number; avg_balance: number;
   realistic_runway_ei: number; answer_key_runway_ei: number; reasons: string; overdraft_next_12m?: boolean | null;
-  cause?: string | null; action?: string | null; cause_code?: string | null }
+  cause?: string | null; action?: string | null; cause_code?: string | null; trend?: [number, number][] | null }
 export interface Watch { asof: string | null; n_in_view: number; rows: WatchRow[]; reveal?: { top_hit: number; base_rate: number }; calls?: Record<string, number> }
 export interface BookTier { tier: "overdrawn" | "act" | "new_hot" | "watch" | "stable" | "new"; label: string; action: string; customers: number;
-  tested_rate: number | null; tested_share_of_overdrafts: number | null }
+  customer_share: number; tested_rate: number | null; tested_share_of_overdrafts: number | null }
 export interface Book { asof: string | null; customers: number; tiers: BookTier[]; act_causes: Record<string, number>; tested_on: string | null;
   summary: { focus_customers: number; focus_customer_share: number; stable_customer_share: number;
     tested_focus_customer_share: number | null; tested_focus_overdraft_share: number | null; tested_stable_rate: number | null } }
@@ -64,6 +64,11 @@ export interface Twist { settings: Scenario; source: string; disagree: string[];
 // evidence.json is large; screens read the fields they need.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Evidence = any;
+
+export interface BankCaseRow { flag_share: number; calls_per_year: number; catches_per_year: number; catch_share: number; calls_per_catch: number; precision: number }
+export interface BankCaseReq { customers: number; flag_share: number; cost_per_call: number | null; value_per_prevented: number | null; prevent_rate: number; relative_reduction: number }
+export interface BankCase { years: string[]; customers: number; rows: BankCaseRow[]; chosen: BankCaseRow; cost?: number; break_even_value_per_prevented?: number;
+  value?: number; net?: number; pilot: { relative_reduction: number; control_rate: number; per_arm: number; total: number; years_of_flags: number | null } }
 
 async function call<T>(path: string, body?: unknown): Promise<T> {
   const r = await fetch(path, body === undefined ? undefined
@@ -90,6 +95,7 @@ export const api = {
   book: (asof: Asof) => call<Book>(`/api/book${q(asof)}`),
   portfolio: (scenario: Scenario) => call<{ month: number; standard: number; realistic: number }[]>("/api/portfolio", { scenario }),
   evidence: () => call<Evidence>("/api/evidence"),
+  bankCase: (r: BankCaseReq) => call<BankCase>("/api/bank-case", r),
 };
 
 // ---- formatting only (no arithmetic on money beyond display rounding) ----

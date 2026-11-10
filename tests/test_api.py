@@ -209,3 +209,25 @@ def test_customers_like_this_on_the_customer_screen():
     assert like["share"] > like["base_rate"] and len(like["examples"]) == 5
     assert client.get("/api/customer/51816", params={"asof": "2024-12"}).json()["like"] is None   # already overdrawn: not a first-overdraft comparison
     assert client.get("/api/customer/21284", params={"asof": "2024-12"}).json()["like"] is None   # too new to rank
+
+
+def test_bank_case_endpoint():
+    r = client.post("/api/bank-case", json={"customers": 100000, "flag_share": 0.05, "cost_per_call": 12, "value_per_prevented": 150, "prevent_rate": 0.3})
+    assert r.status_code == 200
+    b = r.json()
+    assert [x["flag_share"] for x in b["rows"]] == [0.02, 0.05, 0.1, 0.2, 0.3] and b["chosen"]["flag_share"] == 0.05
+    assert b["cost"] == pytest.approx(b["chosen"]["calls_per_year"] * 12) and "net" in b and b["pilot"]["total"] > 0
+    only_measured = client.post("/api/bank-case", json={"flag_share": 0.10}).json()
+    assert "cost" not in only_measured and only_measured["chosen"]["calls_per_catch"] == pytest.approx(10.6, abs=0.8)   # ~10 calls per catch at a 10% flag
+    assert client.post("/api/bank-case", json={"flag_share": 0.07}).status_code == 422
+    assert client.post("/api/bank-case", json={"prevent_rate": 0}).status_code == 422
+
+
+def test_call_list_rows_carry_a_12_month_trend_and_book_rows_a_customer_share():
+    w = client.get("/api/watchlist", params={"asof": "2024-12"}).json()["rows"]
+    row = next(r for r in w if r["account_id"] == 93172)
+    assert len(row["trend"]) == 12 and all(len(p) == 2 and p[0] <= p[1] + 1 for p in row["trend"])   # [lowest, average] per month, lowest never above the average
+    assert min(p[0] for p in row["trend"][-6:]) == pytest.approx(row["min_balance"], abs=1)       # the sparkline agrees with the row's own lowest balance ($238)
+    b = client.get("/api/book", params={"asof": "2024-12"}).json()
+    assert sum(t["customer_share"] for t in b["tiers"]) == pytest.approx(1.0)
+    assert all(t["tested_share_of_overdrafts"] is None or 0 <= t["tested_share_of_overdrafts"] <= 1 for t in b["tiers"])
